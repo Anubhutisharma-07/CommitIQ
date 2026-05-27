@@ -57,10 +57,10 @@ async def _execute_statement(conn, statement: str) -> None:
 
 async def init_db():
     """Initialize database schema for local SQLite and hosted Postgres."""
+    from backend.shared import models  # noqa: F401
+
     async with engine.begin() as conn:
         if not _IS_SQLITE:
-            from backend.shared import models  # noqa: F401
-
             await conn.run_sync(Base.metadata.create_all)
             print("Database schema initialized.")
             return
@@ -68,6 +68,7 @@ async def init_db():
         await conn.execute(text("PRAGMA journal_mode=WAL"))
         await conn.execute(text("PRAGMA synchronous=NORMAL"))
         await conn.execute(text("PRAGMA foreign_keys=ON"))
+        await conn.run_sync(Base.metadata.create_all)
 
         for migration_path in sorted(_migrations_dir().glob("*.sql")):
             migration_lines = migration_path.read_text(encoding="utf-8").splitlines()

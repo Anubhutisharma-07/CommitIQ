@@ -1,15 +1,15 @@
-# .gitignore
 __pycache__/
 *.pyc
 venv/
-# .env
-# .env.local
-# asdf
-commitiq.db
-commitiq.db-shm
-commitiq.db-wal
-/tmp/commitiq_repos/
+.venv/
+.env
+.env.local
+*.db
+*.db-shm
+*.db-wal
+commitiq_repos/
 node_modules/
 dist/
+*.tsbuildinfo
 .DS_Store
 *.log
