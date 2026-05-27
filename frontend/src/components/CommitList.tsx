@@ -1,0 +1,87 @@
+import { Link } from 'react-router-dom'
+import type { CommitListProps } from '../types'
+import { formatSha, getHealthColor } from '../types'
+import { GitCommit, ExternalLink } from 'lucide-react'
+
+export function CommitList({ commits, repoSlug, selectedSha, onSelect }: CommitListProps) {
+  const recent = [...commits].reverse().slice(0, 30)
+
+  if (recent.length === 0) {
+    return (
+      <div className="px-6 py-6 text-slate-500 text-xs font-medium flex flex-col items-center justify-center gap-2">
+        <GitCommit className="w-6 h-6 text-slate-600 animate-pulse" />
+        <span>No analyzed commits found</span>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col h-full space-y-3 relative">
+      <div className="px-5 flex items-center gap-2">
+        <GitCommit className="w-4 h-4 text-purple-400" />
+        <h3 className="font-head text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+          Snapshots Analyzed
+        </h3>
+      </div>
+
+      <div className="overflow-y-auto flex-1 max-h-[400px] pr-1 space-y-1.5 scrollbar-thin">
+        {recent.map((commit) => {
+          const isSelected = selectedSha === commit.sha
+          const healthColor = getHealthColor(commit.health_score)
+
+          return (
+            <div 
+              key={commit.sha} 
+              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl border transition-all duration-200 group relative ${
+                isSelected 
+                  ? 'bg-white/[0.06] border-purple-500/35 shadow-lg shadow-purple-500/5' 
+                  : 'bg-white/[0.02] border-white/5 hover:bg-white/[0.04] hover:border-white/10'
+              }`}
+            >
+              {isSelected && (
+                <span className="absolute left-1.5 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-purple-400 shadow-[0_0_8px_rgba(168,85,247,0.7)]" />
+              )}
+
+              <button 
+                onClick={() => onSelect(commit)} 
+                className="flex-1 min-w-0 flex items-center gap-3 text-left focus:outline-none"
+              >
+                <span 
+                  className={`font-mono text-[10px] font-bold px-2 py-0.5 rounded-md border ${
+                    isSelected 
+                      ? 'text-purple-300 bg-purple-500/10 border-purple-500/15' 
+                      : 'text-slate-400 bg-white/5 border-white/5 group-hover:text-slate-300'
+                  }`}
+                >
+                  {formatSha(commit.sha)}
+                </span>
+                
+                <span className="flex-1 text-slate-300 text-xs truncate font-medium group-hover:text-white transition-colors pr-1">
+                  {commit.message || 'No commit message'}
+                </span>
+                
+                <span 
+                  className="font-mono text-xs font-extrabold flex-shrink-0 px-2 py-0.5 rounded-md"
+                  style={{ 
+                    color: healthColor,
+                    backgroundColor: `${healthColor}12`
+                  }}
+                >
+                  {commit.health_score.toFixed(0)}
+                </span>
+              </button>
+
+              <Link 
+                to={`/dashboard/${repoSlug}/commit/${commit.sha}`} 
+                className="text-purple-400 hover:text-white flex-shrink-0 p-1 bg-white/5 hover:bg-purple-500/15 rounded-lg border border-white/5 hover:border-purple-500/15 transition-all"
+                title="Open Focus Snapshot Details"
+              >
+                <ExternalLink className="w-3 h-3" />
+              </Link>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}

@@ -1,0 +1,35 @@
+import os
+from dotenv import load_dotenv
+from pathlib import Path
+
+load_dotenv()
+
+def _normalize_database_url(url: str) -> str:
+    if url.startswith("postgres://"):
+        return url.replace("postgres://", "postgresql+asyncpg://", 1)
+    if url.startswith("postgresql://") and "+asyncpg" not in url:
+        return url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    return url
+
+
+def _parse_csv(value: str) -> list[str]:
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
+ANTHROPIC_API_KEY  = os.getenv("ANTHROPIC_API_KEY", "")
+GEMINI_API_KEY     = os.getenv("GEMINI_API_KEY", "")
+GITHUB_TOKEN       = os.getenv("GITHUB_TOKEN", "")
+DATABASE_URL       = _normalize_database_url(os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./commitiq.db"))
+REPO_STORAGE_PATH  = Path(os.getenv("REPO_STORAGE_PATH", "/tmp/commitiq_repos"))
+MAX_COMMITS        = int(os.getenv("MAX_COMMITS_PER_INGESTION", "500"))
+LLM_MAX_CALLS      = int(os.getenv("LLM_BUDGET_PER_REPO", os.getenv("LLM_MAX_CALLS_PER_REPO", "25")))
+LLM_BUDGET_PER_REPO_USD = float(os.getenv("LLM_BUDGET_PER_REPO_USD", "0.50"))
+ENABLE_SEMANTIC_ANALYSIS = os.getenv("ENABLE_SEMANTIC_ANALYSIS", "true").lower() not in {"0", "false", "no"}
+ENVIRONMENT        = os.getenv("ENVIRONMENT", "development")
+CORS_ORIGINS       = _parse_csv(os.getenv(
+    "CORS_ORIGINS",
+    "http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174,"
+    "http://localhost:5175,http://127.0.0.1:5175,http://localhost:3000,http://127.0.0.1:3000",
+))
+
+REPO_STORAGE_PATH.mkdir(parents=True, exist_ok=True)

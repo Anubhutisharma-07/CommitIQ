@@ -1,0 +1,141 @@
+import subprocess
+from pathlib import Path
+import shutil
+from backend.config import REPO_STORAGE_PATH, GITHUB_TOKEN
+import httpx
+import re
+
+
+def _redact_secret(value: str) -> str:
+    if GITHUB_TOKEN:
+        value = value.replace(GITHUB_TOKEN, "[REDACTED_GITHUB_TOKEN]")
+    return re.sub(r"https://[^@\s]+@github\.com/", "https://[REDACTED]@github.com/", value)
+
+
+def parse_github_url(url: str) -> tuple[str, str]:
+    """Parse GitHub URL or shorthand to ('owner', 'repo')."""
+    s = url.strip()
+    
+    while s.endswith('/') or s.endswith('.git'):
+        if s.endswith('/'):
+            s = s[:-1]
+        elif s.endswith('.git'):
+            s = s[:-4]
+            
+    if s.startswith('https://'):
+        s = s[len('https://'):]
+    elif s.startswith('http://'):
+        s = s[len('http://'):]
+        
+    if s.startswith('www.'):
+        s = s[4:]
+        
+    if s.startswith('github.com/'):
+        s = s[len('github.com/'):]
+        
+    parts = s.split('/')
+    if len(parts) < 2 or not parts[0] or not parts[1]:
+        raise ValueError(f"Cannot parse GitHub URL: {url}. Expected format 'owner/repo' or 'github.com/owner/repo'.")
+        
+    owner = parts[0]
+    repo = parts[1]
+    
+    # Validate owner/repo format to avoid invalid directory names or bad parameters
+    if not re.match(r'^[\w.-]+$', owner) or not re.match(r'^[\w.-]+$', repo):
+        raise ValueError(f"Invalid owner or repository name in URL: {url}")
+        
+    return owner, repo
+
+
+def make_repo_slug(owner: str, repo: str) -> str:
+    slug = f"{owner}-{repo}".lower()
+    slug = re.sub(r'[^a-z0-9\-]', '-', slug)
+    return slug
+
+
+def get_clone_path(repo_id: int) -> Path:
+    return REPO_STORAGE_PATH / str(repo_id)
+
+
+def clone_repo(repo_url: str, repo_id: int, max_commits: int = 150) -> Path:
+    """Shallow clone to local disk. Returns clone path."""
+    target = get_clone_path(repo_id)
+    if target.exists():
+        shutil.rmtree(target)
+    target.mkdir(parents=True, exist_ok=True)
+
+    # Use git clone via HTTPS — never uses GitHub REST API, no rate limits
+    if GITHUB_TOKEN:
+        # This only speeds up clone for large repos — not required for public
+        auth_url = repo_url.replace(
+            'https://github.com/',
+            f'https://{GITHUB_TOKEN}@github.com/'
+        )
+    else:
+        auth_url = repo_url
+
+    result = subprocess.run(
+        [
+            "git", "clone",
+            "--depth", str(max_commits),
+            "--single-branch",
+            auth_url,
+            str(target)
+        ],
+        capture_output=True,
+        text=True,
+        timeout=300,
+    )
+
+    if result.returncode != 0:
+        shutil.rmtree(target, ignore_errors=True)
+        raise RuntimeError(f"git clone failed: {_redact_secret(result.stderr)[:500]}")
+
+    return target
+
+
+def count_available_commits(repo_path: Path) -> int:
+    result = subprocess.run(
+        ["git", "rev-list", "--count", "HEAD"],
+        cwd=repo_path,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    if result.returncode != 0:
+        return 0
+    try:
+        return int(result.stdout.strip())
+    except ValueError:
+        return 0
+
+
+def cleanup_repo(repo_id: int):
+    """Delete cloned repo after ingestion to reclaim disk space."""
+    target = get_clone_path(repo_id)
+    if target.exists():
+        shutil.rmtree(target)
+
+
+async def fetch_github_metadata(owner: str, repo: str) -> dict:
+    """Optional metadata fetch — cosmetic only, skipped on rate limit."""
+    headers = {"Accept": "application/vnd.github+json"}
+    if GITHUB_TOKEN:
+        headers["Authorization"] = f"token {GITHUB_TOKEN}"
+
+    try:
+        async with httpx.AsyncClient(timeout=5) as client:
+            r = await client.get(
+                f"https://api.github.com/repos/{owner}/{repo}",
+                headers=headers
+            )
+            if r.status_code == 200:
+                data = r.json()
+                return {
+                    "github_stars": data.get("stargazers_count"),
+                    "github_language": data.get("language"),
+                    "github_description": data.get("description", "")[:300],
+                }
+    except Exception:
+        pass  # Metadata is cosmetic — never fail ingestion for this
+    return {"github_stars": None, "github_language": None, "github_description": None}
