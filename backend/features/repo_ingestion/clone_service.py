@@ -12,6 +12,12 @@ def _redact_secret(value: str) -> str:
     return re.sub(r"https://[^@\s]+@github\.com/", "https://[REDACTED]@github.com/", value)
 
 
+def _is_valid_github_name(value: str) -> bool:
+    if value in {".", ".."}:
+        return False
+    return bool(re.fullmatch(r"[\w.-]+", value))
+
+
 def parse_github_url(url: str) -> tuple[str, str]:
     """Parse GitHub URL or shorthand to ('owner', 'repo')."""
     s = url.strip()
@@ -22,16 +28,22 @@ def parse_github_url(url: str) -> tuple[str, str]:
         elif s.endswith('.git'):
             s = s[:-4]
             
+    explicit_host = False
+
     if s.startswith('https://'):
         s = s[len('https://'):]
+        explicit_host = True
     elif s.startswith('http://'):
         s = s[len('http://'):]
+        explicit_host = True
         
     if s.startswith('www.'):
         s = s[4:]
         
     if s.startswith('github.com/'):
         s = s[len('github.com/'):]
+    elif explicit_host:
+        raise ValueError(f"Cannot parse GitHub URL: {url}. Expected a github.com repository URL.")
         
     parts = s.split('/')
     if len(parts) < 2 or not parts[0] or not parts[1]:
@@ -41,7 +53,7 @@ def parse_github_url(url: str) -> tuple[str, str]:
     repo = parts[1]
     
     # Validate owner/repo format to avoid invalid directory names or bad parameters
-    if not re.match(r'^[\w.-]+$', owner) or not re.match(r'^[\w.-]+$', repo):
+    if not _is_valid_github_name(owner) or not _is_valid_github_name(repo):
         raise ValueError(f"Invalid owner or repository name in URL: {url}")
         
     return owner, repo

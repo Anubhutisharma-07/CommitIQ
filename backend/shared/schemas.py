@@ -1,3 +1,4 @@
+import re
 from datetime import datetime
 from typing import Literal
 
@@ -29,10 +30,30 @@ class IngestRequest(BaseModel):
         if not value:
             raise ValueError("Repository URL is required")
         if value.startswith("https://github.com/") or value.startswith("http://github.com/"):
-            return value.replace("http://github.com/", "https://github.com/")
+            normalized = value.replace("http://github.com/", "https://github.com/")
+            path = normalized.removeprefix("https://github.com/")
+            while path.endswith("/") or path.endswith(".git"):
+                path = path[:-1] if path.endswith("/") else path[:-4]
+            parts = path.split("/")
+            name_pattern = re.compile(r"^[\w.-]+$")
+            if (
+                len(parts) == 2
+                and all(part and part not in {".", ".."} for part in parts)
+                and all(name_pattern.fullmatch(part) for part in parts)
+            ):
+                return normalized
+            raise ValueError("Must be a GitHub URL or owner/repo path")
         if "/" in value and not value.startswith("http"):
             owner, repo = value.split("/", 1)
-            if owner and repo:
+            name_pattern = re.compile(r"^[\w.-]+$")
+            if (
+                owner
+                and repo
+                and owner not in {".", ".."}
+                and repo not in {".", ".."}
+                and name_pattern.fullmatch(owner)
+                and name_pattern.fullmatch(repo)
+            ):
                 return f"https://github.com/{owner}/{repo}"
         raise ValueError("Must be a GitHub URL or owner/repo path")
 

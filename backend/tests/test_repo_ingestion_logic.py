@@ -1,0 +1,147 @@
+import json
+
+import pytest
+from pydantic import ValidationError
+
+from backend.features.repo_ingestion.bus_factor import is_code_file
+from backend.features.repo_ingestion.clone_service import make_repo_slug, parse_github_url
+from backend.features.repo_ingestion.graph_builder import (
+    extract_js_imports,
+    extract_python_imports,
+    resolve_import_to_file,
+)
+from backend.features.repo_ingestion.health_scorer import compute_full_snapshot
+from backend.shared.schemas import IngestRequest
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("owner/repo", ("owner", "repo")),
+        ("https://github.com/owner/repo", ("owner", "repo")),
+        ("http://github.com/owner/repo.git/", ("owner", "repo")),
+        ("www.github.com/owner/repo", ("owner", "repo")),
+    ],
+)
+def test_parse_github_url_accepts_supported_forms(raw, expected):
+    assert parse_github_url(raw) == expected
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "",
+        "github.com/owner",
+        "https://gitlab.com/owner/repo",
+        "owner/repo;rm",
+        "owner/../repo",
+    ],
+)
+def test_parse_github_url_rejects_invalid_or_unsafe_forms(raw):
+    with pytest.raises(ValueError):
+        parse_github_url(raw)
+
+
+def test_make_repo_slug_is_stable_and_filesystem_safe():
+    assert make_repo_slug("Open-AI", "Repo.Name") == "open-ai-repo-name"
+
+
+def test_ingest_request_normalizes_shorthand_and_http_github_url():
+    assert IngestRequest(repo_url="owner/repo").repo_url == "https://github.com/owner/repo"
+    assert (
+        IngestRequest(repo_url="http://github.com/owner/repo").repo_url
+        == "https://github.com/owner/repo"
+    )
+
+
+def test_ingest_request_rejects_non_github_urls():
+    for raw in (
+        "https://example.com/owner/repo",
+        "https://github.com/owner/../repo",
+        "owner/../repo",
+        "https://github.com/owner/repo/tree/main",
+    ):
+        with pytest.raises(ValidationError):
+            IngestRequest(repo_url=raw)
+
+
+def test_import_extractors_and_resolver_cover_common_python_and_ts_patterns():
+    python_imports = extract_python_imports(
+        "import os\nfrom package.module import Thing\nfrom .local import helper\n"
+    )
+    assert "os" in python_imports
+    assert "package.module" in python_imports
+
+    js_imports = extract_js_imports(
+        """
+        import type { User } from './types'
+        export { Button } from './Button'
+        import './polyfill'
+        const mod = require('../lib/mod')
+        const lazy = import('./lazy')
+        """
+    )
+    assert js_imports == ["./types", "./Button", "./polyfill", "../lib/mod", "./lazy"]
+
+    files = [
+        "src/App.tsx",
+        "src/types.ts",
+        "src/Button/index.ts",
+        "src/lazy.ts",
+        "lib/mod.ts",
+    ]
+    assert resolve_import_to_file("./types", "src/App.tsx", files) == "src/types.ts"
+    assert resolve_import_to_file("./Button", "src/App.tsx", files) == "src/Button/index.ts"
+    assert resolve_import_to_file("../lib/mod", "src/App.tsx", files) == "lib/mod.ts"
+
+
+def test_bus_factor_file_filter_keeps_code_and_ignores_docs_configs():
+    assert is_code_file("src/api/router.py")
+    assert is_code_file("frontend/src/App.tsx")
+    assert not is_code_file("README.md")
+    assert not is_code_file(".github/workflows/ci.yml")
+    assert not is_code_file("package.json")
+
+
+def test_compute_full_snapshot_aggregates_metric_and_semantic_inputs():
+    commit_data = {
+        "full_sha": "abc123",
+        "insertions": 10,
+        "deletions": 5,
+        "files_list": ["src/high.py", "src/low.py"],
+    }
+    file_metrics = {
+        "src/high.py": {"avg_complexity": 8.0, "max_complexity": 12.0, "loc": 120},
+        "src/low.py": {"avg_complexity": 2.0, "max_complexity": 3.0, "loc": 40},
+        "__semantic_health__": {
+            "avg_semantic_drift": 0.25,
+            "semantic_health_score": 75.0,
+            "high_drift_files": 1,
+            "semantic_drift_method": "fallback_levenshtein",
+        },
+    }
+
+    snapshot = compute_full_snapshot(
+        commit_data=commit_data,
+        file_metrics_map=file_metrics,
+        bus_factor_min=2,
+        prev_health=60.0,
+        prev_avg_complexity=4.0,
+        dependency_density=0.5,
+        has_cycles=True,
+        hotspot_files=["src/high.py"],
+    )
+
+    assert snapshot["full_sha"] == "abc123"
+    assert snapshot["avg_complexity"] == 5.0
+    assert snapshot["max_complexity"] == 12.0
+    assert snapshot["total_loc"] == 160
+    assert snapshot["bus_factor_min"] == 2
+    assert snapshot["has_cycles"] is True
+    assert snapshot["hotspot_count"] == 1
+    assert snapshot["avg_semantic_drift"] == 0.25
+    assert snapshot["semantic_health_score"] == 75.0
+    assert snapshot["semantic_drift_method"] == "fallback_levenshtein"
+
+    top_files = json.loads(snapshot["top_files_json"])
+    assert [item["path"] for item in top_files] == ["src/high.py", "src/low.py"]
