@@ -1,5 +1,5 @@
 import { useCallback, useState, useEffect, useRef, useMemo } from 'react'
-import ForceGraph2D from 'react-force-graph-2d'
+import ForceGraph2D, { type ForceGraphMethods } from 'react-force-graph-2d'
 import { forceCollide } from 'd3-force'
 import { 
   Play, 
@@ -23,6 +23,23 @@ import {
 } from 'lucide-react'
 import type { ForceGraphLink, ForceGraphNode, GraphExplorerProps } from '../types'
 
+type NodeSizeMetric = 'loc' | 'churn' | 'coupling' | 'instability' | 'equal'
+
+type RenderNode = ForceGraphNode & {
+  module: string
+  is_entry_point: boolean
+  churn?: number
+  x?: number
+  y?: number
+}
+
+type NodeRef = string | number | { id?: string | number }
+
+type GraphLinkRef = Omit<ForceGraphLink, 'source' | 'target'> & {
+  source: NodeRef
+  target: NodeRef
+}
+
 const HEALTH_COLORS_RGB: Record<string, string> = {
   green: '52, 211, 153',
   yellow: '251, 191, 36',
@@ -31,9 +48,18 @@ const HEALTH_COLORS_RGB: Record<string, string> = {
   neutral: '156, 163, 175',
 }
 
-const getNodeId = (node: any): string => {
+const NODE_SIZE_METRICS = new Set<NodeSizeMetric>(['loc', 'churn', 'coupling', 'instability', 'equal'])
+
+function isNodeSizeMetric(value: string): value is NodeSizeMetric {
+  return NODE_SIZE_METRICS.has(value as NodeSizeMetric)
+}
+
+const getNodeId = (node: unknown): string => {
   if (!node) return ''
-  if (typeof node === 'object') return node.id || ''
+  if (typeof node === 'object' && 'id' in node) {
+    const id = (node as { id?: string | number }).id
+    return id === undefined ? '' : String(id)
+  }
   return String(node)
 }
 
@@ -45,7 +71,7 @@ export function GraphExplorer({ graphData, selectedSha, commits = [], onSelectCo
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const [isLeftSidebarOpen, setIsLeftSidebarOpen] = useState(true)
-  const [nodeSizeMetric, setNodeSizeMetric] = useState<'loc' | 'churn' | 'coupling' | 'instability' | 'equal'>('loc')
+  const [nodeSizeMetric, setNodeSizeMetric] = useState<NodeSizeMetric>('loc')
 
   const [showImports, setShowImports] = useState(true)
   const [showCoChange, setShowCoChange] = useState(true)
@@ -58,14 +84,14 @@ export function GraphExplorer({ graphData, selectedSha, commits = [], onSelectCo
 
   const [isPlaying, setIsPlaying] = useState(false)
   const [playSpeed, setPlaySpeed] = useState(1500)
-  const playIntervalRef = useRef<any>(null)
+  const playIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  // Track root class to support light/dark mode changes dynamically
-  const [isDarkMode, setIsDarkMode] = useState(() => document.documentElement.classList.contains('dark'))
+  // Force a canvas redraw when root theme classes change.
+  const [, setThemeRevision] = useState(0)
 
   useEffect(() => {
     const observer = new MutationObserver(() => {
-      setIsDarkMode(document.documentElement.classList.contains('dark'))
+      setThemeRevision((revision) => revision + 1)
     })
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
     return () => observer.disconnect()
@@ -73,7 +99,7 @@ export function GraphExplorer({ graphData, selectedSha, commits = [], onSelectCo
 
   const containerRef = useRef<HTMLDivElement>(null)
   const wrapperRef = useRef<HTMLDivElement>(null)
-  const graphRef = useRef<any>(null)
+  const graphRef = useRef<ForceGraphMethods | undefined>(undefined)
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 })
 
   useEffect(() => {
@@ -131,7 +157,7 @@ export function GraphExplorer({ graphData, selectedSha, commits = [], onSelectCo
   }, [graphData])
 
   // Memoize nodes to preserve their coordinates (x, y, vx, vy)
-  const nodes = useMemo(() => {
+  const nodes = useMemo<RenderNode[]>(() => {
     if (!graphData) return []
     return graphData.nodes.map((node) => ({
       id: node.id,
@@ -145,7 +171,7 @@ export function GraphExplorer({ graphData, selectedSha, commits = [], onSelectCo
     }))
   }, [graphData])
 
-  const links = useMemo(() => {
+  const links = useMemo<GraphLinkRef[]>(() => {
     if (!graphData) return []
     const filteredEdges = graphData.edges.filter((edge) => (
       (showImports && edge.type === 'import') ||
@@ -160,9 +186,10 @@ export function GraphExplorer({ graphData, selectedSha, commits = [], onSelectCo
   }, [graphData, showImports, showCoChange])
 
   // Helper key to track edge references safely
-  const getEdgeKey = (link: any) => {
-    const s = getNodeId(link.source)
-    const t = getNodeId(link.target)
+  const getEdgeKey = (link: unknown) => {
+    const graphLink = link as GraphLinkRef
+    const s = getNodeId(graphLink.source)
+    const t = getNodeId(graphLink.target)
     return `${s}->${t}`
   }
 
@@ -323,7 +350,7 @@ export function GraphExplorer({ graphData, selectedSha, commits = [], onSelectCo
     return { nodes: matchingNodes, links: matchingLinks }
   }, [nodes, links, selectedModule, selectedRisk, searchQuery])
 
-  const getNodeSize = useCallback((node: any): number => {
+  const getNodeSize = useCallback((node: RenderNode): number => {
     let base = 5
     if (nodeSizeMetric === 'loc') {
       base = Math.sqrt(Math.max(node.loc || 0, 10)) * 0.9 + 2.5
@@ -351,7 +378,7 @@ export function GraphExplorer({ graphData, selectedSha, commits = [], onSelectCo
       const link = graphRef.current.d3Force('link')
       if (link) link.distance(160)
       
-      const collide = forceCollide().radius((node: any) => getNodeSize(node) + 32)
+      const collide = forceCollide<RenderNode>().radius((node) => getNodeSize(node) + 32)
       graphRef.current.d3Force('collide', collide)
     }
     refitPendingRef.current = true
@@ -378,7 +405,7 @@ export function GraphExplorer({ graphData, selectedSha, commits = [], onSelectCo
   }, [filteredGraphData])
 
   const handleFocusNode = useCallback((nodeId: string) => {
-    const canvasNode = nodes.find(n => n.id === nodeId) as any
+    const canvasNode = nodes.find(n => n.id === nodeId)
     if (canvasNode && graphRef.current) {
       graphRef.current.centerAt(canvasNode.x, canvasNode.y, 800)
       graphRef.current.zoom(1.8, 800)
@@ -403,7 +430,7 @@ export function GraphExplorer({ graphData, selectedSha, commits = [], onSelectCo
     }
   }, [isPlaying, commits, selectedSha, playSpeed, onSelectCommit])
 
-  const getNodeColor = useCallback((node: any): string => {
+  const getNodeColor = useCallback((node: RenderNode): string => {
     const focusNodeId = selectedNodeId || hoveredNode
     
     let isFocused = true
@@ -427,7 +454,7 @@ export function GraphExplorer({ graphData, selectedSha, commits = [], onSelectCo
     return `rgba(${baseColor}, ${baseOpacity})`
   }, [hoveredNode, selectedNodeId, links, highlightStability, couplingMetrics])
 
-  const drawNodeCanvas = useCallback((node: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
+  const drawNodeCanvas = useCallback((node: RenderNode, ctx: CanvasRenderingContext2D, globalScale: number) => {
     if (
       !node ||
       node.x === undefined || 
@@ -543,8 +570,8 @@ export function GraphExplorer({ graphData, selectedSha, commits = [], onSelectCo
       
       ctx.fillStyle = 'rgba(10, 11, 16, 0.72)'
       ctx.beginPath()
-      if ((ctx as any).roundRect) {
-        (ctx as any).roundRect(rectX, rectY, rectW, rectH, 6)
+      if (typeof ctx.roundRect === 'function') {
+        ctx.roundRect(rectX, rectY, rectW, rectH, 6)
       } else {
         ctx.rect(rectX, rectY, rectW, rectH)
       }
@@ -559,12 +586,12 @@ export function GraphExplorer({ graphData, selectedSha, commits = [], onSelectCo
       ctx.fillStyle = isFocused ? '#FFFFFF' : '#E2E8F0'
       ctx.fillText(label, node.x, rectY + rectH / 2 + 0.2)
     }
-  }, [getNodeSize, getNodeColor, hoveredNode, selectedNodeId, addedNodeIds, cyclicNodesAndEdges, isDarkMode, highlightCyclic, highlightHotspots, highlightStability, couplingMetrics])
+  }, [getNodeSize, getNodeColor, hoveredNode, selectedNodeId, addedNodeIds, cyclicNodesAndEdges, highlightCyclic, highlightHotspots, couplingMetrics])
 
   const drawBackgroundClusters = useCallback((ctx: CanvasRenderingContext2D, globalScale: number) => {
     if (nodes.length === 0) return
 
-    const moduleGroups = new Map<string, any[]>()
+    const moduleGroups = new Map<string, RenderNode[]>()
     nodes.forEach(node => {
       const parts = node.file.split('/')
       const moduleName = parts.length > 1 ? parts[0] : 'core'
@@ -839,7 +866,10 @@ export function GraphExplorer({ graphData, selectedSha, commits = [], onSelectCo
                   <label className="text-xs text-slate-400 font-medium">Scale Nodes By</label>
                   <select
                     value={nodeSizeMetric}
-                    onChange={(e) => setNodeSizeMetric(e.target.value as any)}
+                    onChange={(e) => {
+                      const value = e.target.value
+                      if (isNodeSizeMetric(value)) setNodeSizeMetric(value)
+                    }}
                     className="w-full px-3 py-2 text-xs bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-purple-500/45 cursor-pointer"
                   >
                     <option value="loc" className="bg-[#181a24]">Complexity (LOC)</option>
@@ -1018,37 +1048,42 @@ export function GraphExplorer({ graphData, selectedSha, commits = [], onSelectCo
               if (highlightCyclic && cyclicNodesAndEdges.edges.has(key)) return 3.0
               return 1.2 + Math.log((link as ForceGraphLink).weight || 1) * 0.6
             }}
-            linkDirectionalParticles={(link: any) => {
-              const key = getEdgeKey(link)
+            linkDirectionalParticles={(link: unknown) => {
+              const graphLink = link as GraphLinkRef
+              const key = getEdgeKey(graphLink)
               const focusNodeId = selectedNodeId || hoveredNode
               if (focusNodeId) {
-                const s = getNodeId(link.source)
-                const t = getNodeId(link.target)
+                const s = getNodeId(graphLink.source)
+                const t = getNodeId(graphLink.target)
                 if (s !== focusNodeId && t !== focusNodeId) return 0
               }
               if (highlightCyclic && cyclicNodesAndEdges.edges.has(key)) return 6
-              return link.type === 'import' ? 3 : 0
+              return graphLink.type === 'import' ? 3 : 0
             }}
-            linkDirectionalParticleSpeed={(link: any) => {
-              return 0.005 + Math.min(link.weight || 1, 10) * 0.001
+            linkDirectionalParticleSpeed={(link: unknown) => {
+              const graphLink = link as GraphLinkRef
+              return 0.005 + Math.min(graphLink.weight || 1, 10) * 0.001
             }}
-            linkDirectionalParticleWidth={(link: any) => {
-              const key = getEdgeKey(link)
+            linkDirectionalParticleWidth={(link: unknown) => {
+              const graphLink = link as GraphLinkRef
+              const key = getEdgeKey(graphLink)
               return highlightCyclic && cyclicNodesAndEdges.edges.has(key) ? 3.0 : 1.8
             }}
-            linkDirectionalParticleColor={(link: any) => {
-              const key = getEdgeKey(link)
+            linkDirectionalParticleColor={(link: unknown) => {
+              const graphLink = link as GraphLinkRef
+              const key = getEdgeKey(graphLink)
               if (highlightCyclic && cyclicNodesAndEdges.edges.has(key)) return '#F59E0B'
               return '#60A5FA'
             }}
-            linkDirectionalArrowLength={(link: any) => {
+            linkDirectionalArrowLength={(link: unknown) => {
+              const graphLink = link as GraphLinkRef
               const focusNodeId = selectedNodeId || hoveredNode
               if (focusNodeId) {
-                const s = getNodeId(link.source)
-                const t = getNodeId(link.target)
+                const s = getNodeId(graphLink.source)
+                const t = getNodeId(graphLink.target)
                 if (s !== focusNodeId && t !== focusNodeId) return 0
               }
-              return link.type === 'import' ? 4.5 : 0
+              return graphLink.type === 'import' ? 4.5 : 0
             }}
             linkDirectionalArrowRelPos={1.0}
             onNodeHover={(node) => setHoveredNode((node as ForceGraphNode | null)?.id || null)}
