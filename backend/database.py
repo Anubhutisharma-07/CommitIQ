@@ -39,8 +39,8 @@ async def _sqlite_columns(conn, table_name: str) -> set[str]:
     return {row[1] for row in result.fetchall()}
 
 
-async def _execute_statement(conn, statement: str) -> None:
-    if not _IS_SQLITE:
+async def _execute_statement(conn, statement: str, *, is_sqlite: bool = _IS_SQLITE) -> None:
+    if not is_sqlite:
         await conn.execute(text(statement))
         return
 
@@ -55,35 +55,84 @@ async def _execute_statement(conn, statement: str) -> None:
     await conn.execute(text(statement))
 
 
+def _migration_statements(migration_sql: str) -> list[str]:
+    migration_lines = migration_sql.splitlines()
+    uncommented_sql = "\n".join(
+        line for line in migration_lines
+        if not line.lstrip().startswith("--")
+    )
+    return [
+        statement.strip()
+        for statement in uncommented_sql.split(";")
+        if statement.strip()
+    ]
+
+
+async def _ensure_migration_table(conn) -> None:
+    await conn.execute(text("""
+        CREATE TABLE IF NOT EXISTS schema_migrations (
+            version VARCHAR(255) PRIMARY KEY,
+            applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """))
+
+
+async def _applied_migrations(conn) -> set[str]:
+    result = await conn.execute(text("SELECT version FROM schema_migrations"))
+    return {row[0] for row in result.fetchall()}
+
+
+async def _record_migration(conn, version: str) -> None:
+    await conn.execute(
+        text("INSERT INTO schema_migrations (version) VALUES (:version)"),
+        {"version": version},
+    )
+
+
+async def apply_sql_migrations(
+    conn,
+    migrations_dir: Path | None = None,
+    *,
+    is_sqlite: bool = _IS_SQLITE,
+) -> list[str]:
+    """Apply checked-in SQL migrations once, in filename order."""
+    migration_root = migrations_dir or _migrations_dir()
+    await _ensure_migration_table(conn)
+
+    if not migration_root.exists():
+        return []
+
+    applied = await _applied_migrations(conn)
+    applied_now: list[str] = []
+
+    for migration_path in sorted(migration_root.glob("*.sql")):
+        version = migration_path.stem
+        if version in applied:
+            continue
+
+        for statement in _migration_statements(migration_path.read_text(encoding="utf-8")):
+            if not is_sqlite and statement.upper().startswith("PRAGMA"):
+                continue
+            await _execute_statement(conn, statement, is_sqlite=is_sqlite)
+
+        await _record_migration(conn, version)
+        applied.add(version)
+        applied_now.append(version)
+
+    return applied_now
+
+
 async def init_db():
     """Initialize database schema for local SQLite and hosted Postgres."""
     from backend.shared import models  # noqa: F401
 
     async with engine.begin() as conn:
-        if not _IS_SQLITE:
-            await conn.run_sync(Base.metadata.create_all)
-            print("Database schema initialized.")
-            return
+        if _IS_SQLITE:
+            await conn.execute(text("PRAGMA journal_mode=WAL"))
+            await conn.execute(text("PRAGMA synchronous=NORMAL"))
+            await conn.execute(text("PRAGMA foreign_keys=ON"))
 
-        await conn.execute(text("PRAGMA journal_mode=WAL"))
-        await conn.execute(text("PRAGMA synchronous=NORMAL"))
-        await conn.execute(text("PRAGMA foreign_keys=ON"))
         await conn.run_sync(Base.metadata.create_all)
+        applied = await apply_sql_migrations(conn)
 
-        for migration_path in sorted(_migrations_dir().glob("*.sql")):
-            migration_lines = migration_path.read_text(encoding="utf-8").splitlines()
-            migration_sql = "\n".join(
-                line for line in migration_lines
-                if not line.lstrip().startswith("--")
-            )
-            statements = [
-                statement.strip()
-                for statement in migration_sql.split(";")
-                if statement.strip()
-            ]
-            for statement in statements:
-                if not _IS_SQLITE and statement.upper().startswith("PRAGMA"):
-                    continue
-                await _execute_statement(conn, statement)
-
-    print("Database migrations applied.")
+    print(f"Database initialized. Applied {len(applied)} migrations.")
