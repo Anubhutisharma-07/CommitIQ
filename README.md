@@ -132,6 +132,11 @@ npm audit --audit-level=moderate
 ```
 
 CI runs backend tests and frontend tests/lint/build on pushes to `main` and pull requests.
+Repository governance checks also run on pushes and pull requests to reject merge
+conflict markers, obvious secrets, and debug output in production code. Pull
+requests additionally validate conventional PR titles, require a PR body, and
+require `PROJECT_BRAIN.md` updates for source, migration, package, or workflow
+changes.
 
 ## Documentation
 

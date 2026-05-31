@@ -1,0 +1,9 @@
+# Default ownership for all repository changes.
+* @eshaanag
+
+# Keep product/architecture brain changes visible to the project owner.
+PROJECT_BRAIN.md @eshaanag
+docs/ @eshaanag
+
+# CI and repository governance changes should be reviewed deliberately.
+.github/ @eshaanag

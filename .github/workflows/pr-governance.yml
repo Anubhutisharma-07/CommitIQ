@@ -1,0 +1,108 @@
+name: Repository Governance
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types:
+      - opened
+      - edited
+      - synchronize
+      - reopened
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  pr-metadata:
+    name: PR Metadata
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate conventional PR title
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          set -euo pipefail
+          pattern='^(feat|fix|test|docs|refactor|chore|ci|perf|build|style|revert)(\([A-Za-z0-9._/-]+\))?: .{10,}$'
+          if [[ ! "$PR_TITLE" =~ $pattern ]]; then
+            echo "PR title must follow conventional format, for example: feat: add dashboard risk reasons"
+            echo "Allowed types: feat, fix, test, docs, refactor, chore, ci, perf, build, style, revert"
+            exit 1
+          fi
+
+      - name: Require PR body
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${PR_BODY//[[:space:]]/}" ]]; then
+            echo "PR body is required. Fill out the summary, verification, risk notes, and documentation sections."
+            exit 1
+          fi
+
+  repository-hygiene:
+    name: Repository Hygiene
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Reject merge conflict markers
+        run: |
+          set -euo pipefail
+          if git grep -nE '^(<<<<<<<|=======|>>>>>>>)' -- ':!frontend/package-lock.json'; then
+            echo "Merge conflict markers found. Resolve them before merging."
+            exit 1
+          fi
+
+      - name: Reject debug output in production code
+        run: |
+          set -euo pipefail
+          if git grep -nE 'console\.log|debugger|print\(' -- \
+            'backend/**/*.py' \
+            'frontend/src/**/*.ts' \
+            'frontend/src/**/*.tsx' \
+            ':!backend/tests/**' \
+            ':!frontend/src/**/*.test.ts' \
+            ':!frontend/src/**/*.test.tsx'; then
+            echo "Debug output found in production code. Remove console.log/debugger/print before merging."
+            exit 1
+          fi
+
+      - name: Reject obvious secrets
+        run: |
+          set -euo pipefail
+          if git grep -nE '(BEGIN (RSA |OPENSSH |EC |DSA )?PRIVATE KEY|ANTHROPIC_API_KEY=sk-|GEMINI_API_KEY=AIza|GITHUB_TOKEN=gh[pousr]_)' -- \
+            ':!frontend/package-lock.json'; then
+            echo "Potential secret found. Remove credentials and rotate any exposed key."
+            exit 1
+          fi
+
+  project-brain:
+    name: Project Brain Updated
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Require PROJECT_BRAIN.md for product or architecture changes
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          changed_files="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")"
+          echo "$changed_files"
+
+          if echo "$changed_files" | grep -Eq '^(backend/|frontend/src/|frontend/package(-lock)?\.json|frontend/vite\.config\.ts|frontend/tsconfig|migrations/|\.github/workflows/)'; then
+            if ! echo "$changed_files" | grep -qx 'PROJECT_BRAIN.md'; then
+              echo "PROJECT_BRAIN.md must be updated when source, migration, package, or workflow behavior changes."
+              exit 1
+            fi
+          fi
