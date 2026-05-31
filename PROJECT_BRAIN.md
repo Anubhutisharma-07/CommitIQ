@@ -62,7 +62,7 @@ Incomplete or fragile:
 - High: npm audit reports 9 frontend dependency vulnerabilities after lockfile generation.
 - High: no migration files despite migration-aware database code.
 - High: demo route no longer depends on missing seeded data; it now starts a bounded `facebook/react` analysis, but a true instant fixture demo is still not available.
-- Medium: production frontend bundle is about 919 kB minified, triggering the configured Vite chunk warning.
+- Medium: route-level code splitting reduced the initial frontend JS chunk to about 168 kB; dashboard and narrative code are now separate chunks.
 - Medium: backend startup uses `print` in database initialization instead of structured logging.
 - Medium: default CORS allows several localhost origins only; production CORS must be explicit.
 - Medium: LLM usage summary counts persisted narratives, not runtime cache-hit events; cache hit metrics are therefore misleading.
@@ -115,13 +115,14 @@ Missing but obviously needed:
 - 2026-05-31: Moved the heavy metrics extractor import into `run_ingestion` so read-only API route imports do not require analysis dependencies such as `lizard` unless ingestion actually runs.
 - 2026-05-31: Added landing-page route smoke coverage for invalid repo input, shorthand submission normalization, full GitHub URL normalization, and commit-limit submission.
 - 2026-05-31: Replaced the broken `/demo` seed-data dependency with a bounded `facebook/react` analysis flow and added tests for success/error behavior.
+- 2026-05-31: Added route-level lazy loading so graph/dashboard dependencies are no longer part of the first-load bundle.
 
 ## Test coverage status
 - Backend unit tests: initial pure-logic coverage exists for repo URL parsing/validation, max-commit cap validation, slug generation, import extraction/resolution, bus-factor file filtering, health snapshot aggregation, LLM cache keys, provider mapping, cost estimation, and prompt builders.
 - Backend integration/API tests: database-backed coverage exists for repo listing/lookup, timeline payloads, graph payloads, bus factor payloads, LLM usage payloads, and commit detail composition.
 - Frontend unit/component tests: Vitest coverage exists for health status/formatting helpers, `HealthBadge`, and `streamNarrative` success/error parsing.
 - Frontend route/smoke tests: landing-page repository validation/submission coverage and demo-page bounded-analysis coverage exist with mocked API calls.
-- Local quality gates: `python -m pytest`, `npm run test`, `npm run lint`, and `npm run build` pass as of 2026-05-31. `npm run test` emits Vite React plugin deprecation warnings; `npm run build` still emits a chunk-size warning.
+- Local quality gates: `python -m pytest`, `npm run test`, `npm run lint`, and `npm run build` pass as of 2026-05-31. `npm run test` emits Vite React plugin deprecation warnings.
 - CI quality gates: GitHub Actions workflow exists for backend tests and frontend tests/lint/build.
 - Must be tested before shipping: GitHub URL parsing, repo slug generation, cache key generation, cost guard behavior, health scoring, semantic fallback behavior, graph import/co-change generation, bus-factor risk levels, ingestion progress SSE payloads, timeline/graph API responses, narrative streaming parser, and landing/analyze/dashboard user flows.
 
@@ -142,3 +143,5 @@ Missing but obviously needed:
 - `e625d54` test: cover landing repository submission flow. Added landing-page smoke tests and shared Testing Library cleanup for Vitest.
 - `8f16701` docs: update project brain after landing flow tests. Recorded landing-page route coverage and updated frontend route test status.
 - `93e8972` fix: replace missing demo seed path with bounded analysis. Replaced the nonexistent seed-data dependency with a real bounded demo analysis flow and tests.
+- `edf6bcf` docs: update project brain after demo fix. Recorded the demo route fix and updated route test status.
+- `4145e84` perf: split route bundles to reduce initial payload. Added route-level lazy loading and removed the Vite chunk-size warning by splitting dashboard/narrative code out of the initial bundle.
