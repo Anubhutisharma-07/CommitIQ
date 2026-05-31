@@ -31,14 +31,14 @@ Working well:
 Incomplete or fragile:
 - Test runner config, focused backend/frontend tests, a frontend lockfile, and CI quality gates now exist; backend dependency locking is still absent.
 - A tracked SQL migration workflow now exists with `schema_migrations` applied-file tracking, but there are not yet model-changing migration files because the current schema is still bootstrapped from SQLAlchemy metadata.
-- Backend ingestion performs long CPU/disk/network work inside FastAPI `BackgroundTasks`; active duplicate submissions now reuse the existing job, but restarts, cancellation, and production scaling remain fragile.
+- Backend ingestion performs long CPU/disk/network work inside FastAPI `BackgroundTasks`; active duplicate submissions now reuse the existing job and users can request cooperative cancellation, but restarts and production scaling remain fragile.
 - Graph and health metrics are often based only on files changed in each commit, not a stable whole-repo snapshot, so dashboard labels can overstate "codebase" health.
 - Frontend Tailwind tokens now have checked-in PostCSS/Tailwind config, so production builds emit real utility CSS instead of raw `@tailwind` directives.
 - Demo flow now runs live bounded analysis, but still lacks a fast fixture-backed offline demo.
 
 ## User flows (as-is)
 - New analysis: user opens `/`, enters a GitHub URL or `owner/repo`, optionally sets max commits, submits, then lands on `/analyze?repo_id=...`.
-- Ingestion progress: `/analyze` opens an EventSource to `/api/repos/ingest/progress/{repo_id}`, displays clone/analyze/bus-factor/finalize progress, then redirects to `/dashboard/{repo_slug}` when ready.
+- Ingestion progress: `/analyze` opens an EventSource to `/api/repos/ingest/progress/{repo_id}`, displays clone/analyze/bus-factor/finalize progress, allows cancellation through `/api/repos/ingest/cancel/{repo_id}`, then redirects to `/dashboard/{repo_slug}` when ready.
 - Dashboard: user views latest health score, commit timeline, recent commit list, selected commit metrics, graph explorer, bus factor table, hotspot map, and LLM cost meter.
 - Commit selection: user can select commits from the timeline/list or step through graph playback. Commit detail route shows metadata, metrics, graph, structural diff vs previous commit, and narrative controls.
 - Narrative generation: user clicks the narrative card, frontend streams generated chunks, then displays provider/cache/cost metadata.
@@ -47,7 +47,7 @@ Incomplete or fragile:
 ## Identified problems (root causes, not symptoms)
 - Missing verification foundation: no unit/integration/e2e tests means changes to parsers, scoring, ingestion, or UI flows cannot be made safely.
 - Missing dependency reproducibility: no `package-lock.json`, `requirements` pins, or lock tooling means installs can drift and break builds.
-- No production ingestion boundary: FastAPI background tasks are not a durable job system. Active job reuse now prevents duplicate submissions, but long repo analysis is still tied to a web worker process lifecycle.
+- No production ingestion boundary: FastAPI background tasks are not a durable job system. Active job reuse and cooperative cancellation reduce user-facing harm, but long repo analysis is still tied to a web worker process lifecycle.
 - Schema evolution gap: the project now has a tracked SQL migration runner, but future model changes still need explicit migration files and review discipline.
 - Metric contract ambiguity: names like "codebase health" are presented broadly, but many calculations operate on commit-touched files and shallow clone data.
 - Semantic analysis default risk: `ENABLE_SEMANTIC_ANALYSIS` defaults to true, which can trigger large model downloads/imports unless optional ML dependencies and cache strategy are deliberately configured.
@@ -83,7 +83,7 @@ Missing but obviously needed:
 - Test infrastructure and focused tests for URL parsing, cache keys, cost guard, scoring, graph import resolution, bus-factor classification, API validation, and frontend ingest/dashboard flows.
 - Lockfiles or pinned dependency management.
 - CI running backend tests, frontend typecheck/build/lint, and secret/debug scans.
-- Durable job processing or at least safer ingestion state management with cancellation/retry.
+- Durable job processing or at least safer ingestion state management with retry and stronger cancellation semantics around long-running subprocesses.
 - Documented seed/demo path.
 - Production deployment configuration and environment docs.
 
@@ -122,14 +122,15 @@ Missing but obviously needed:
 - 2026-05-31: Changed the frontend API default from a hardcoded localhost origin to same-origin `/api`, because deployed builds should not assume a local backend and local development can be handled by the Vite proxy.
 - 2026-05-31: Made ingestion submissions idempotent while a job is active and scheduled background work by explicit job id, because duplicate clicks/retries should not create races or attach work to the wrong latest job.
 - 2026-05-31: Replaced the remaining backend startup `print` with structured logger metadata so production logs can be routed consistently.
+- 2026-05-31: Added cooperative ingestion cancellation and exposed it from the progress page, because users need a way to stop expensive analyses even before a durable worker queue exists.
 
 ## Test coverage status
 - Backend unit tests: initial pure-logic coverage exists for repo URL parsing/validation, max-commit cap validation, slug generation, import extraction/resolution, bus-factor file filtering, health snapshot aggregation, LLM cache keys, provider mapping, cost estimation, and prompt builders.
-- Backend integration/API tests: database-backed coverage exists for repo listing/lookup, timeline payloads, graph payloads, bus factor payloads, LLM usage payloads, commit detail composition, active ingestion job reuse, and background job scheduling arguments.
+- Backend integration/API tests: database-backed coverage exists for repo listing/lookup, timeline payloads, graph payloads, bus factor payloads, LLM usage payloads, commit detail composition, active ingestion job reuse, background job scheduling arguments, and ingestion cancellation.
 - Backend migration tests: coverage exists for sorted SQL migration application, applied-file tracking, skip-on-reapply behavior, and SQLite duplicate-column protection.
 - Frontend unit/component tests: Vitest coverage exists for health status/formatting helpers, `HealthBadge`, and `streamNarrative` success/error parsing, including same-origin `/api` stream URL behavior.
-- Frontend route/smoke tests: landing-page repository validation/submission coverage and demo-page bounded-analysis coverage exist with mocked API calls.
-- Local quality gates: `python -m pytest` (28 tests), `npm run test` (12 tests), `npm run lint`, `npm run build`, and `npm audit --audit-level=moderate` pass as of 2026-05-31.
+- Frontend route/smoke tests: landing-page repository validation/submission coverage, analyze-page cancellation/completion coverage, and demo-page bounded-analysis coverage exist with mocked API calls.
+- Local quality gates: `python -m pytest` (30 tests), `npm run test` (14 tests), `npm run lint`, `npm run build`, and `npm audit --audit-level=moderate` pass as of 2026-05-31.
 - CI quality gates: GitHub Actions workflow exists for backend tests and frontend tests/lint/build.
 - Must be tested before shipping: GitHub URL parsing, repo slug generation, cache key generation, cost guard behavior, health scoring, semantic fallback behavior, graph import/co-change generation, bus-factor risk levels, ingestion progress SSE payloads, timeline/graph API responses, narrative streaming parser, and landing/analyze/dashboard user flows.
 
@@ -162,3 +163,5 @@ Missing but obviously needed:
 - `b8d53a9` fix: make ingestion submissions reuse active jobs. Returned the existing active ingestion job for duplicate submissions and scheduled background work with an explicit job id to avoid latest-job races.
 - `691bbc1` docs: update project brain after ingestion job reuse. Recorded the active-job reuse decision, updated ingestion risk notes, and bumped backend test count.
 - `df6b1da` chore: use structured logging for database startup. Replaced the last backend startup `print` with module logger metadata after verifying no backend prints remain.
+- `7a62f1a` docs: update project brain after database logging. Recorded the database logging decision and updated observability risk notes.
+- `b57ce4c` feat: support cancelling active ingestion jobs. Added a cancel endpoint, cooperative cancellation checks during ingestion, a progress-page cancel action, and backend/frontend tests for cancellation behavior.
