@@ -17,6 +17,7 @@ from backend.features.repo_ingestion.graph_builder import (
     resolve_import_to_file,
 )
 from backend.features.repo_ingestion.health_scorer import compute_full_snapshot
+from backend.features.repo_ingestion import semantic_analyzer
 from backend.shared.schemas import IngestRequest
 
 
@@ -135,6 +136,21 @@ def test_bus_factor_file_filter_keeps_code_and_ignores_docs_configs():
     assert not is_code_file("README.md")
     assert not is_code_file(".github/workflows/ci.yml")
     assert not is_code_file("package.json")
+
+
+def test_semantic_drift_uses_fallback_without_graphcodebert(monkeypatch):
+    def fail_if_model_loads():
+        raise AssertionError("GraphCodeBERT should not load unless explicitly enabled")
+
+    monkeypatch.setattr(semantic_analyzer, "ENABLE_SEMANTIC_ANALYSIS", True)
+    monkeypatch.setattr(semantic_analyzer, "ENABLE_GRAPHCODEBERT", False)
+    monkeypatch.setattr(semantic_analyzer, "_load_model", fail_if_model_loads)
+
+    result = semantic_analyzer.compute_semantic_drift("def value():\n    return 1\n", "def value():\n    return 2\n")
+
+    assert result["method"] == "fallback_levenshtein"
+    assert result["model"] == "difflib.SequenceMatcher"
+    assert result["semantic_drift_score"] > 0
 
 
 def test_compute_full_snapshot_aggregates_metric_and_semantic_inputs():

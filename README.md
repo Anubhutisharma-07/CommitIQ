@@ -41,7 +41,8 @@ source .venv/bin/activate
 pip install -r backend/requirements.txt
 ```
 
-For optional GraphCodeBERT semantic analysis:
+Semantic drift uses a lightweight difflib fallback by default. For optional
+GraphCodeBERT embeddings, install the ML extras and set `ENABLE_GRAPHCODEBERT=true`:
 
 ```bash
 pip install -r backend/requirements-ml.txt
@@ -73,12 +74,17 @@ CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
 REPO_STORAGE_PATH=/tmp/commitiq_repos
 LLM_MAX_CALLS=25
 MAX_COMMITS=150
+ENABLE_SEMANTIC_ANALYSIS=true
+ENABLE_GRAPHCODEBERT=false
 GITHUB_TOKEN=your_github_token_here
 ANTHROPIC_API_KEY=your_anthropic_api_key_here
 GEMINI_API_KEY=your_gemini_api_key_here
 ```
 
 Set `ENVIRONMENT=production` in deployed environments and provide the exact browser origins allowed to call the API in `CORS_ORIGINS`.
+Set `ENABLE_SEMANTIC_ANALYSIS=false` to disable semantic drift entirely. Keep
+`ENABLE_GRAPHCODEBERT=false` unless the ML dependencies are installed and model
+downloads/caching are intentional.
 
 Frontend variables live in `frontend/.env`:
 

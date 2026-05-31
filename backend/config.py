@@ -16,6 +16,12 @@ def _parse_csv(value: str) -> list[str]:
     return [item.strip() for item in value.split(",") if item.strip()]
 
 
+def _parse_bool(value: str | None, default: bool = False) -> bool:
+    if value is None:
+        return default
+    return value.strip().lower() not in {"", "0", "false", "no", "off"}
+
+
 DEFAULT_LOCAL_CORS_ORIGINS = (
     "http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174,"
     "http://localhost:5175,http://127.0.0.1:5175,http://localhost:3000,http://127.0.0.1:3000"
@@ -38,7 +44,8 @@ REPO_STORAGE_PATH  = Path(os.getenv("REPO_STORAGE_PATH", "/tmp/commitiq_repos"))
 MAX_COMMITS        = int(os.getenv("MAX_COMMITS_PER_INGESTION", os.getenv("MAX_COMMITS", "500")))
 LLM_MAX_CALLS      = int(os.getenv("LLM_BUDGET_PER_REPO", os.getenv("LLM_MAX_CALLS_PER_REPO", os.getenv("LLM_MAX_CALLS", "25"))))
 LLM_BUDGET_PER_REPO_USD = float(os.getenv("LLM_BUDGET_PER_REPO_USD", "0.50"))
-ENABLE_SEMANTIC_ANALYSIS = os.getenv("ENABLE_SEMANTIC_ANALYSIS", "true").lower() not in {"0", "false", "no"}
+ENABLE_SEMANTIC_ANALYSIS = _parse_bool(os.getenv("ENABLE_SEMANTIC_ANALYSIS"), default=True)
+ENABLE_GRAPHCODEBERT = _parse_bool(os.getenv("ENABLE_GRAPHCODEBERT"), default=False)
 ENVIRONMENT        = os.getenv("ENVIRONMENT", "development")
 CORS_ORIGINS       = _cors_origins(ENVIRONMENT, os.getenv("CORS_ORIGINS"))
 

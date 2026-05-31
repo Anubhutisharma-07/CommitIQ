@@ -1,4 +1,4 @@
-from backend.config import _cors_origins, _normalize_database_url, _parse_csv
+from backend.config import _cors_origins, _normalize_database_url, _parse_bool, _parse_csv
 
 
 def test_normalize_database_url_uses_asyncpg_for_postgres_urls():
@@ -12,6 +12,15 @@ def test_parse_csv_trims_empty_values():
         "https://app.example.com",
         "https://admin.example.com",
     ]
+
+
+def test_parse_bool_handles_common_env_values():
+    assert _parse_bool(None, default=True) is True
+    assert _parse_bool(None, default=False) is False
+    assert _parse_bool("true") is True
+    assert _parse_bool("1") is True
+    assert _parse_bool("off") is False
+    assert _parse_bool(" no ") is False
 
 
 def test_cors_origins_use_local_defaults_outside_production():

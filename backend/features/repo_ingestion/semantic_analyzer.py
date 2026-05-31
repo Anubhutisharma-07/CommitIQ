@@ -14,7 +14,7 @@ import math
 from pathlib import Path
 from typing import Optional
 
-from backend.config import ENABLE_SEMANTIC_ANALYSIS
+from backend.config import ENABLE_GRAPHCODEBERT, ENABLE_SEMANTIC_ANALYSIS
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,7 @@ _model_attempted = False
 def _load_model() -> bool:
     """Load GraphCodeBERT once per ingestion process."""
     global _tokenizer, _model, _model_loaded, _model_attempted
-    if not ENABLE_SEMANTIC_ANALYSIS:
+    if not ENABLE_SEMANTIC_ANALYSIS or not ENABLE_GRAPHCODEBERT:
         return False
     if _model_loaded:
         return True
@@ -77,7 +77,7 @@ def _save_embedding(code: str, embedding: list[float]) -> None:
 
 def get_code_embedding(code: str, max_tokens: int = 512) -> Optional[list[float]]:
     """Return a 768-dim GraphCodeBERT CLS embedding, or None if unavailable."""
-    if not code.strip():
+    if not code.strip() or not ENABLE_SEMANTIC_ANALYSIS or not ENABLE_GRAPHCODEBERT:
         return None
 
     cached = _get_cached_embedding(code)
