@@ -9,7 +9,7 @@ CommitIQ is a full-stack repository health analyzer for GitHub projects. It inge
 - Semantic analysis: difflib fallback enabled by default, optional GraphCodeBERT via transformers and torch only when `ENABLE_GRAPHCODEBERT=true`.
 - LLM layer: Anthropic Claude first, Google Gemini fallback, persisted narrative cache and per-repo cost/call guard.
 - Frontend: React 18, TypeScript, Vite, SWR, axios, Recharts, react-force-graph-2d, d3-force, lucide-react, Tailwind CSS-style utility classes plus custom CSS tokens.
-- Deployment/config: backend `.env.example`, frontend `.env.example`, frontend lockfile, and GitHub Actions CI are checked in; no Dockerfile, backend lockfile, or deployment manifest exists yet.
+- Deployment/config: backend `.env.example`, frontend `.env.example`, frontend lockfile, GitHub Actions CI, contribution/security templates, and GitHub issue/PR templates are checked in; no Dockerfile, backend lockfile, or deployment manifest exists yet.
 
 ## Architecture overview
 - `backend/main.py` creates the FastAPI app, initializes database schema and SQL migrations on lifespan startup, configures CORS, and mounts repo ingestion plus LLM routers under `/api`.
@@ -57,7 +57,7 @@ Incomplete or fragile:
 
 ## Discovered issues
 - Critical: baseline backend and frontend tests now exist, and a Vitest app-flow smoke covers landing-to-dashboard navigation with mocked API/SSE; true browser e2e coverage is still absent.
-- Critical: full browser e2e coverage is still absent, though Vitest route smoke coverage now exists for landing, analyze, demo, dashboard, and app-level landing-to-dashboard flows.
+- Critical: full browser e2e coverage is still absent, though Vitest route smoke coverage now exists for landing, analyze, demo, dashboard, narrative UI, and app-level landing-to-dashboard flows.
 - High: no deployment health gate; CI now exists for tests/lint/build.
 - High: npm audit previously reported 9 frontend dependency vulnerabilities; dependency upgrades now leave `npm audit --audit-level=moderate` clean as of 2026-05-31.
 - High: migration workflow now exists, but no model-changing migration files have been needed or authored yet.
@@ -81,12 +81,13 @@ Half-done:
 - LLM cache exists and usage reporting separates provider, demo, and pre-cached rows, but runtime cache-hit telemetry is not persisted as its own event stream.
 
 Missing but obviously needed:
-- Broader e2e/route coverage for full ingest-to-dashboard behavior, dashboard interactions, narrative UI states, and ingestion progress edge cases.
-- Lockfiles or pinned dependency management.
-- CI running backend tests, frontend typecheck/build/lint, and secret/debug scans.
+- Real-browser e2e coverage for the full ingest-to-dashboard behavior.
+- Backend lockfiles or pinned dependency management.
+- CI secret/debug scans and deployment health checks.
 - Durable job processing or at least safer ingestion state management with retry and stronger cancellation semantics around long-running subprocesses.
 - Documented seed/demo path.
 - Production deployment configuration and environment docs.
+- Productized deeper health metrics with explainable risk reasons, hotspot persistence, ownership entropy, coupling surprise, blast radius, and cycle severity.
 
 ## Improvement plan (prioritised)
 1. Establish verification baseline: add backend pytest setup, frontend test setup, and smoke checks for core user/API flows. This matters because every meaningful improvement touches scoring, ingestion, or UI behavior.
@@ -133,6 +134,7 @@ Missing but obviously needed:
 - 2026-05-31: Added `NarrativeCard` UI state coverage for disabled, streaming, completed metadata, callback error, and request failure paths, because the user-facing LLM flow needs regression coverage beyond the low-level SSE parser.
 - 2026-05-31: Made co-change graph edges count each file pair at most once per commit and emit stable sorted output, because duplicate file entries should not inflate hidden-coupling scores or create self-edges.
 - 2026-05-31: Added ingestion progress SSE edge-case tests for missing jobs, terminal jobs, and active-to-cancelled polling updates, because the analyze page depends on this stream for user-facing progress and recovery states.
+- 2026-05-31: Added professional GitHub repository materials and a deeper repo-health metrics roadmap, because maintainers need contribution/security workflows and the product needs a clear path from raw metrics to explainable risk signals.
 
 ## Test coverage status
 - Backend unit tests: initial pure-logic coverage exists for config parsing/CORS defaults, boolean env parsing, repo URL parsing/validation, max-commit cap validation, slug generation, clone cleanup success/failure, import extraction/resolution, co-change edge generation, top-file frequency, bus-factor file filtering, semantic fallback behavior, health snapshot aggregation, LLM cache keys, provider mapping, cost estimation, usage/budget accounting, and prompt builders.
@@ -193,3 +195,5 @@ Missing but obviously needed:
 - docs: update project brain after co-change graph hardening. Recorded the graph decision, updated backend test counts, and removed co-change generation from the must-test-before-shipping list.
 - `4661e6d` test: cover ingestion progress stream edge cases. Added direct SSE endpoint coverage for missing jobs, terminal ready jobs, and active-to-cancelled polling updates.
 - docs: update project brain after ingestion progress SSE coverage. Recorded the SSE testing decision, updated backend test counts, and narrowed remaining shipping test gaps to real-browser e2e coverage.
+- `a16ecdb` docs: professionalize GitHub project materials. Added contribution, security, issue, pull request, README, and repo-health metrics roadmap documentation.
+- docs: update project brain after GitHub professionalization. Recorded the GitHub hygiene decision and deeper health metrics roadmap.
