@@ -31,7 +31,7 @@ Working well:
 Incomplete or fragile:
 - Test runner config, focused backend/frontend tests, a frontend lockfile, and CI quality gates now exist; backend dependency locking is still absent.
 - A tracked SQL migration workflow now exists with `schema_migrations` applied-file tracking, but there are not yet model-changing migration files because the current schema is still bootstrapped from SQLAlchemy metadata.
-- Backend ingestion performs long CPU/disk/network work inside FastAPI `BackgroundTasks`; this is fragile for restarts, concurrency, cancellation, and production scaling.
+- Backend ingestion performs long CPU/disk/network work inside FastAPI `BackgroundTasks`; active duplicate submissions now reuse the existing job, but restarts, cancellation, and production scaling remain fragile.
 - Graph and health metrics are often based only on files changed in each commit, not a stable whole-repo snapshot, so dashboard labels can overstate "codebase" health.
 - Frontend Tailwind tokens now have checked-in PostCSS/Tailwind config, so production builds emit real utility CSS instead of raw `@tailwind` directives.
 - Demo flow now runs live bounded analysis, but still lacks a fast fixture-backed offline demo.
@@ -47,7 +47,7 @@ Incomplete or fragile:
 ## Identified problems (root causes, not symptoms)
 - Missing verification foundation: no unit/integration/e2e tests means changes to parsers, scoring, ingestion, or UI flows cannot be made safely.
 - Missing dependency reproducibility: no `package-lock.json`, `requirements` pins, or lock tooling means installs can drift and break builds.
-- No production ingestion boundary: FastAPI background tasks are not a durable job system. Long repo analysis should not be tied to a web worker process lifecycle.
+- No production ingestion boundary: FastAPI background tasks are not a durable job system. Active job reuse now prevents duplicate submissions, but long repo analysis is still tied to a web worker process lifecycle.
 - Schema evolution gap: the project now has a tracked SQL migration runner, but future model changes still need explicit migration files and review discipline.
 - Metric contract ambiguity: names like "codebase health" are presented broadly, but many calculations operate on commit-touched files and shallow clone data.
 - Semantic analysis default risk: `ENABLE_SEMANTIC_ANALYSIS` defaults to true, which can trigger large model downloads/imports unless optional ML dependencies and cache strategy are deliberately configured.
@@ -120,14 +120,15 @@ Missing but obviously needed:
 - 2026-05-31: Added explicit Tailwind/PostCSS config after build output showed raw `@tailwind` directives, preserving the app's existing CSS-variable design tokens rather than introducing a new theme.
 - 2026-05-31: Added a lightweight SQL migration runner with `schema_migrations` tracking instead of introducing Alembic immediately, because the app already had a simple SQL migration hook and needed reliable application across SQLite/Postgres first.
 - 2026-05-31: Changed the frontend API default from a hardcoded localhost origin to same-origin `/api`, because deployed builds should not assume a local backend and local development can be handled by the Vite proxy.
+- 2026-05-31: Made ingestion submissions idempotent while a job is active and scheduled background work by explicit job id, because duplicate clicks/retries should not create races or attach work to the wrong latest job.
 
 ## Test coverage status
 - Backend unit tests: initial pure-logic coverage exists for repo URL parsing/validation, max-commit cap validation, slug generation, import extraction/resolution, bus-factor file filtering, health snapshot aggregation, LLM cache keys, provider mapping, cost estimation, and prompt builders.
-- Backend integration/API tests: database-backed coverage exists for repo listing/lookup, timeline payloads, graph payloads, bus factor payloads, LLM usage payloads, and commit detail composition.
+- Backend integration/API tests: database-backed coverage exists for repo listing/lookup, timeline payloads, graph payloads, bus factor payloads, LLM usage payloads, commit detail composition, active ingestion job reuse, and background job scheduling arguments.
 - Backend migration tests: coverage exists for sorted SQL migration application, applied-file tracking, skip-on-reapply behavior, and SQLite duplicate-column protection.
 - Frontend unit/component tests: Vitest coverage exists for health status/formatting helpers, `HealthBadge`, and `streamNarrative` success/error parsing, including same-origin `/api` stream URL behavior.
 - Frontend route/smoke tests: landing-page repository validation/submission coverage and demo-page bounded-analysis coverage exist with mocked API calls.
-- Local quality gates: `python -m pytest` (26 tests), `npm run test` (12 tests), `npm run lint`, `npm run build`, and `npm audit --audit-level=moderate` pass as of 2026-05-31.
+- Local quality gates: `python -m pytest` (28 tests), `npm run test` (12 tests), `npm run lint`, `npm run build`, and `npm audit --audit-level=moderate` pass as of 2026-05-31.
 - CI quality gates: GitHub Actions workflow exists for backend tests and frontend tests/lint/build.
 - Must be tested before shipping: GitHub URL parsing, repo slug generation, cache key generation, cost guard behavior, health scoring, semantic fallback behavior, graph import/co-change generation, bus-factor risk levels, ingestion progress SSE payloads, timeline/graph API responses, narrative streaming parser, and landing/analyze/dashboard user flows.
 
@@ -156,3 +157,5 @@ Missing but obviously needed:
 - `60f4591` feat: add tracked schema migration workflow. Added a reusable SQL migration runner, `schema_migrations` tracking, migration docs, and backend tests for apply/skip/idempotency behavior.
 - `fa27861` docs: update project brain after migration workflow. Recorded the migration-runner decision, migration test coverage, and current schema-evolution risk.
 - `8e43f38` fix: use deploy-safe frontend API base path. Switched frontend API calls to same-origin `/api`, added Vite dev proxy configuration, documented frontend env variables, and tested the stream URL behavior.
+- `ea3106c` docs: update project brain after API config fix. Recorded the deploy-safe frontend API base path decision and current deployment config state.
+- `b8d53a9` fix: make ingestion submissions reuse active jobs. Returned the existing active ingestion job for duplicate submissions and scheduled background work with an explicit job id to avoid latest-job races.
