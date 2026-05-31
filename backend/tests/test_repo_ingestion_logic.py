@@ -3,6 +3,7 @@ import json
 import pytest
 from pydantic import ValidationError
 
+from backend.config import MAX_COMMITS
 from backend.features.repo_ingestion.bus_factor import is_code_file
 from backend.features.repo_ingestion.clone_service import make_repo_slug, parse_github_url
 from backend.features.repo_ingestion.graph_builder import (
@@ -63,6 +64,11 @@ def test_ingest_request_rejects_non_github_urls():
     ):
         with pytest.raises(ValidationError):
             IngestRequest(repo_url=raw)
+
+
+def test_ingest_request_rejects_commit_limits_above_configured_cap():
+    with pytest.raises(ValidationError):
+        IngestRequest(repo_url="owner/repo", max_commits=MAX_COMMITS + 1)
 
 
 def test_import_extractors_and_resolver_cover_common_python_and_ts_patterns():

@@ -2,6 +2,7 @@ import re
 from datetime import datetime
 from typing import Literal
 
+from backend.config import MAX_COMMITS
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
@@ -21,7 +22,7 @@ class ApiError(BaseModel):
 
 class IngestRequest(BaseModel):
     repo_url: str = Field(..., min_length=3, max_length=300)
-    max_commits: int = Field(default=500, ge=1)
+    max_commits: int = Field(default=MAX_COMMITS, ge=1, le=MAX_COMMITS)
 
     @field_validator("repo_url")
     @classmethod

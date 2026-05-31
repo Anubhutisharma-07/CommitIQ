@@ -175,6 +175,7 @@ export default function LandingPage() {
                   onKeyDown={(event) => event.key === 'Enter' && handleSubmit()}
                   placeholder="500"
                   min="1"
+                  max="500"
                   className="w-12 bg-transparent text-white font-mono text-xs outline-none focus:text-purple-300 transition-colors"
                 />
               </div>
