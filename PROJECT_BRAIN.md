@@ -19,7 +19,7 @@ CommitIQ is a full-stack repository health analyzer for GitHub projects. It inge
 - Ingestion clones a shallow single-branch repo, walks commits oldest-to-newest, checks out each commit, extracts file metrics and semantic drift, builds import and co-change graph rows, computes health snapshots, computes bus factor at HEAD, and marks the repo ready/error.
 - The frontend entry is `frontend/src/App.tsx`, with routes for landing, ingestion progress, dashboard, commit detail, demo redirect, and 404.
 - Frontend data flow uses `frontend/src/lib/api.ts` for REST/SSE/fetch calls and SWR in dashboard/detail views. The landing page starts ingestion; the analyze page streams job progress; dashboard and detail pages read persisted snapshots/graphs/narratives.
-- LLM narratives are requested on demand from `NarrativeCard`, streamed over `/api/explain/stream`, cached in `llm_narratives`, and summarized in the cost meter.
+- LLM narratives are requested on demand from `NarrativeCard`, streamed over `/api/explain/stream`, cached in `llm_narratives`, and summarized in the cost meter with billable provider rows separated from demo/pre-cached rows.
 
 ## Current state assessment
 Working well:
@@ -65,7 +65,7 @@ Incomplete or fragile:
 - Medium: route-level code splitting reduced the initial frontend JS chunk to about 168 kB; dashboard and narrative code are now separate chunks.
 - Medium: backend startup now logs database initialization through the module logger; broader request/job observability is still limited.
 - Medium: production CORS now requires explicit `CORS_ORIGINS`; local development still gets localhost defaults when not in production.
-- Medium: LLM usage summary counts persisted narratives, not runtime cache-hit events; cache hit metrics are therefore misleading.
+- Medium: LLM usage accounting now separates billable provider rows from pre-cached/demo rows; runtime cache-hit telemetry is still not persisted separately from narrative rows.
 - Medium: shallow clone plus per-commit checkout can fail or produce incomplete stats around boundary commits and deleted/renamed files.
 
 ## Feature analysis
@@ -77,10 +77,10 @@ Half-done:
 - Migration support exists as a startup SQL runner with applied-file tracking and directory docs; it still lacks a generated-diff/revision authoring process.
 - Semantic drift is implemented but optional dependency/runtime behavior is not productionized.
 - Structural graph diff exists but uses separate visual language from the rest of the UI and likely relies on undefined design tokens.
-- LLM cache exists but usage reporting does not distinguish ordinary cached reads accurately.
+- LLM cache exists and usage reporting separates provider, demo, and pre-cached rows, but runtime cache-hit telemetry is not persisted as its own event stream.
 
 Missing but obviously needed:
-- Test infrastructure and focused tests for URL parsing, cache keys, cost guard, scoring, graph import resolution, bus-factor classification, API validation, and frontend ingest/dashboard flows.
+- Broader e2e/route coverage for full ingest-to-dashboard behavior, dashboard interactions, narrative UI states, and ingestion progress edge cases.
 - Lockfiles or pinned dependency management.
 - CI running backend tests, frontend typecheck/build/lint, and secret/debug scans.
 - Durable job processing or at least safer ingestion state management with retry and stronger cancellation semantics around long-running subprocesses.
@@ -125,16 +125,17 @@ Missing but obviously needed:
 - 2026-05-31: Added cooperative ingestion cancellation and exposed it from the progress page, because users need a way to stop expensive analyses even before a durable worker queue exists.
 - 2026-05-31: Made clone cleanup return success/failure instead of raising in ingestion cleanup paths, because cleanup errors should be logged without masking the original ingestion result.
 - 2026-05-31: Changed CORS config so production has no implicit browser origins, while development keeps localhost defaults for local ergonomics.
+- 2026-05-31: Changed LLM usage and budget accounting to count only billable provider rows while reporting pre-cached rows separately, because demo/cache records should not consume provider budget or inflate cost totals.
 
 ## Test coverage status
-- Backend unit tests: initial pure-logic coverage exists for config parsing/CORS defaults, repo URL parsing/validation, max-commit cap validation, slug generation, clone cleanup success/failure, import extraction/resolution, bus-factor file filtering, health snapshot aggregation, LLM cache keys, provider mapping, cost estimation, and prompt builders.
+- Backend unit tests: initial pure-logic coverage exists for config parsing/CORS defaults, repo URL parsing/validation, max-commit cap validation, slug generation, clone cleanup success/failure, import extraction/resolution, bus-factor file filtering, health snapshot aggregation, LLM cache keys, provider mapping, cost estimation, usage/budget accounting, and prompt builders.
 - Backend integration/API tests: database-backed coverage exists for repo listing/lookup, timeline payloads, graph payloads, bus factor payloads, LLM usage payloads, commit detail composition, active ingestion job reuse, background job scheduling arguments, and ingestion cancellation.
 - Backend migration tests: coverage exists for sorted SQL migration application, applied-file tracking, skip-on-reapply behavior, and SQLite duplicate-column protection.
 - Frontend unit/component tests: Vitest coverage exists for health status/formatting helpers, `HealthBadge`, and `streamNarrative` success/error parsing, including same-origin `/api` stream URL behavior.
 - Frontend route/smoke tests: landing-page repository validation/submission coverage, analyze-page cancellation/completion coverage, and demo-page bounded-analysis coverage exist with mocked API calls.
-- Local quality gates: `python -m pytest` (36 tests), `npm run test` (14 tests), `npm run lint`, `npm run build`, and `npm audit --audit-level=moderate` pass as of 2026-05-31.
+- Local quality gates: `python -m pytest` (38 tests), `npm run test` (14 tests), `npm run lint`, `npm run build`, and `npm audit --audit-level=moderate` pass as of 2026-05-31.
 - CI quality gates: GitHub Actions workflow exists for backend tests and frontend tests/lint/build.
-- Must be tested before shipping: GitHub URL parsing, repo slug generation, cache key generation, cost guard behavior, health scoring, semantic fallback behavior, graph import/co-change generation, bus-factor risk levels, ingestion progress SSE payloads, timeline/graph API responses, narrative streaming parser, and landing/analyze/dashboard user flows.
+- Must be tested before shipping: semantic fallback behavior, graph co-change generation, ingestion progress SSE payload edge cases, dashboard route behavior, narrative streaming UI behavior, and at least one full landing-to-dashboard e2e flow.
 
 ## Commit log summary
 - `1132a0d` docs: initial PROJECT_BRAIN.md — full codebase understanding. Added the required living project understanding document before feature work.
@@ -170,3 +171,6 @@ Missing but obviously needed:
 - `1a1e16d` fix: keep clone cleanup from masking ingestion failures. Made clone cleanup non-throwing for cleanup paths, strict for stale clone replacement before new clones, logged cleanup failures, and added cleanup tests.
 - `163e74f` docs: update project brain after clone cleanup hardening. Recorded cleanup behavior and updated backend test counts.
 - `03bf056` fix: require explicit CORS origins in production. Added environment-aware CORS defaults, config tests, and deployment docs so production APIs do not inherit local browser origins.
+- `1d2c207` docs: update project brain after CORS hardening. Recorded the production CORS decision, deployment docs, and clean audit status.
+- `ad667be` fix: report LLM usage from billable provider calls. Separated billable provider usage from pre-cached/demo narrative rows and added regression tests for usage summaries and budget checks.
+- docs: update project brain after LLM usage accounting. Recorded the LLM accounting decision, updated test counts, and narrowed remaining test gaps.
