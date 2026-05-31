@@ -56,8 +56,8 @@ Incomplete or fragile:
 - UI maintainability drift: Tailwind token configuration now exists, but heavy one-off styling still makes visual regressions likely without broader route-level visual/e2e coverage.
 
 ## Discovered issues
-- Critical: baseline backend and frontend tests now exist, but end-to-end coverage for full ingest/dashboard flows is still absent.
-- Critical: full browser e2e coverage is still absent, though Vitest route smoke coverage now exists for landing, analyze, demo, and dashboard flows.
+- Critical: baseline backend and frontend tests now exist, and a Vitest app-flow smoke covers landing-to-dashboard navigation with mocked API/SSE; true browser e2e coverage is still absent.
+- Critical: full browser e2e coverage is still absent, though Vitest route smoke coverage now exists for landing, analyze, demo, dashboard, and app-level landing-to-dashboard flows.
 - High: no deployment health gate; CI now exists for tests/lint/build.
 - High: npm audit previously reported 9 frontend dependency vulnerabilities; dependency upgrades now leave `npm audit --audit-level=moderate` clean as of 2026-05-31.
 - High: migration workflow now exists, but no model-changing migration files have been needed or authored yet.
@@ -129,16 +129,17 @@ Missing but obviously needed:
 - 2026-05-31: Changed LLM usage and budget accounting to count only billable provider rows while reporting pre-cached rows separately, because demo/cache records should not consume provider budget or inflate cost totals.
 - 2026-05-31: Split semantic drift enablement from GraphCodeBERT model loading, keeping fallback drift on by default while requiring explicit `ENABLE_GRAPHCODEBERT=true` for ML runtime costs.
 - 2026-05-31: Added dashboard route smoke tests with child widgets mocked, because the page's API orchestration, empty/error states, selected-commit behavior, and commit-detail navigation are the user-facing core of the product.
+- 2026-05-31: Added an app-level landing-to-dashboard smoke test inside Vitest rather than adding Playwright immediately, because it closes the main route orchestration risk using existing tooling while keeping a true browser e2e runner as a separate infrastructure decision.
 
 ## Test coverage status
 - Backend unit tests: initial pure-logic coverage exists for config parsing/CORS defaults, boolean env parsing, repo URL parsing/validation, max-commit cap validation, slug generation, clone cleanup success/failure, import extraction/resolution, bus-factor file filtering, semantic fallback behavior, health snapshot aggregation, LLM cache keys, provider mapping, cost estimation, usage/budget accounting, and prompt builders.
 - Backend integration/API tests: database-backed coverage exists for repo listing/lookup, timeline payloads, graph payloads, bus factor payloads, LLM usage payloads, commit detail composition, active ingestion job reuse, background job scheduling arguments, and ingestion cancellation.
 - Backend migration tests: coverage exists for sorted SQL migration application, applied-file tracking, skip-on-reapply behavior, and SQLite duplicate-column protection.
 - Frontend unit/component tests: Vitest coverage exists for health status/formatting helpers, `HealthBadge`, and `streamNarrative` success/error parsing, including same-origin `/api` stream URL behavior.
-- Frontend route/smoke tests: landing-page repository validation/submission coverage, analyze-page cancellation/completion coverage, demo-page bounded-analysis coverage, and dashboard repository error/latest-commit/empty-timeline/detail-navigation coverage exist with mocked API calls.
-- Local quality gates: `python -m pytest` (40 tests), `npm run test` (18 tests), `npm run lint`, `npm run build`, and `npm audit --audit-level=moderate` pass as of 2026-05-31.
+- Frontend route/smoke tests: landing-page repository validation/submission coverage, analyze-page cancellation/completion coverage, demo-page bounded-analysis coverage, dashboard repository error/latest-commit/empty-timeline/detail-navigation coverage, and app-level landing-to-dashboard navigation coverage exist with mocked API/SSE calls.
+- Local quality gates: `python -m pytest` (40 tests), `npm run test` (19 tests), `npm run lint`, `npm run build`, and `npm audit --audit-level=moderate` pass as of 2026-05-31.
 - CI quality gates: GitHub Actions workflow exists for backend tests and frontend tests/lint/build.
-- Must be tested before shipping: graph co-change generation, ingestion progress SSE payload edge cases, narrative streaming UI behavior, and at least one full landing-to-dashboard e2e flow.
+- Must be tested before shipping: graph co-change generation, ingestion progress SSE payload edge cases, narrative streaming UI behavior, and at least one real-browser landing-to-dashboard e2e flow.
 
 ## Commit log summary
 - `1132a0d` docs: initial PROJECT_BRAIN.md — full codebase understanding. Added the required living project understanding document before feature work.
@@ -181,3 +182,5 @@ Missing but obviously needed:
 - docs: update project brain after GraphCodeBERT opt-in. Recorded the semantic runtime decision, updated test counts, and narrowed the remaining semantic-analysis risk.
 - `605937b` test: cover dashboard route data states. Added dashboard route smoke coverage for repository load failure, latest commit selection, empty timeline behavior, data widget orchestration, and commit-detail navigation.
 - docs: update project brain after dashboard route coverage. Recorded the dashboard testing decision, updated frontend test counts, and narrowed the remaining frontend coverage gap to full e2e and narrative UI behavior.
+- `41cfb9b` test: cover landing to dashboard app flow. Added an app-level smoke test for repository submission, analyze-page SSE completion, dashboard route navigation, and dashboard data loading with mocked API/SSE.
+- docs: update project brain after app-flow coverage. Recorded the app-flow testing decision, updated frontend test counts, and clarified that true browser e2e is still outstanding.
