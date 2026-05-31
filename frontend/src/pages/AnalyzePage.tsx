@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { getIngestProgress, getRepo } from '../lib/api'
+import { cancelIngest, getIngestProgress, getRepo } from '../lib/api'
 import type { IngestStatus } from '../types'
 
 const STAGES = [
@@ -30,6 +30,7 @@ export default function AnalyzePage() {
     error_message: null,
   })
   const [error, setError] = useState<string | null>(null)
+  const [isCancelling, setIsCancelling] = useState(false)
 
   useEffect(() => {
     if (!repoId) {
@@ -53,6 +54,10 @@ export default function AnalyzePage() {
         source.close()
         setError(data.error_message || 'Repository ingestion failed.')
       }
+      if (data.status === 'cancelled') {
+        source.close()
+        setError(data.error_message || 'Repository ingestion was cancelled.')
+      }
     }
     source.onerror = () => {
       source.close()
@@ -62,6 +67,21 @@ export default function AnalyzePage() {
   }, [repoId, navigate])
 
   const currentStageIdx = progress.status === 'queued' ? 0 : stageIndex(progress.status)
+  const canCancel = Boolean(repoId && !error && !['ready', 'error', 'cancelled'].includes(progress.status))
+
+  async function handleCancel() {
+    if (!repoId || isCancelling) return
+    setIsCancelling(true)
+    try {
+      const cancelled = await cancelIngest(repoId)
+      setProgress(cancelled)
+      setError(cancelled.error_message || 'Repository ingestion was cancelled.')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not cancel repository ingestion.')
+    } finally {
+      setIsCancelling(false)
+    }
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6 selection:bg-purple-500/30">
@@ -142,6 +162,19 @@ export default function AnalyzePage() {
             <div className="mt-8 pt-6 border-t border-white/10 flex items-center justify-between text-xs text-slate-500 font-mono">
               <span>ACTIVE SNAPSHOT</span>
               <span className="text-slate-400 bg-white/5 px-2.5 py-1 rounded-full border border-white/5">{progress.current_sha}</span>
+            </div>
+          )}
+
+          {canCancel && (
+            <div className="mt-8 pt-6 border-t border-white/10 text-center">
+              <button
+                type="button"
+                onClick={handleCancel}
+                disabled={isCancelling}
+                className="px-5 py-2 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white text-sm font-semibold transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isCancelling ? 'Cancelling...' : 'Cancel analysis'}
+              </button>
             </div>
           )}
 

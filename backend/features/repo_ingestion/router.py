@@ -50,16 +50,27 @@ from backend.shared.schemas import (
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/repos", tags=["repos"])
 ACTIVE_JOB_STATUSES = {"queued", "cloning", "analyzing", "building_graph", "computing_bus_factor"}
+CANCELLED_MESSAGE = "Ingestion cancelled by user."
 
 
 def _http_error(status_code: int, detail: str, code: str = "request_error") -> HTTPException:
     return HTTPException(status_code=status_code, detail=detail, headers={"X-CommitIQ-Error": code})
 
 
+class IngestionCancelled(RuntimeError):
+    pass
+
+
 async def _update_job(db: AsyncSession, job: AnalysisJob, **kwargs) -> None:
     for key, value in kwargs.items():
         setattr(job, key, value)
     await db.commit()
+
+
+async def _raise_if_cancelled(db: AsyncSession, job: AnalysisJob) -> None:
+    await db.refresh(job)
+    if job.status == "cancelled":
+        raise IngestionCancelled(CANCELLED_MESSAGE)
 
 
 def _parse_top_files(raw: str | None) -> list[dict]:
@@ -313,6 +324,7 @@ async def run_ingestion(repo_id: int, job_id: int, max_commits: int) -> None:
             await db.commit()
 
             clone_path = clone_repo(repo.url, repo_id, max_commits)
+            await _raise_if_cancelled(db, job)
             available_commits = count_available_commits(clone_path)
             if available_commits < 1:
                 raise RuntimeError(
@@ -320,13 +332,17 @@ async def run_ingestion(repo_id: int, job_id: int, max_commits: int) -> None:
                 )
 
             await _update_job(db, job, status="analyzing", current_stage="Walking commit history")
+            await _raise_if_cancelled(db, job)
             commit_history = list(walk_commits(clone_path, max_commits))
             if not commit_history:
                 raise RuntimeError("No commits were found in this repository.")
             await _update_job(db, job, total_commits=len(commit_history))
+            await _raise_if_cancelled(db, job)
 
             await _clear_repo_data(db, repo_id)
+            await _raise_if_cancelled(db, job)
             await _update_job(db, job, status="computing_bus_factor", current_stage="Computing bus factor")
+            await _raise_if_cancelled(db, job)
             checkout_commit(clone_path, commit_history[-1]["full_sha"])
             bus_entries = compute_bus_factor_from_history(commit_history, clone_path)
             min_bus_factor = min((entry["contributor_count"] for entry in bus_entries), default=1)
@@ -334,6 +350,7 @@ async def run_ingestion(repo_id: int, job_id: int, max_commits: int) -> None:
             prev_health = None
             prev_avg_complexity = 0.0
             for idx, commit_data in enumerate(commit_history):
+                await _raise_if_cancelled(db, job)
                 await _update_job(
                     db,
                     job,
@@ -443,6 +460,15 @@ async def run_ingestion(repo_id: int, job_id: int, max_commits: int) -> None:
                 duration_seconds=duration,
             )
             await db.commit()
+        except IngestionCancelled:
+            logger.info("Repository ingestion cancelled for repo_id=%s job_id=%s", repo_id, job_id)
+            repo.status = "pending"
+            repo.error_message = CANCELLED_MESSAGE
+            job.current_stage = "Cancelled"
+            job.error_message = CANCELLED_MESSAGE
+            if not job.completed_at:
+                job.completed_at = datetime.now(tz=timezone.utc)
+            await db.commit()
         except Exception as exc:
             logger.exception("Repository ingestion failed for repo_id=%s", repo_id)
             repo.status = "error"
@@ -527,6 +553,39 @@ async def ingest_repo(
         status="processing",
         job_id=job.id,
         message=f"Ingestion started. Poll /api/repos/ingest/progress/{repo.id} for updates.",
+    )
+
+
+@router.post("/ingest/cancel/{repo_id}", response_model=JobProgressOut)
+async def cancel_ingestion(repo_id: int, db: AsyncSession = Depends(get_db)):
+    repo = await db.get(Repo, repo_id)
+    if not repo:
+        raise _http_error(404, "Repository not found.", "repo_not_found")
+
+    job = await _latest_active_job(db, repo_id)
+    if not job:
+        raise _http_error(404, "No active ingestion job found.", "job_not_found")
+
+    completed = datetime.now(tz=timezone.utc)
+    job.status = "cancelled"
+    job.current_stage = "Cancelled"
+    job.error_message = CANCELLED_MESSAGE
+    job.completed_at = completed
+    if job.started_at and not job.duration_seconds:
+        job.duration_seconds = (completed - job.started_at).total_seconds()
+    repo.status = "pending"
+    repo.error_message = CANCELLED_MESSAGE
+    await db.commit()
+    await db.refresh(job)
+
+    return JobProgressOut(
+        current=job.processed_commits,
+        total=job.total_commits,
+        current_sha=job.current_sha,
+        stage=job.current_stage,
+        progress_pct=job.progress_pct,
+        status=job.status,
+        error_message=job.error_message,
     )
 
 

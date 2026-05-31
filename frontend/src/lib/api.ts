@@ -8,6 +8,7 @@ import type {
   HotspotResponse,
   HealthSnapshot,
   IngestResponse,
+  IngestStatus,
   LLMNarrative,
   LLMUsage,
   NarrativeStreamChunk,
@@ -125,6 +126,10 @@ export async function getLLMUsage(repoId: string | number): Promise<LLMUsage> {
 
 export function getIngestProgress(repoId: string | number): EventSource {
   return new EventSource(`${API_ROOT}/repos/ingest/progress/${repoId}`)
+}
+
+export async function cancelIngest(repoId: string | number): Promise<IngestStatus> {
+  return request<IngestStatus>(client.post(`/repos/ingest/cancel/${repoId}`))
 }
 
 export async function streamNarrative(

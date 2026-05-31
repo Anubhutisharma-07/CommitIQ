@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from backend.database import Base
 from backend.features.llm_analysis.cache import make_cache_key
 from backend.features.repo_ingestion.router import (
+    cancel_ingestion,
     get_bus_factor,
     get_commit_detail,
     get_graph,
@@ -368,3 +369,38 @@ async def test_ingest_repo_schedules_created_job_by_id(db_session: AsyncSessionA
     assert args == (response.repo_id, response.job_id, 25)
     assert kwargs == {}
     assert job.status == "queued"
+
+
+async def test_cancel_ingestion_marks_active_job_cancelled(db_session: AsyncSessionAdapter):
+    active_job = AnalysisJob(
+        repo_id=1,
+        status="queued",
+        total_commits=50,
+        processed_commits=0,
+        current_stage="Queued",
+        triggered_by="user",
+    )
+    repo = db_session.session.get(Repo, 1)
+    repo.status = "processing"
+    db_session.session.add(active_job)
+    db_session.session.commit()
+
+    response = await cancel_ingestion(repo_id=1, db=db_session)
+
+    cancelled_job = db_session.session.get(AnalysisJob, active_job.id)
+    repo = db_session.session.get(Repo, 1)
+    assert response.status == "cancelled"
+    assert response.stage == "Cancelled"
+    assert response.error_message == "Ingestion cancelled by user."
+    assert cancelled_job.status == "cancelled"
+    assert cancelled_job.completed_at is not None
+    assert repo.status == "pending"
+    assert repo.error_message == "Ingestion cancelled by user."
+
+
+async def test_cancel_ingestion_requires_active_job(db_session: AsyncSessionAdapter):
+    with pytest.raises(HTTPException) as exc_info:
+        await cancel_ingestion(repo_id=1, db=db_session)
+
+    assert exc_info.value.status_code == 404
+    assert exc_info.value.headers["X-CommitIQ-Error"] == "job_not_found"
