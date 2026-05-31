@@ -9,10 +9,10 @@ CommitIQ is a full-stack repository health analyzer for GitHub projects. It inge
 - Semantic analysis: optional GraphCodeBERT via transformers and torch, with difflib fallback.
 - LLM layer: Anthropic Claude first, Google Gemini fallback, persisted narrative cache and per-repo cost/call guard.
 - Frontend: React 18, TypeScript, Vite, SWR, axios, Recharts, react-force-graph-2d, d3-force, lucide-react, Tailwind CSS-style utility classes plus custom CSS tokens.
-- Deployment/config: `.env.example` only; no Dockerfile, CI, lockfiles, or deployment manifests are checked in.
+- Deployment/config: `.env.example`, frontend lockfile, and GitHub Actions CI are checked in; no Dockerfile, backend lockfile, or deployment manifest exists yet.
 
 ## Architecture overview
-- `backend/main.py` creates the FastAPI app, initializes database schema on lifespan startup, configures CORS, and mounts repo ingestion plus LLM routers under `/api`.
+- `backend/main.py` creates the FastAPI app, initializes database schema and SQL migrations on lifespan startup, configures CORS, and mounts repo ingestion plus LLM routers under `/api`.
 - `backend/config.py` loads environment variables, normalizes database URLs, creates repo storage, and exposes operational settings.
 - `backend/shared/models.py` defines repos, commits, health snapshots, graph nodes/edges, bus factor rows, LLM narratives, and ingestion jobs.
 - Repo ingestion starts at `POST /api/repos/ingest`, validates a GitHub URL, creates/updates a `Repo` and `AnalysisJob`, then runs `run_ingestion` as a FastAPI background task.
@@ -29,8 +29,8 @@ Working well:
 - The UI has loading/error/empty states in many places and exposes high-value analysis concepts rather than raw tables only.
 
 Incomplete or fragile:
-- There are no checked-in tests, no test runner config, no frontend lockfile, no backend lockfile, and no CI quality gate.
-- The database migration hook exists, but no `migrations/` directory is present. Startup relies mostly on `Base.metadata.create_all`, which cannot safely evolve existing schemas.
+- Test runner config, focused backend/frontend tests, a frontend lockfile, and CI quality gates now exist; backend dependency locking is still absent.
+- A tracked SQL migration workflow now exists with `schema_migrations` applied-file tracking, but there are not yet model-changing migration files because the current schema is still bootstrapped from SQLAlchemy metadata.
 - Backend ingestion performs long CPU/disk/network work inside FastAPI `BackgroundTasks`; this is fragile for restarts, concurrency, cancellation, and production scaling.
 - Graph and health metrics are often based only on files changed in each commit, not a stable whole-repo snapshot, so dashboard labels can overstate "codebase" health.
 - Frontend Tailwind tokens now have checked-in PostCSS/Tailwind config, so production builds emit real utility CSS instead of raw `@tailwind` directives.
@@ -48,7 +48,7 @@ Incomplete or fragile:
 - Missing verification foundation: no unit/integration/e2e tests means changes to parsers, scoring, ingestion, or UI flows cannot be made safely.
 - Missing dependency reproducibility: no `package-lock.json`, `requirements` pins, or lock tooling means installs can drift and break builds.
 - No production ingestion boundary: FastAPI background tasks are not a durable job system. Long repo analysis should not be tied to a web worker process lifecycle.
-- Schema evolution gap: create-all plus absent migrations hides incompatible model changes until existing deployments break.
+- Schema evolution gap: the project now has a tracked SQL migration runner, but future model changes still need explicit migration files and review discipline.
 - Metric contract ambiguity: names like "codebase health" are presented broadly, but many calculations operate on commit-touched files and shallow clone data.
 - Semantic analysis default risk: `ENABLE_SEMANTIC_ANALYSIS` defaults to true, which can trigger large model downloads/imports unless optional ML dependencies and cache strategy are deliberately configured.
 - Security/abuse surface: ingestion clones arbitrary public GitHub repositories and runs git commands over repo contents; URL validation and max-commit caps are now stronger, but storage quotas, concurrency controls, and operational limits still need hardening.
@@ -56,11 +56,11 @@ Incomplete or fragile:
 - UI maintainability drift: Tailwind token configuration now exists, but heavy one-off styling still makes visual regressions likely without broader route-level visual/e2e coverage.
 
 ## Discovered issues
-- Critical: zero tests exist across backend and frontend.
+- Critical: baseline backend and frontend tests now exist, but end-to-end coverage for full ingest/dashboard flows is still absent.
 - Critical: frontend still lacks route-level/e2e coverage, though focused Vitest coverage now exists for health utilities, `HealthBadge`, and narrative stream parsing.
 - High: no deployment health gate; CI now exists for tests/lint/build.
 - High: npm audit previously reported 9 frontend dependency vulnerabilities; dependency upgrades now leave `npm audit --audit-level=moderate` clean as of 2026-05-31.
-- High: no migration files despite migration-aware database code.
+- High: migration workflow now exists, but no model-changing migration files have been needed or authored yet.
 - High: demo route no longer depends on missing seeded data; it now starts a bounded `facebook/react` analysis, but a true instant fixture demo is still not available.
 - Medium: route-level code splitting reduced the initial frontend JS chunk to about 168 kB; dashboard and narrative code are now separate chunks.
 - Medium: backend startup uses `print` in database initialization instead of structured logging.
@@ -74,7 +74,7 @@ Exists:
 
 Half-done:
 - Demo mode exists as a route and LLM fallback concept but lacks seed data/scripts and a complete no-backend demo experience.
-- Migration support exists as code but lacks migration assets and a revision process.
+- Migration support exists as a startup SQL runner with applied-file tracking and directory docs; it still lacks a generated-diff/revision authoring process.
 - Semantic drift is implemented but optional dependency/runtime behavior is not productionized.
 - Structural graph diff exists but uses separate visual language from the rest of the UI and likely relies on undefined design tokens.
 - LLM cache exists but usage reporting does not distinguish ordinary cached reads accurately.
@@ -118,13 +118,15 @@ Missing but obviously needed:
 - 2026-05-31: Added route-level lazy loading so graph/dashboard dependencies are no longer part of the first-load bundle.
 - 2026-05-31: Upgraded vulnerable frontend dependencies, including the Vite 8 toolchain move, because the remaining audit findings had no non-major fix path and the local Node version satisfies Vite 8 requirements.
 - 2026-05-31: Added explicit Tailwind/PostCSS config after build output showed raw `@tailwind` directives, preserving the app's existing CSS-variable design tokens rather than introducing a new theme.
+- 2026-05-31: Added a lightweight SQL migration runner with `schema_migrations` tracking instead of introducing Alembic immediately, because the app already had a simple SQL migration hook and needed reliable application across SQLite/Postgres first.
 
 ## Test coverage status
 - Backend unit tests: initial pure-logic coverage exists for repo URL parsing/validation, max-commit cap validation, slug generation, import extraction/resolution, bus-factor file filtering, health snapshot aggregation, LLM cache keys, provider mapping, cost estimation, and prompt builders.
 - Backend integration/API tests: database-backed coverage exists for repo listing/lookup, timeline payloads, graph payloads, bus factor payloads, LLM usage payloads, and commit detail composition.
+- Backend migration tests: coverage exists for sorted SQL migration application, applied-file tracking, skip-on-reapply behavior, and SQLite duplicate-column protection.
 - Frontend unit/component tests: Vitest coverage exists for health status/formatting helpers, `HealthBadge`, and `streamNarrative` success/error parsing.
 - Frontend route/smoke tests: landing-page repository validation/submission coverage and demo-page bounded-analysis coverage exist with mocked API calls.
-- Local quality gates: `python -m pytest`, `npm run test`, `npm run lint`, `npm run build`, and `npm audit --audit-level=moderate` pass as of 2026-05-31.
+- Local quality gates: `python -m pytest` (26 tests), `npm run test` (12 tests), `npm run lint`, `npm run build`, and `npm audit --audit-level=moderate` pass as of 2026-05-31.
 - CI quality gates: GitHub Actions workflow exists for backend tests and frontend tests/lint/build.
 - Must be tested before shipping: GitHub URL parsing, repo slug generation, cache key generation, cost guard behavior, health scoring, semantic fallback behavior, graph import/co-change generation, bus-factor risk levels, ingestion progress SSE payloads, timeline/graph API responses, narrative streaming parser, and landing/analyze/dashboard user flows.
 
@@ -149,3 +151,5 @@ Missing but obviously needed:
 - `4145e84` perf: split route bundles to reduce initial payload. Added route-level lazy loading and removed the Vite chunk-size warning by splitting dashboard/narrative code out of the initial bundle.
 - `c049a3b` docs: update project brain after route splitting. Recorded the lazy-loading decision and updated the known bundle-risk status.
 - `4ac3ee0` chore: close frontend audit findings and restore Tailwind build. Upgraded vulnerable frontend dependencies, moved to Vite 8 with the compatible React plugin, and added PostCSS/Tailwind config so production CSS includes generated utilities.
+- `3de8975` docs: update project brain after frontend audit hardening. Recorded the dependency-audit and Tailwind build decisions plus current clean gate state.
+- `60f4591` feat: add tracked schema migration workflow. Added a reusable SQL migration runner, `schema_migrations` tracking, migration docs, and backend tests for apply/skip/idempotency behavior.
