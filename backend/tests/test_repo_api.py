@@ -15,9 +15,12 @@ from backend.features.repo_ingestion.router import (
     get_llm_usage,
     get_repo_by_slug,
     get_timeline,
+    ingest_repo,
     list_repos,
+    run_ingestion,
 )
 from backend.shared.models import (
+    AnalysisJob,
     BusFactor,
     Commit,
     GraphEdge,
@@ -26,6 +29,7 @@ from backend.shared.models import (
     LLMNarrative,
     Repo,
 )
+from backend.shared.schemas import IngestRequest
 
 pytestmark = pytest.mark.anyio
 
@@ -44,6 +48,29 @@ class AsyncSessionAdapter:
 
     async def get(self, *args, **kwargs):
         return self.session.get(*args, **kwargs)
+
+    def add(self, *args, **kwargs):
+        return self.session.add(*args, **kwargs)
+
+    async def flush(self):
+        self.session.flush()
+
+    async def commit(self):
+        self.session.commit()
+
+    async def rollback(self):
+        self.session.rollback()
+
+    async def refresh(self, instance):
+        self.session.refresh(instance)
+
+
+class BackgroundTaskRecorder:
+    def __init__(self):
+        self.tasks = []
+
+    def add_task(self, func, *args, **kwargs):
+        self.tasks.append((func, args, kwargs))
 
 
 def _seed_repo(session: Session) -> None:
@@ -284,3 +311,60 @@ async def test_commit_detail_includes_nested_snapshot_graph_and_cached_narrative
     assert detail["has_narrative"] is True
     assert detail["narrative"]["cached"] is True
     assert detail["narrative"]["explanation"] == "Complexity increased in the service layer."
+
+
+async def test_ingest_repo_reuses_active_job_without_scheduling_duplicate(db_session: AsyncSessionAdapter):
+    active_job = AnalysisJob(
+        repo_id=1,
+        status="analyzing",
+        total_commits=50,
+        processed_commits=10,
+        current_stage="Analyzing commit 10/50",
+        triggered_by="user",
+    )
+    repo = db_session.session.get(Repo, 1)
+    repo.status = "processing"
+    db_session.session.add(active_job)
+    db_session.session.commit()
+    background_tasks = BackgroundTaskRecorder()
+
+    response = await ingest_repo(
+        IngestRequest(repo_url="example/project", max_commits=50),
+        background_tasks=background_tasks,
+        db=db_session,
+    )
+
+    assert response.repo_id == 1
+    assert response.status == "processing"
+    assert response.job_id == active_job.id
+    assert response.message.startswith("Ingestion already in progress")
+    assert background_tasks.tasks == []
+
+
+async def test_ingest_repo_schedules_created_job_by_id(db_session: AsyncSessionAdapter, monkeypatch):
+    async def fake_fetch_github_metadata(owner: str, repo: str):
+        return {
+            "github_stars": 0,
+            "github_language": None,
+            "github_description": None,
+        }
+
+    monkeypatch.setattr(
+        "backend.features.repo_ingestion.router.fetch_github_metadata",
+        fake_fetch_github_metadata,
+    )
+    background_tasks = BackgroundTaskRecorder()
+
+    response = await ingest_repo(
+        IngestRequest(repo_url="another/project", max_commits=25),
+        background_tasks=background_tasks,
+        db=db_session,
+    )
+
+    scheduled_func, args, kwargs = background_tasks.tasks[0]
+    job = db_session.session.get(AnalysisJob, response.job_id)
+
+    assert scheduled_func is run_ingestion
+    assert args == (response.repo_id, response.job_id, 25)
+    assert kwargs == {}
+    assert job.status == "queued"

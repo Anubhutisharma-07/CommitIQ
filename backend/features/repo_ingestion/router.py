@@ -49,6 +49,7 @@ from backend.shared.schemas import (
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/repos", tags=["repos"])
+ACTIVE_JOB_STATUSES = {"queued", "cloning", "analyzing", "building_graph", "computing_bus_factor"}
 
 
 def _http_error(status_code: int, detail: str, code: str = "request_error") -> HTTPException:
@@ -274,7 +275,17 @@ async def _clear_repo_data(db: AsyncSession, repo_id: int) -> None:
     await db.commit()
 
 
-async def run_ingestion(repo_id: int, max_commits: int) -> None:
+async def _latest_active_job(db: AsyncSession, repo_id: int) -> AnalysisJob | None:
+    result = await db.execute(
+        select(AnalysisJob)
+        .where(AnalysisJob.repo_id == repo_id, AnalysisJob.status.in_(ACTIVE_JOB_STATUSES))
+        .order_by(desc(AnalysisJob.created_at))
+        .limit(1)
+    )
+    return result.scalar_one_or_none()
+
+
+async def run_ingestion(repo_id: int, job_id: int, max_commits: int) -> None:
     from backend.database import AsyncSessionLocal
     from backend.features.repo_ingestion.metrics_extractor import checkout_commit, extract_commit_metrics
 
@@ -283,13 +294,10 @@ async def run_ingestion(repo_id: int, max_commits: int) -> None:
         if not repo:
             return
 
-        job_result = await db.execute(
-            select(AnalysisJob)
-            .where(AnalysisJob.repo_id == repo_id)
-            .order_by(desc(AnalysisJob.created_at))
-            .limit(1)
-        )
-        job = job_result.scalar_one()
+        job = await db.get(AnalysisJob, job_id)
+        if not job or job.repo_id != repo_id:
+            logger.warning("Skipping ingestion for repo_id=%s because job_id=%s was not found", repo_id, job_id)
+            return
 
         clone_path = None
         try:
@@ -469,8 +477,16 @@ async def ingest_repo(
     existing_result = await db.execute(select(Repo).where(Repo.repo_slug == repo_slug))
     repo = existing_result.scalar_one_or_none()
 
-    if repo and repo.status == "processing":
-        raise _http_error(409, "Repository ingestion is already in progress.", "repo_processing")
+    if repo:
+        active_job = await _latest_active_job(db, repo.id)
+        if active_job:
+            return IngestResponse(
+                repo_id=repo.id,
+                repo_slug=repo.repo_slug,
+                status="processing",
+                job_id=active_job.id,
+                message=f"Ingestion already in progress. Poll /api/repos/ingest/progress/{repo.id} for updates.",
+            )
 
     if not repo:
         metadata = await fetch_github_metadata(owner, repo_name)
@@ -504,7 +520,7 @@ async def ingest_repo(
     await db.refresh(repo)
     await db.refresh(job)
 
-    background_tasks.add_task(run_ingestion, repo.id, max_c)
+    background_tasks.add_task(run_ingestion, repo.id, job.id, max_c)
     return IngestResponse(
         repo_id=repo.id,
         repo_slug=repo.repo_slug,
