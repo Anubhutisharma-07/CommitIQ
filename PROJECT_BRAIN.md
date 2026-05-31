@@ -16,7 +16,7 @@ CommitIQ is a full-stack repository health analyzer for GitHub projects. It inge
 - `backend/config.py` loads environment variables, normalizes database URLs, creates repo storage, and exposes operational settings.
 - `backend/shared/models.py` defines repos, commits, health snapshots, graph nodes/edges, bus factor rows, LLM narratives, and ingestion jobs.
 - Repo ingestion starts at `POST /api/repos/ingest`, validates a GitHub URL, creates/updates a `Repo` and `AnalysisJob`, then runs `run_ingestion` as a FastAPI background task.
-- Ingestion clones a shallow single-branch repo, walks commits oldest-to-newest, checks out each commit, extracts file metrics and semantic drift, builds import and co-change graph rows, computes health snapshots, computes bus factor at HEAD, and marks the repo ready/error.
+- Ingestion clones a shallow single-branch repo, walks commits oldest-to-newest, checks out each commit, extracts file metrics and semantic drift, builds import and co-change graph rows, computes explainable health snapshots with risk reasons and hotspot persistence, computes bus factor at HEAD, and marks the repo ready/error.
 - The frontend entry is `frontend/src/App.tsx`, with routes for landing, ingestion progress, dashboard, commit detail, demo redirect, and 404.
 - Frontend data flow uses `frontend/src/lib/api.ts` for REST/SSE/fetch calls and SWR in dashboard/detail views. The landing page starts ingestion; the analyze page streams job progress; dashboard and detail pages read persisted snapshots/graphs/narratives.
 - LLM narratives are requested on demand from `NarrativeCard`, streamed over `/api/explain/stream`, cached in `llm_narratives`, and summarized in the cost meter with billable provider rows separated from demo/pre-cached rows.
@@ -39,7 +39,7 @@ Incomplete or fragile:
 ## User flows (as-is)
 - New analysis: user opens `/`, enters a GitHub URL or `owner/repo`, optionally sets max commits, submits, then lands on `/analyze?repo_id=...`.
 - Ingestion progress: `/analyze` opens an EventSource to `/api/repos/ingest/progress/{repo_id}`, displays clone/analyze/bus-factor/finalize progress, allows cancellation through `/api/repos/ingest/cancel/{repo_id}`, then redirects to `/dashboard/{repo_slug}` when ready.
-- Dashboard: user views latest health score, commit timeline, recent commit list, selected commit metrics, graph explorer, bus factor table, hotspot map, and LLM cost meter.
+- Dashboard: user views latest health score, commit timeline, recent commit list, selected commit metrics, top risk reasons, persistent hotspots, graph explorer, bus factor table, hotspot map, and LLM cost meter.
 - Commit selection: user can select commits from the timeline/list or step through graph playback. Commit detail route shows metadata, metrics, graph, structural diff vs previous commit, and narrative controls.
 - Narrative generation: user clicks the narrative card, frontend streams generated chunks, then displays provider/cache/cost metadata.
 - Demo: `/demo` starts a bounded `facebook/react` analysis and then routes to the normal analysis progress page.
@@ -49,7 +49,7 @@ Incomplete or fragile:
 - Missing dependency reproducibility: no `package-lock.json`, `requirements` pins, or lock tooling means installs can drift and break builds.
 - No production ingestion boundary: FastAPI background tasks are not a durable job system. Active job reuse and cooperative cancellation reduce user-facing harm, but long repo analysis is still tied to a web worker process lifecycle.
 - Schema evolution gap: the project now has a tracked SQL migration runner, but future model changes still need explicit migration files and review discipline.
-- Metric contract ambiguity: names like "codebase health" are presented broadly, but many calculations operate on commit-touched files and shallow clone data.
+- Metric contract ambiguity: names like "codebase health" are presented broadly, but many calculations operate on commit-touched files and shallow clone data. Risk reasons and hotspot persistence now make the score more explainable, but the snapshot scope still needs clearer product labeling.
 - Semantic analysis model risk is now gated: lightweight difflib drift remains enabled by default, while GraphCodeBERT requires explicit `ENABLE_GRAPHCODEBERT=true`; operators still need to plan ML cache/storage before enabling it.
 - Security/abuse surface: ingestion clones arbitrary public GitHub repositories and runs git commands over repo contents; URL validation and max-commit caps are now stronger, but storage quotas, concurrency controls, and operational limits still need hardening.
 - API/base URL behavior is now deployment-safe by default: frontend calls same-origin `/api`, with optional `VITE_API_BASE_URL` for separate API origins and a Vite dev proxy target for local development.
@@ -87,7 +87,7 @@ Missing but obviously needed:
 - Durable job processing or at least safer ingestion state management with retry and stronger cancellation semantics around long-running subprocesses.
 - Documented seed/demo path.
 - Production deployment configuration and environment docs.
-- Productized deeper health metrics with explainable risk reasons, hotspot persistence, ownership entropy, coupling surprise, blast radius, and cycle severity.
+- Productized deeper health metrics beyond the new risk reasons and hotspot persistence, especially ownership entropy, coupling surprise, blast radius, cycle severity, and stabilization scoring.
 
 ## Improvement plan (prioritised)
 1. Establish verification baseline: add backend pytest setup, frontend test setup, and smoke checks for core user/API flows. This matters because every meaningful improvement touches scoring, ingestion, or UI behavior.
@@ -135,13 +135,14 @@ Missing but obviously needed:
 - 2026-05-31: Made co-change graph edges count each file pair at most once per commit and emit stable sorted output, because duplicate file entries should not inflate hidden-coupling scores or create self-edges.
 - 2026-05-31: Added ingestion progress SSE edge-case tests for missing jobs, terminal jobs, and active-to-cancelled polling updates, because the analyze page depends on this stream for user-facing progress and recovery states.
 - 2026-05-31: Added professional GitHub repository materials and a deeper repo-health metrics roadmap, because maintainers need contribution/security workflows and the product needs a clear path from raw metrics to explainable risk signals.
+- 2026-05-31: Added persisted risk reasons and hotspot persistence to health snapshots, because users need to understand why a score moved and which risky files are recurring across recent commits.
 
 ## Test coverage status
-- Backend unit tests: initial pure-logic coverage exists for config parsing/CORS defaults, boolean env parsing, repo URL parsing/validation, max-commit cap validation, slug generation, clone cleanup success/failure, import extraction/resolution, co-change edge generation, top-file frequency, bus-factor file filtering, semantic fallback behavior, health snapshot aggregation, LLM cache keys, provider mapping, cost estimation, usage/budget accounting, and prompt builders.
-- Backend integration/API tests: database-backed coverage exists for repo listing/lookup, timeline payloads, graph payloads, bus factor payloads, LLM usage payloads, commit detail composition, active ingestion job reuse, background job scheduling arguments, ingestion cancellation, and ingestion progress SSE payloads for missing/terminal/polled jobs.
+- Backend unit tests: initial pure-logic coverage exists for config parsing/CORS defaults, boolean env parsing, repo URL parsing/validation, max-commit cap validation, slug generation, clone cleanup success/failure, import extraction/resolution, co-change edge generation, top-file frequency, bus-factor file filtering, semantic fallback behavior, health snapshot aggregation, risk reasons/hotspot persistence, LLM cache keys, provider mapping, cost estimation, usage/budget accounting, and prompt builders.
+- Backend integration/API tests: database-backed coverage exists for repo listing/lookup, timeline payloads including risk reasons and persistent hotspots, graph payloads, bus factor payloads, LLM usage payloads, commit detail composition, active ingestion job reuse, background job scheduling arguments, ingestion cancellation, and ingestion progress SSE payloads for missing/terminal/polled jobs.
 - Backend migration tests: coverage exists for sorted SQL migration application, applied-file tracking, skip-on-reapply behavior, and SQLite duplicate-column protection.
 - Frontend unit/component tests: Vitest coverage exists for health status/formatting helpers, `HealthBadge`, `streamNarrative` success/error parsing, and `NarrativeCard` disabled/streaming/done/error states, including same-origin `/api` stream URL behavior.
-- Frontend route/smoke tests: landing-page repository validation/submission coverage, analyze-page cancellation/completion coverage, demo-page bounded-analysis coverage, dashboard repository error/latest-commit/empty-timeline/detail-navigation coverage, and app-level landing-to-dashboard navigation coverage exist with mocked API/SSE calls.
+- Frontend route/smoke tests: landing-page repository validation/submission coverage, analyze-page cancellation/completion coverage, demo-page bounded-analysis coverage, dashboard repository error/latest-commit/empty-timeline/detail-navigation/risk-reason rendering coverage, and app-level landing-to-dashboard navigation coverage exist with mocked API/SSE calls.
 - Local quality gates: `python -m pytest` (45 tests), `npm run test` (23 tests), `npm run lint`, `npm run build`, and `npm audit --audit-level=moderate` pass as of 2026-05-31.
 - CI quality gates: GitHub Actions workflow exists for backend tests and frontend tests/lint/build.
 - Must be tested before shipping: at least one real-browser landing-to-dashboard e2e flow.
@@ -197,3 +198,5 @@ Missing but obviously needed:
 - docs: update project brain after ingestion progress SSE coverage. Recorded the SSE testing decision, updated backend test counts, and narrowed remaining shipping test gaps to real-browser e2e coverage.
 - `a16ecdb` docs: professionalize GitHub project materials. Added contribution, security, issue, pull request, README, and repo-health metrics roadmap documentation.
 - docs: update project brain after GitHub professionalization. Recorded the GitHub hygiene decision and deeper health metrics roadmap.
+- `76c2bd9` feat: explain repo health risk reasons. Persisted risk reason and hotspot persistence fields, added migration/schema/API/frontend support, and rendered top reasons plus recurring hotspots in the dashboard.
+- docs: update project brain after explainable health metrics. Recorded the score-explainability decision and updated coverage notes.
