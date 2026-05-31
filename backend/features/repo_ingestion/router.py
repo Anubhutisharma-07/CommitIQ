@@ -25,7 +25,6 @@ from backend.features.repo_ingestion.clone_service import (
 from backend.features.repo_ingestion.commit_walker import walk_commits
 from backend.features.repo_ingestion.graph_builder import build_cochange_edges, build_import_edges
 from backend.features.repo_ingestion.health_scorer import assign_health_color, compute_full_snapshot
-from backend.features.repo_ingestion.metrics_extractor import checkout_commit, extract_commit_metrics
 from backend.shared.models import (
     AnalysisJob,
     BusFactor,
@@ -277,6 +276,7 @@ async def _clear_repo_data(db: AsyncSession, repo_id: int) -> None:
 
 async def run_ingestion(repo_id: int, max_commits: int) -> None:
     from backend.database import AsyncSessionLocal
+    from backend.features.repo_ingestion.metrics_extractor import checkout_commit, extract_commit_metrics
 
     async with AsyncSessionLocal() as db:
         repo = await db.get(Repo, repo_id)
