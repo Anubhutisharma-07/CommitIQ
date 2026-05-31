@@ -64,7 +64,7 @@ Incomplete or fragile:
 - High: demo route no longer depends on missing seeded data; it now starts a bounded `facebook/react` analysis, but a true instant fixture demo is still not available.
 - Medium: route-level code splitting reduced the initial frontend JS chunk to about 168 kB; dashboard and narrative code are now separate chunks.
 - Medium: backend startup now logs database initialization through the module logger; broader request/job observability is still limited.
-- Medium: default CORS allows several localhost origins only; production CORS must be explicit.
+- Medium: production CORS now requires explicit `CORS_ORIGINS`; local development still gets localhost defaults when not in production.
 - Medium: LLM usage summary counts persisted narratives, not runtime cache-hit events; cache hit metrics are therefore misleading.
 - Medium: shallow clone plus per-commit checkout can fail or produce incomplete stats around boundary commits and deleted/renamed files.
 
@@ -124,14 +124,15 @@ Missing but obviously needed:
 - 2026-05-31: Replaced the remaining backend startup `print` with structured logger metadata so production logs can be routed consistently.
 - 2026-05-31: Added cooperative ingestion cancellation and exposed it from the progress page, because users need a way to stop expensive analyses even before a durable worker queue exists.
 - 2026-05-31: Made clone cleanup return success/failure instead of raising in ingestion cleanup paths, because cleanup errors should be logged without masking the original ingestion result.
+- 2026-05-31: Changed CORS config so production has no implicit browser origins, while development keeps localhost defaults for local ergonomics.
 
 ## Test coverage status
-- Backend unit tests: initial pure-logic coverage exists for repo URL parsing/validation, max-commit cap validation, slug generation, clone cleanup success/failure, import extraction/resolution, bus-factor file filtering, health snapshot aggregation, LLM cache keys, provider mapping, cost estimation, and prompt builders.
+- Backend unit tests: initial pure-logic coverage exists for config parsing/CORS defaults, repo URL parsing/validation, max-commit cap validation, slug generation, clone cleanup success/failure, import extraction/resolution, bus-factor file filtering, health snapshot aggregation, LLM cache keys, provider mapping, cost estimation, and prompt builders.
 - Backend integration/API tests: database-backed coverage exists for repo listing/lookup, timeline payloads, graph payloads, bus factor payloads, LLM usage payloads, commit detail composition, active ingestion job reuse, background job scheduling arguments, and ingestion cancellation.
 - Backend migration tests: coverage exists for sorted SQL migration application, applied-file tracking, skip-on-reapply behavior, and SQLite duplicate-column protection.
 - Frontend unit/component tests: Vitest coverage exists for health status/formatting helpers, `HealthBadge`, and `streamNarrative` success/error parsing, including same-origin `/api` stream URL behavior.
 - Frontend route/smoke tests: landing-page repository validation/submission coverage, analyze-page cancellation/completion coverage, and demo-page bounded-analysis coverage exist with mocked API calls.
-- Local quality gates: `python -m pytest` (32 tests), `npm run test` (14 tests), `npm run lint`, `npm run build`, and `npm audit --audit-level=moderate` pass as of 2026-05-31.
+- Local quality gates: `python -m pytest` (36 tests), `npm run test` (14 tests), `npm run lint`, `npm run build`, and `npm audit --audit-level=moderate` pass as of 2026-05-31.
 - CI quality gates: GitHub Actions workflow exists for backend tests and frontend tests/lint/build.
 - Must be tested before shipping: GitHub URL parsing, repo slug generation, cache key generation, cost guard behavior, health scoring, semantic fallback behavior, graph import/co-change generation, bus-factor risk levels, ingestion progress SSE payloads, timeline/graph API responses, narrative streaming parser, and landing/analyze/dashboard user flows.
 
@@ -167,3 +168,5 @@ Missing but obviously needed:
 - `7a62f1a` docs: update project brain after database logging. Recorded the database logging decision and updated observability risk notes.
 - `b57ce4c` feat: support cancelling active ingestion jobs. Added a cancel endpoint, cooperative cancellation checks during ingestion, a progress-page cancel action, and backend/frontend tests for cancellation behavior.
 - `1a1e16d` fix: keep clone cleanup from masking ingestion failures. Made clone cleanup non-throwing for cleanup paths, strict for stale clone replacement before new clones, logged cleanup failures, and added cleanup tests.
+- `163e74f` docs: update project brain after clone cleanup hardening. Recorded cleanup behavior and updated backend test counts.
+- `03bf056` fix: require explicit CORS origins in production. Added environment-aware CORS defaults, config tests, and deployment docs so production APIs do not inherit local browser origins.
