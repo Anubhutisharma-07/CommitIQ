@@ -9,7 +9,7 @@ CommitIQ is a full-stack repository health analyzer for GitHub projects. It inge
 - Semantic analysis: optional GraphCodeBERT via transformers and torch, with difflib fallback.
 - LLM layer: Anthropic Claude first, Google Gemini fallback, persisted narrative cache and per-repo cost/call guard.
 - Frontend: React 18, TypeScript, Vite, SWR, axios, Recharts, react-force-graph-2d, d3-force, lucide-react, Tailwind CSS-style utility classes plus custom CSS tokens.
-- Deployment/config: `.env.example`, frontend lockfile, and GitHub Actions CI are checked in; no Dockerfile, backend lockfile, or deployment manifest exists yet.
+- Deployment/config: backend `.env.example`, frontend `.env.example`, frontend lockfile, and GitHub Actions CI are checked in; no Dockerfile, backend lockfile, or deployment manifest exists yet.
 
 ## Architecture overview
 - `backend/main.py` creates the FastAPI app, initializes database schema and SQL migrations on lifespan startup, configures CORS, and mounts repo ingestion plus LLM routers under `/api`.
@@ -52,7 +52,7 @@ Incomplete or fragile:
 - Metric contract ambiguity: names like "codebase health" are presented broadly, but many calculations operate on commit-touched files and shallow clone data.
 - Semantic analysis default risk: `ENABLE_SEMANTIC_ANALYSIS` defaults to true, which can trigger large model downloads/imports unless optional ML dependencies and cache strategy are deliberately configured.
 - Security/abuse surface: ingestion clones arbitrary public GitHub repositories and runs git commands over repo contents; URL validation and max-commit caps are now stronger, but storage quotas, concurrency controls, and operational limits still need hardening.
-- API/base URL fragility: frontend defaults to `http://localhost:8000`; acceptable locally but needs environment-driven deployment config and documented production behavior.
+- API/base URL behavior is now deployment-safe by default: frontend calls same-origin `/api`, with optional `VITE_API_BASE_URL` for separate API origins and a Vite dev proxy target for local development.
 - UI maintainability drift: Tailwind token configuration now exists, but heavy one-off styling still makes visual regressions likely without broader route-level visual/e2e coverage.
 
 ## Discovered issues
@@ -119,12 +119,13 @@ Missing but obviously needed:
 - 2026-05-31: Upgraded vulnerable frontend dependencies, including the Vite 8 toolchain move, because the remaining audit findings had no non-major fix path and the local Node version satisfies Vite 8 requirements.
 - 2026-05-31: Added explicit Tailwind/PostCSS config after build output showed raw `@tailwind` directives, preserving the app's existing CSS-variable design tokens rather than introducing a new theme.
 - 2026-05-31: Added a lightweight SQL migration runner with `schema_migrations` tracking instead of introducing Alembic immediately, because the app already had a simple SQL migration hook and needed reliable application across SQLite/Postgres first.
+- 2026-05-31: Changed the frontend API default from a hardcoded localhost origin to same-origin `/api`, because deployed builds should not assume a local backend and local development can be handled by the Vite proxy.
 
 ## Test coverage status
 - Backend unit tests: initial pure-logic coverage exists for repo URL parsing/validation, max-commit cap validation, slug generation, import extraction/resolution, bus-factor file filtering, health snapshot aggregation, LLM cache keys, provider mapping, cost estimation, and prompt builders.
 - Backend integration/API tests: database-backed coverage exists for repo listing/lookup, timeline payloads, graph payloads, bus factor payloads, LLM usage payloads, and commit detail composition.
 - Backend migration tests: coverage exists for sorted SQL migration application, applied-file tracking, skip-on-reapply behavior, and SQLite duplicate-column protection.
-- Frontend unit/component tests: Vitest coverage exists for health status/formatting helpers, `HealthBadge`, and `streamNarrative` success/error parsing.
+- Frontend unit/component tests: Vitest coverage exists for health status/formatting helpers, `HealthBadge`, and `streamNarrative` success/error parsing, including same-origin `/api` stream URL behavior.
 - Frontend route/smoke tests: landing-page repository validation/submission coverage and demo-page bounded-analysis coverage exist with mocked API calls.
 - Local quality gates: `python -m pytest` (26 tests), `npm run test` (12 tests), `npm run lint`, `npm run build`, and `npm audit --audit-level=moderate` pass as of 2026-05-31.
 - CI quality gates: GitHub Actions workflow exists for backend tests and frontend tests/lint/build.
@@ -153,3 +154,5 @@ Missing but obviously needed:
 - `4ac3ee0` chore: close frontend audit findings and restore Tailwind build. Upgraded vulnerable frontend dependencies, moved to Vite 8 with the compatible React plugin, and added PostCSS/Tailwind config so production CSS includes generated utilities.
 - `3de8975` docs: update project brain after frontend audit hardening. Recorded the dependency-audit and Tailwind build decisions plus current clean gate state.
 - `60f4591` feat: add tracked schema migration workflow. Added a reusable SQL migration runner, `schema_migrations` tracking, migration docs, and backend tests for apply/skip/idempotency behavior.
+- `fa27861` docs: update project brain after migration workflow. Recorded the migration-runner decision, migration test coverage, and current schema-evolution risk.
+- `8e43f38` fix: use deploy-safe frontend API base path. Switched frontend API calls to same-origin `/api`, added Vite dev proxy configuration, documented frontend env variables, and tested the stream URL behavior.
