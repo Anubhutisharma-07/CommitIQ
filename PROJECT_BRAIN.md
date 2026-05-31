@@ -63,7 +63,7 @@ Incomplete or fragile:
 - High: migration workflow now exists, but no model-changing migration files have been needed or authored yet.
 - High: demo route no longer depends on missing seeded data; it now starts a bounded `facebook/react` analysis, but a true instant fixture demo is still not available.
 - Medium: route-level code splitting reduced the initial frontend JS chunk to about 168 kB; dashboard and narrative code are now separate chunks.
-- Medium: backend startup uses `print` in database initialization instead of structured logging.
+- Medium: backend startup now logs database initialization through the module logger; broader request/job observability is still limited.
 - Medium: default CORS allows several localhost origins only; production CORS must be explicit.
 - Medium: LLM usage summary counts persisted narratives, not runtime cache-hit events; cache hit metrics are therefore misleading.
 - Medium: shallow clone plus per-commit checkout can fail or produce incomplete stats around boundary commits and deleted/renamed files.
@@ -121,6 +121,7 @@ Missing but obviously needed:
 - 2026-05-31: Added a lightweight SQL migration runner with `schema_migrations` tracking instead of introducing Alembic immediately, because the app already had a simple SQL migration hook and needed reliable application across SQLite/Postgres first.
 - 2026-05-31: Changed the frontend API default from a hardcoded localhost origin to same-origin `/api`, because deployed builds should not assume a local backend and local development can be handled by the Vite proxy.
 - 2026-05-31: Made ingestion submissions idempotent while a job is active and scheduled background work by explicit job id, because duplicate clicks/retries should not create races or attach work to the wrong latest job.
+- 2026-05-31: Replaced the remaining backend startup `print` with structured logger metadata so production logs can be routed consistently.
 
 ## Test coverage status
 - Backend unit tests: initial pure-logic coverage exists for repo URL parsing/validation, max-commit cap validation, slug generation, import extraction/resolution, bus-factor file filtering, health snapshot aggregation, LLM cache keys, provider mapping, cost estimation, and prompt builders.
@@ -159,3 +160,5 @@ Missing but obviously needed:
 - `8e43f38` fix: use deploy-safe frontend API base path. Switched frontend API calls to same-origin `/api`, added Vite dev proxy configuration, documented frontend env variables, and tested the stream URL behavior.
 - `ea3106c` docs: update project brain after API config fix. Recorded the deploy-safe frontend API base path decision and current deployment config state.
 - `b8d53a9` fix: make ingestion submissions reuse active jobs. Returned the existing active ingestion job for duplicate submissions and scheduled background work with an explicit job id to avoid latest-job races.
+- `691bbc1` docs: update project brain after ingestion job reuse. Recorded the active-job reuse decision, updated ingestion risk notes, and bumped backend test count.
+- `df6b1da` chore: use structured logging for database startup. Replaced the last backend startup `print` with module logger metadata after verifying no backend prints remain.
