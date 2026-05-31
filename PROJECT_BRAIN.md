@@ -57,7 +57,7 @@ Incomplete or fragile:
 
 ## Discovered issues
 - Critical: zero tests exist across backend and frontend.
-- Critical: frontend has no automated tests, though lint/build gates now run locally.
+- Critical: frontend still lacks route-level/e2e coverage, though focused Vitest coverage now exists for health utilities, `HealthBadge`, and narrative stream parsing.
 - High: no CI, test automation, or deployment health gate.
 - High: npm audit reports 9 frontend dependency vulnerabilities after lockfile generation.
 - High: no migration files despite migration-aware database code.
@@ -108,13 +108,14 @@ Missing but obviously needed:
 - 2026-05-31: Hardened GitHub URL validation after tests exposed that non-GitHub HTTPS URLs and `.`/`..` path segments could pass low-level parsing.
 - 2026-05-31: Generated and committed the frontend npm lockfile to make installs reproducible before adding more frontend testing or dependency changes.
 - 2026-05-31: Added ESLint 9 flat config and typed graph explorer integration points instead of weakening `no-explicit-any`, so `npm run lint` is now a usable gate.
+- 2026-05-31: Added Vitest with jsdom and focused frontend smoke tests for health display logic and SSE narrative parsing; deferred route/e2e coverage to the next testing increment.
 
 ## Test coverage status
 - Backend unit tests: initial pure-logic coverage exists for repo URL parsing/validation, slug generation, import extraction/resolution, bus-factor file filtering, health snapshot aggregation, LLM cache keys, provider mapping, cost estimation, and prompt builders.
 - Backend integration/API tests: none.
-- Frontend unit/component tests: none.
+- Frontend unit/component tests: initial Vitest coverage exists for health status/formatting helpers, `HealthBadge`, and `streamNarrative` success/error parsing.
 - Frontend e2e/smoke tests: none.
-- Local quality gates: `python -m pytest`, `npm run lint`, and `npm run build` pass as of 2026-05-31. `npm run build` still emits a chunk-size warning.
+- Local quality gates: `python -m pytest`, `npm run test`, `npm run lint`, and `npm run build` pass as of 2026-05-31. `npm run test` emits Vite React plugin deprecation warnings; `npm run build` still emits a chunk-size warning.
 - CI quality gates: none.
 - Must be tested before shipping: GitHub URL parsing, repo slug generation, cache key generation, cost guard behavior, health scoring, semantic fallback behavior, graph import/co-change generation, bus-factor risk levels, ingestion progress SSE payloads, timeline/graph API responses, narrative streaming parser, and landing/analyze/dashboard user flows.
 
@@ -123,3 +124,5 @@ Missing but obviously needed:
 - `e2fc631` test: add backend logic coverage and harden repo URL validation. Established pytest configuration/dev requirements, added 19 backend pure-logic tests, and fixed URL validation gaps those tests exposed.
 - `d1e0cef` docs: update project brain after backend test baseline. Recorded the backend test baseline and parser-hardening decision.
 - `aa471ab` chore: make frontend builds reproducible and enforce lint. Added `package-lock.json`, ESLint flat config, and graph explorer type cleanup so lint/build are actionable.
+- `c089461` docs: update project brain after frontend quality gate. Recorded the frontend lockfile/lint/build baseline and remaining audit/bundle risks.
+- `4f5940b` test: add frontend smoke coverage for dashboard utilities. Added Vitest/jsdom setup and 7 frontend tests around health utilities, `HealthBadge`, and narrative stream parsing.
