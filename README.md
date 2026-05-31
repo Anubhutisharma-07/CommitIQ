@@ -57,11 +57,12 @@ uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
 
 ```bash
 cd frontend
+cp .env.example .env
 npm install
 npm run dev
 ```
 
-The frontend runs at `http://localhost:5173` by default and expects the backend at `http://localhost:8000`.
+The frontend runs at `http://localhost:5173` by default. In local development, Vite proxies `/api` requests when `VITE_DEV_API_PROXY_TARGET` is set in `frontend/.env`.
 
 ## Environment Variables
 
@@ -74,3 +75,12 @@ GITHUB_TOKEN=your_github_token_here
 ANTHROPIC_API_KEY=your_anthropic_api_key_here
 GEMINI_API_KEY=your_gemini_api_key_here
 ```
+
+Frontend variables live in `frontend/.env`:
+
+```env
+VITE_API_BASE_URL=
+VITE_DEV_API_PROXY_TARGET=http://127.0.0.1:8000
+```
+
+Leave `VITE_API_BASE_URL` blank when the deployed frontend and backend share an origin and the API is mounted at `/api`. Set it only when the browser must call a separate backend origin.
