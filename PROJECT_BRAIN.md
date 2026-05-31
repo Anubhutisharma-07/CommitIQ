@@ -6,7 +6,7 @@ CommitIQ is a full-stack repository health analyzer for GitHub projects. It inge
 ## Tech stack
 - Backend: Python 3.11+, FastAPI, SQLAlchemy async ORM, SQLite via aiosqlite by default, optional Postgres via asyncpg.
 - Repository analysis: GitPython, git subprocess calls, radon for Python complexity, lizard for JS/TS/Java/Go/C/C++ metrics, custom import/co-change graph extraction, git blame for bus factor.
-- Semantic analysis: optional GraphCodeBERT via transformers and torch, with difflib fallback.
+- Semantic analysis: difflib fallback enabled by default, optional GraphCodeBERT via transformers and torch only when `ENABLE_GRAPHCODEBERT=true`.
 - LLM layer: Anthropic Claude first, Google Gemini fallback, persisted narrative cache and per-repo cost/call guard.
 - Frontend: React 18, TypeScript, Vite, SWR, axios, Recharts, react-force-graph-2d, d3-force, lucide-react, Tailwind CSS-style utility classes plus custom CSS tokens.
 - Deployment/config: backend `.env.example`, frontend `.env.example`, frontend lockfile, and GitHub Actions CI are checked in; no Dockerfile, backend lockfile, or deployment manifest exists yet.
@@ -50,7 +50,7 @@ Incomplete or fragile:
 - No production ingestion boundary: FastAPI background tasks are not a durable job system. Active job reuse and cooperative cancellation reduce user-facing harm, but long repo analysis is still tied to a web worker process lifecycle.
 - Schema evolution gap: the project now has a tracked SQL migration runner, but future model changes still need explicit migration files and review discipline.
 - Metric contract ambiguity: names like "codebase health" are presented broadly, but many calculations operate on commit-touched files and shallow clone data.
-- Semantic analysis default risk: `ENABLE_SEMANTIC_ANALYSIS` defaults to true, which can trigger large model downloads/imports unless optional ML dependencies and cache strategy are deliberately configured.
+- Semantic analysis model risk is now gated: lightweight difflib drift remains enabled by default, while GraphCodeBERT requires explicit `ENABLE_GRAPHCODEBERT=true`; operators still need to plan ML cache/storage before enabling it.
 - Security/abuse surface: ingestion clones arbitrary public GitHub repositories and runs git commands over repo contents; URL validation and max-commit caps are now stronger, but storage quotas, concurrency controls, and operational limits still need hardening.
 - API/base URL behavior is now deployment-safe by default: frontend calls same-origin `/api`, with optional `VITE_API_BASE_URL` for separate API origins and a Vite dev proxy target for local development.
 - UI maintainability drift: Tailwind token configuration now exists, but heavy one-off styling still makes visual regressions likely without broader route-level visual/e2e coverage.
@@ -66,6 +66,7 @@ Incomplete or fragile:
 - Medium: backend startup now logs database initialization through the module logger; broader request/job observability is still limited.
 - Medium: production CORS now requires explicit `CORS_ORIGINS`; local development still gets localhost defaults when not in production.
 - Medium: LLM usage accounting now separates billable provider rows from pre-cached/demo rows; runtime cache-hit telemetry is still not persisted separately from narrative rows.
+- Medium: GraphCodeBERT model loading is now opt-in; deployments that enable it still need explicit model cache/storage planning.
 - Medium: shallow clone plus per-commit checkout can fail or produce incomplete stats around boundary commits and deleted/renamed files.
 
 ## Feature analysis
@@ -75,7 +76,7 @@ Exists:
 Half-done:
 - Demo mode exists as a route and LLM fallback concept but lacks seed data/scripts and a complete no-backend demo experience.
 - Migration support exists as a startup SQL runner with applied-file tracking and directory docs; it still lacks a generated-diff/revision authoring process.
-- Semantic drift is implemented but optional dependency/runtime behavior is not productionized.
+- Semantic drift is implemented with a default lightweight fallback; GraphCodeBERT is documented and opt-in but not productionized for cache/storage management.
 - Structural graph diff exists but uses separate visual language from the rest of the UI and likely relies on undefined design tokens.
 - LLM cache exists and usage reporting separates provider, demo, and pre-cached rows, but runtime cache-hit telemetry is not persisted as its own event stream.
 
@@ -126,16 +127,17 @@ Missing but obviously needed:
 - 2026-05-31: Made clone cleanup return success/failure instead of raising in ingestion cleanup paths, because cleanup errors should be logged without masking the original ingestion result.
 - 2026-05-31: Changed CORS config so production has no implicit browser origins, while development keeps localhost defaults for local ergonomics.
 - 2026-05-31: Changed LLM usage and budget accounting to count only billable provider rows while reporting pre-cached rows separately, because demo/cache records should not consume provider budget or inflate cost totals.
+- 2026-05-31: Split semantic drift enablement from GraphCodeBERT model loading, keeping fallback drift on by default while requiring explicit `ENABLE_GRAPHCODEBERT=true` for ML runtime costs.
 
 ## Test coverage status
-- Backend unit tests: initial pure-logic coverage exists for config parsing/CORS defaults, repo URL parsing/validation, max-commit cap validation, slug generation, clone cleanup success/failure, import extraction/resolution, bus-factor file filtering, health snapshot aggregation, LLM cache keys, provider mapping, cost estimation, usage/budget accounting, and prompt builders.
+- Backend unit tests: initial pure-logic coverage exists for config parsing/CORS defaults, boolean env parsing, repo URL parsing/validation, max-commit cap validation, slug generation, clone cleanup success/failure, import extraction/resolution, bus-factor file filtering, semantic fallback behavior, health snapshot aggregation, LLM cache keys, provider mapping, cost estimation, usage/budget accounting, and prompt builders.
 - Backend integration/API tests: database-backed coverage exists for repo listing/lookup, timeline payloads, graph payloads, bus factor payloads, LLM usage payloads, commit detail composition, active ingestion job reuse, background job scheduling arguments, and ingestion cancellation.
 - Backend migration tests: coverage exists for sorted SQL migration application, applied-file tracking, skip-on-reapply behavior, and SQLite duplicate-column protection.
 - Frontend unit/component tests: Vitest coverage exists for health status/formatting helpers, `HealthBadge`, and `streamNarrative` success/error parsing, including same-origin `/api` stream URL behavior.
 - Frontend route/smoke tests: landing-page repository validation/submission coverage, analyze-page cancellation/completion coverage, and demo-page bounded-analysis coverage exist with mocked API calls.
-- Local quality gates: `python -m pytest` (38 tests), `npm run test` (14 tests), `npm run lint`, `npm run build`, and `npm audit --audit-level=moderate` pass as of 2026-05-31.
+- Local quality gates: `python -m pytest` (40 tests), `npm run test` (14 tests), `npm run lint`, `npm run build`, and `npm audit --audit-level=moderate` pass as of 2026-05-31.
 - CI quality gates: GitHub Actions workflow exists for backend tests and frontend tests/lint/build.
-- Must be tested before shipping: semantic fallback behavior, graph co-change generation, ingestion progress SSE payload edge cases, dashboard route behavior, narrative streaming UI behavior, and at least one full landing-to-dashboard e2e flow.
+- Must be tested before shipping: graph co-change generation, ingestion progress SSE payload edge cases, dashboard route behavior, narrative streaming UI behavior, and at least one full landing-to-dashboard e2e flow.
 
 ## Commit log summary
 - `1132a0d` docs: initial PROJECT_BRAIN.md — full codebase understanding. Added the required living project understanding document before feature work.
@@ -174,3 +176,5 @@ Missing but obviously needed:
 - `1d2c207` docs: update project brain after CORS hardening. Recorded the production CORS decision, deployment docs, and clean audit status.
 - `ad667be` fix: report LLM usage from billable provider calls. Separated billable provider usage from pre-cached/demo narrative rows and added regression tests for usage summaries and budget checks.
 - docs: update project brain after LLM usage accounting. Recorded the LLM accounting decision, updated test counts, and narrowed remaining test gaps.
+- `d834ed9` fix: make GraphCodeBERT analysis explicitly opt-in. Added `ENABLE_GRAPHCODEBERT`, kept fallback semantic drift enabled, documented the runtime switch, and tested that fallback drift does not load the model path.
+- docs: update project brain after GraphCodeBERT opt-in. Recorded the semantic runtime decision, updated test counts, and narrowed the remaining semantic-analysis risk.
