@@ -102,9 +102,11 @@ Missing but obviously needed:
 - 2026-05-31: Treated `PROJECT_BRAIN.md` as the first required artifact and did not edit source code before creating it.
 - 2026-05-31: Prioritized test infrastructure and reproducibility ahead of feature additions because the project currently has no safe change boundary.
 - 2026-05-31: Added a "Discovered issues" section because critical production-readiness gaps were found during the audit.
+- 2026-05-31: Added backend pytest infrastructure before broader feature work, because pure parser/scoring/LLM helpers are the safest first regression boundary.
+- 2026-05-31: Hardened GitHub URL validation after tests exposed that non-GitHub HTTPS URLs and `.`/`..` path segments could pass low-level parsing.
 
 ## Test coverage status
-- Backend unit tests: none.
+- Backend unit tests: initial pure-logic coverage exists for repo URL parsing/validation, slug generation, import extraction/resolution, bus-factor file filtering, health snapshot aggregation, LLM cache keys, provider mapping, cost estimation, and prompt builders.
 - Backend integration/API tests: none.
 - Frontend unit/component tests: none.
 - Frontend e2e/smoke tests: none.
@@ -112,4 +114,5 @@ Missing but obviously needed:
 - Must be tested before shipping: GitHub URL parsing, repo slug generation, cache key generation, cost guard behavior, health scoring, semantic fallback behavior, graph import/co-change generation, bus-factor risk levels, ingestion progress SSE payloads, timeline/graph API responses, narrative streaming parser, and landing/analyze/dashboard user flows.
 
 ## Commit log summary
-- Pending: `docs: initial PROJECT_BRAIN.md — full codebase understanding` will add this full-codebase understanding document before any feature code changes.
+- `1132a0d` docs: initial PROJECT_BRAIN.md — full codebase understanding. Added the required living project understanding document before feature work.
+- `e2fc631` test: add backend logic coverage and harden repo URL validation. Established pytest configuration/dev requirements, added 19 backend pure-logic tests, and fixed URL validation gaps those tests exposed.
