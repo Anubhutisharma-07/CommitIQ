@@ -9,7 +9,7 @@ CommitIQ is a full-stack repository health analyzer for GitHub projects. It inge
 - Semantic analysis: difflib fallback enabled by default, optional GraphCodeBERT via transformers and torch only when `ENABLE_GRAPHCODEBERT=true`.
 - LLM layer: Anthropic Claude first, Google Gemini fallback, persisted narrative cache and per-repo cost/call guard.
 - Frontend: React 18, TypeScript, Vite, SWR, axios, Recharts, react-force-graph-2d, d3-force, lucide-react, Tailwind CSS-style utility classes plus custom CSS tokens.
-- Deployment/config: backend `.env.example`, frontend `.env.example`, frontend lockfile, GitHub Actions CI, contribution/security templates, and GitHub issue/PR templates are checked in; no Dockerfile, backend lockfile, or deployment manifest exists yet.
+- Deployment/config: backend `.env.example`, frontend `.env.example`, frontend lockfile, GitHub Actions CI/governance checks, contribution/security templates, Dependabot config, CODEOWNERS, and GitHub issue/PR templates are checked in; no Dockerfile, backend lockfile, or deployment manifest exists yet.
 
 ## Architecture overview
 - `backend/main.py` creates the FastAPI app, initializes database schema and SQL migrations on lifespan startup, configures CORS, and mounts repo ingestion plus LLM routers under `/api`.
@@ -58,7 +58,7 @@ Incomplete or fragile:
 ## Discovered issues
 - Critical: baseline backend and frontend tests now exist, and a Vitest app-flow smoke covers landing-to-dashboard navigation with mocked API/SSE; true browser e2e coverage is still absent.
 - Critical: full browser e2e coverage is still absent, though Vitest route smoke coverage now exists for landing, analyze, demo, dashboard, narrative UI, and app-level landing-to-dashboard flows.
-- High: no deployment health gate; CI now exists for tests/lint/build.
+- High: no deployment health gate; CI now exists for tests/lint/build and repository hygiene checks now run on pushes and pull requests.
 - High: npm audit previously reported 9 frontend dependency vulnerabilities; dependency upgrades now leave `npm audit --audit-level=moderate` clean as of 2026-05-31.
 - High: migration workflow now exists, but no model-changing migration files have been needed or authored yet.
 - High: demo route no longer depends on missing seeded data; it now starts a bounded `facebook/react` analysis, but a true instant fixture demo is still not available.
@@ -83,7 +83,7 @@ Half-done:
 Missing but obviously needed:
 - Real-browser e2e coverage for the full ingest-to-dashboard behavior.
 - Backend lockfiles or pinned dependency management.
-- CI secret/debug scans and deployment health checks.
+- Deployment health checks; basic CI secret/debug/conflict scans now exist.
 - Durable job processing or at least safer ingestion state management with retry and stronger cancellation semantics around long-running subprocesses.
 - Documented seed/demo path.
 - Production deployment configuration and environment docs.
@@ -136,6 +136,7 @@ Missing but obviously needed:
 - 2026-05-31: Added ingestion progress SSE edge-case tests for missing jobs, terminal jobs, and active-to-cancelled polling updates, because the analyze page depends on this stream for user-facing progress and recovery states.
 - 2026-05-31: Added professional GitHub repository materials and a deeper repo-health metrics roadmap, because maintainers need contribution/security workflows and the product needs a clear path from raw metrics to explainable risk signals.
 - 2026-05-31: Added persisted risk reasons and hotspot persistence to health snapshots, because users need to understand why a score moved and which risky files are recurring across recent commits.
+- 2026-05-31: Added repository governance checks for pushes and pull requests, plus PR metadata enforcement, Dependabot, and CODEOWNERS, because open-source-style repositories need automated guardrails beyond test execution.
 
 ## Test coverage status
 - Backend unit tests: initial pure-logic coverage exists for config parsing/CORS defaults, boolean env parsing, repo URL parsing/validation, max-commit cap validation, slug generation, clone cleanup success/failure, import extraction/resolution, co-change edge generation, top-file frequency, bus-factor file filtering, semantic fallback behavior, health snapshot aggregation, risk reasons/hotspot persistence, LLM cache keys, provider mapping, cost estimation, usage/budget accounting, and prompt builders.
@@ -144,7 +145,7 @@ Missing but obviously needed:
 - Frontend unit/component tests: Vitest coverage exists for health status/formatting helpers, `HealthBadge`, `streamNarrative` success/error parsing, and `NarrativeCard` disabled/streaming/done/error states, including same-origin `/api` stream URL behavior.
 - Frontend route/smoke tests: landing-page repository validation/submission coverage, analyze-page cancellation/completion coverage, demo-page bounded-analysis coverage, dashboard repository error/latest-commit/empty-timeline/detail-navigation/risk-reason rendering coverage, and app-level landing-to-dashboard navigation coverage exist with mocked API/SSE calls.
 - Local quality gates: `python -m pytest` (45 tests), `npm run test` (23 tests), `npm run lint`, `npm run build`, and `npm audit --audit-level=moderate` pass as of 2026-05-31.
-- CI quality gates: GitHub Actions workflow exists for backend tests and frontend tests/lint/build.
+- CI quality gates: GitHub Actions workflow exists for backend tests and frontend tests/lint/build. Repository governance also rejects conflict markers, obvious secrets, and debug output on pushes and pull requests; PRs additionally require conventional titles, bodies, and `PROJECT_BRAIN.md` updates for behavior-affecting files.
 - Must be tested before shipping: at least one real-browser landing-to-dashboard e2e flow.
 
 ## Commit log summary
@@ -200,3 +201,5 @@ Missing but obviously needed:
 - docs: update project brain after GitHub professionalization. Recorded the GitHub hygiene decision and deeper health metrics roadmap.
 - `76c2bd9` feat: explain repo health risk reasons. Persisted risk reason and hotspot persistence fields, added migration/schema/API/frontend support, and rendered top reasons plus recurring hotspots in the dashboard.
 - docs: update project brain after explainable health metrics. Recorded the score-explainability decision and updated coverage notes.
+- `f2c8d31` ci: add repository governance checks. Added push/PR hygiene scans, PR title/body validation, project-brain update enforcement for PRs, Dependabot, and CODEOWNERS.
+- docs: update project brain after repository governance. Recorded the governance decision and updated CI/deployment-risk notes.
