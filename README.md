@@ -1,13 +1,36 @@
 # CommitIQ
 
+[![CI](https://github.com/eshaanag/CommitIQ---/actions/workflows/ci.yml/badge.svg)](https://github.com/eshaanag/CommitIQ---/actions/workflows/ci.yml)
+
 CommitIQ analyzes a GitHub repository's commit history to show how code health changes over time. It ingests commits, computes complexity, churn, dependency, semantic drift, and bus factor signals, then presents an interactive dashboard with health timelines, graph exploration, hotspot views, and optional Claude or Gemini-generated commit narratives.
+
+## Features
+
+- GitHub repository ingestion with bounded commit analysis.
+- Health timeline based on complexity, churn, dependency, semantic, and ownership signals.
+- Import and co-change graph exploration for architectural risk.
+- Hotspot and bus-factor views for maintainability and ownership risk.
+- Optional Claude/Gemini narrative generation with cache and budget controls.
+- Ingestion progress streaming with cancellation support.
+- Light/dark React dashboard built with Vite, SWR, Recharts, and force graph tooling.
 
 ## Tech Stack
 
-- FastAPI and Python
-- React and Vite
-- SQLite
-- Claude and Gemini APIs
+- Backend: FastAPI, SQLAlchemy async ORM, SQLite by default, optional Postgres.
+- Analysis: GitPython, git subprocesses, radon, lizard, custom graph and ownership analysis.
+- Semantic drift: lightweight difflib fallback by default, optional GraphCodeBERT.
+- LLMs: Anthropic Claude first, Google Gemini fallback.
+- Frontend: React, TypeScript, Vite, SWR, Recharts, react-force-graph-2d.
+
+## Repository Structure
+
+```text
+backend/      FastAPI app, ingestion, metrics, LLM, database models, tests
+frontend/     React dashboard, route/component tests, Vite config
+migrations/   SQL migration runner documentation
+docs/         Product and engineering design notes
+.github/      CI workflow, issue templates, pull request template
+```
 
 ## Prerequisites
 
@@ -94,3 +117,35 @@ VITE_DEV_API_PROXY_TARGET=http://127.0.0.1:8000
 ```
 
 Leave `VITE_API_BASE_URL` blank when the deployed frontend and backend share an origin and the API is mounted at `/api`. Set it only when the browser must call a separate backend origin.
+
+## Quality Gates
+
+Run these before opening a pull request:
+
+```bash
+python -m pytest
+cd frontend
+npm run test
+npm run lint
+npm run build
+npm audit --audit-level=moderate
+```
+
+CI runs backend tests and frontend tests/lint/build on pushes to `main` and pull requests.
+
+## Documentation
+
+- [PROJECT_BRAIN.md](PROJECT_BRAIN.md) tracks architecture, decisions, current risks, test status, and improvement history.
+- [docs/REPO_HEALTH_METRICS.md](docs/REPO_HEALTH_METRICS.md) outlines deeper repo-health metrics planned for future product versions.
+- [CONTRIBUTING.md](CONTRIBUTING.md) explains local setup, expectations, and pull request checks.
+- [SECURITY.md](SECURITY.md) explains vulnerability reporting and operator security notes.
+
+## Roadmap
+
+Near-term priorities:
+
+- Add a real-browser landing-to-dashboard e2e test.
+- Tighten backend dependency reproducibility.
+- Add a fixture-backed instant demo path.
+- Improve deployment packaging and health checks.
+- Deepen health scoring with risk reasons, hotspot persistence, ownership entropy, coupling surprise, blast radius, and cycle severity.
