@@ -111,10 +111,12 @@ Missing but obviously needed:
 - 2026-05-31: Added Vitest with jsdom and focused frontend smoke tests for health display logic and SSE narrative parsing; deferred route/e2e coverage to the next testing increment.
 - 2026-05-31: Added GitHub Actions CI to run backend pytest and frontend npm ci/test/lint/build on pushes to `main` and pull requests.
 - 2026-05-31: Capped `IngestRequest.max_commits` at the configured backend maximum and exposed the 500-commit UI max to prevent accidental oversized ingestion jobs.
+- 2026-05-31: Added backend database-backed endpoint coverage for repo listing, lookup, timeline, graph, bus factor, usage, and commit detail payloads.
+- 2026-05-31: Moved the heavy metrics extractor import into `run_ingestion` so read-only API route imports do not require analysis dependencies such as `lizard` unless ingestion actually runs.
 
 ## Test coverage status
 - Backend unit tests: initial pure-logic coverage exists for repo URL parsing/validation, max-commit cap validation, slug generation, import extraction/resolution, bus-factor file filtering, health snapshot aggregation, LLM cache keys, provider mapping, cost estimation, and prompt builders.
-- Backend integration/API tests: none.
+- Backend integration/API tests: database-backed coverage exists for repo listing/lookup, timeline payloads, graph payloads, bus factor payloads, LLM usage payloads, and commit detail composition.
 - Frontend unit/component tests: initial Vitest coverage exists for health status/formatting helpers, `HealthBadge`, and `streamNarrative` success/error parsing.
 - Frontend e2e/smoke tests: none.
 - Local quality gates: `python -m pytest`, `npm run test`, `npm run lint`, and `npm run build` pass as of 2026-05-31. `npm run test` emits Vite React plugin deprecation warnings; `npm run build` still emits a chunk-size warning.
@@ -132,3 +134,5 @@ Missing but obviously needed:
 - `40d4663` ci: run backend and frontend quality gates. Added GitHub Actions for backend pytest and frontend npm ci/test/lint/build on pushes and pull requests.
 - `d840474` docs: update project brain after ci setup. Recorded the CI workflow and updated quality-gate status.
 - `6fb83c3` fix: cap ingestion commit limits to protect analysis jobs. Enforced the configured max commit cap in backend validation, added regression coverage, and reflected the limit in the landing form.
+- `b049e64` docs: update project brain after ingestion cap. Recorded the ingestion cap hardening and updated test coverage notes.
+- `4b3ee64` test: cover backend repository data endpoints. Added database-backed endpoint coverage and deferred heavy metrics imports until ingestion execution.
