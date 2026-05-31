@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 
 from sqlalchemy import text
@@ -6,6 +7,7 @@ from sqlalchemy.orm import DeclarativeBase
 
 from backend.config import DATABASE_URL
 
+logger = logging.getLogger(__name__)
 _IS_SQLITE = DATABASE_URL.startswith("sqlite")
 
 engine = create_async_engine(
@@ -135,4 +137,4 @@ async def init_db():
         await conn.run_sync(Base.metadata.create_all)
         applied = await apply_sql_migrations(conn)
 
-    print(f"Database initialized. Applied {len(applied)} migrations.")
+    logger.info("Database initialized", extra={"migrations_applied": len(applied)})
