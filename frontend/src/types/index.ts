@@ -51,6 +51,21 @@ export interface TopFileMetric {
   loc: number
 }
 
+export interface RiskReason {
+  code: string
+  severity: string
+  label: string
+  detail: string
+  impact: number
+}
+
+export interface PersistentHotspot {
+  path: string
+  recent_commit_count: number
+  complexity: number
+  loc: number
+}
+
 export interface HealthSnapshot {
   id?: number
   repo_id?: number
@@ -89,6 +104,9 @@ export interface HealthSnapshot {
   semantic_health_score?: number
   high_drift_files?: number
   semantic_drift_method?: string
+  risk_reasons?: RiskReason[]
+  hotspot_persistence_score?: number
+  persistent_hotspots?: PersistentHotspot[]
   top_files: TopFileMetric[]
   computed_at?: string | null
 }

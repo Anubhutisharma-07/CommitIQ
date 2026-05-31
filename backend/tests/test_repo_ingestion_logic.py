@@ -211,6 +211,9 @@ def test_compute_full_snapshot_aggregates_metric_and_semantic_inputs():
             "semantic_drift_method": "fallback_levenshtein",
         },
     }
+    persistent_hotspots = [
+        {"path": "src/high.py", "recent_commit_count": 4, "complexity": 8.0, "loc": 120},
+    ]
 
     snapshot = compute_full_snapshot(
         commit_data=commit_data,
@@ -221,6 +224,7 @@ def test_compute_full_snapshot_aggregates_metric_and_semantic_inputs():
         dependency_density=0.5,
         has_cycles=True,
         hotspot_files=["src/high.py"],
+        persistent_hotspots=persistent_hotspots,
     )
 
     assert snapshot["full_sha"] == "abc123"
@@ -233,6 +237,15 @@ def test_compute_full_snapshot_aggregates_metric_and_semantic_inputs():
     assert snapshot["avg_semantic_drift"] == 0.25
     assert snapshot["semantic_health_score"] == 75.0
     assert snapshot["semantic_drift_method"] == "fallback_levenshtein"
+    assert snapshot["hotspot_persistence_score"] == 50.0
 
     top_files = json.loads(snapshot["top_files_json"])
     assert [item["path"] for item in top_files] == ["src/high.py", "src/low.py"]
+    risk_reasons = json.loads(snapshot["risk_reasons_json"])
+    assert {reason["code"] for reason in risk_reasons} >= {
+        "dependency_cycle",
+        "limited_ownership",
+        "semantic_drift",
+        "persistent_hotspots",
+    }
+    assert json.loads(snapshot["persistent_hotspots_json"]) == persistent_hotspots

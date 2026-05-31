@@ -178,6 +178,9 @@ def _seed_repo(session: Session) -> None:
             semantic_health_score=88,
             high_drift_files=0,
             semantic_drift_method="fallback_levenshtein",
+            risk_reasons_json='[{"code":"single_owner","severity":"critical","label":"Single-owner risk","detail":"At least one critical module has only one active contributor.","impact":30.0}]',
+            hotspot_persistence_score=37.5,
+            persistent_hotspots_json='[{"path":"src/service.py","recent_commit_count":3,"complexity":7.25,"loc":160}]',
             top_files_json='[{"path":"src/service.py","complexity":7.25,"loc":160}]',
         ),
     ])
@@ -284,6 +287,9 @@ async def test_timeline_returns_snapshot_payloads(db_session: AsyncSessionAdapte
         {"path": "src/service.py", "complexity": 7.25, "loc": 160}
     ]
     assert payload["commits"][1]["subscores"]["semantic_drift"] == 88
+    assert payload["commits"][1]["risk_reasons"][0]["code"] == "single_owner"
+    assert payload["commits"][1]["hotspot_persistence_score"] == 37.5
+    assert payload["commits"][1]["persistent_hotspots"][0]["path"] == "src/service.py"
 
 
 async def test_graph_bus_factor_and_usage_endpoints_return_seeded_data(db_session: AsyncSessionAdapter):

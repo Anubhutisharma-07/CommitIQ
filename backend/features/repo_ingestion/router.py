@@ -83,6 +83,16 @@ def _parse_top_files(raw: str | None) -> list[dict]:
         return []
 
 
+def _parse_json_list(raw: str | None) -> list[dict]:
+    if not raw:
+        return []
+    try:
+        value = json.loads(raw)
+        return value if isinstance(value, list) else []
+    except json.JSONDecodeError:
+        return []
+
+
 def _detect_cycles(edges: list[dict]) -> bool:
     graph: dict[str, list[str]] = {}
     for edge in edges:
@@ -126,6 +136,37 @@ def _hotspot_files(
     ]
 
 
+def _persistent_hotspots(
+    commit_history: list[dict],
+    current_index: int,
+    file_metrics_map: dict,
+    min_recent_commits: int = 3,
+) -> list[dict]:
+    recent_commits = commit_history[max(0, current_index - 5):current_index + 1]
+    churn_counts: dict[str, int] = {}
+    for commit_data in recent_commits:
+        for fpath in set(commit_data.get("files_list", [])):
+            churn_counts[fpath] = churn_counts.get(fpath, 0) + 1
+
+    hotspots = []
+    for fpath, recent_count in churn_counts.items():
+        metrics = file_metrics_map.get(fpath, {})
+        avg_complexity = float(metrics.get("avg_complexity", 0.0))
+        if recent_count < min_recent_commits or avg_complexity <= 5.0:
+            continue
+        hotspots.append({
+            "path": fpath,
+            "recent_commit_count": recent_count,
+            "complexity": round(avg_complexity, 2),
+            "loc": int(metrics.get("loc", 0)),
+        })
+    return sorted(
+        hotspots,
+        key=lambda item: (item["recent_commit_count"], item["complexity"], item["loc"]),
+        reverse=True,
+    )
+
+
 def _snapshot_payload(commit: Commit, snap: HealthSnapshot) -> dict:
     return {
         "id": snap.id,
@@ -165,6 +206,9 @@ def _snapshot_payload(commit: Commit, snap: HealthSnapshot) -> dict:
         "semantic_health_score": snap.semantic_health_score,
         "high_drift_files": snap.high_drift_files,
         "semantic_drift_method": snap.semantic_drift_method,
+        "risk_reasons": _parse_json_list(snap.risk_reasons_json),
+        "hotspot_persistence_score": snap.hotspot_persistence_score,
+        "persistent_hotspots": _parse_json_list(snap.persistent_hotspots_json),
         "top_files": _parse_top_files(snap.top_files_json),
         "computed_at": snap.computed_at,
     }
@@ -378,6 +422,7 @@ async def run_ingestion(repo_id: int, job_id: int, max_commits: int) -> None:
                     filtered_edges.append(edge)
 
                 hotspot_files = _hotspot_files(commit_history, idx, file_metrics_map)
+                persistent_hotspots = _persistent_hotspots(commit_history, idx, file_metrics_map)
                 dependency_density = len(filtered_edges) / max(len(top_files), 1)
                 has_cycles = _detect_cycles(filtered_edges)
                 snapshot_data = compute_full_snapshot(
@@ -389,6 +434,7 @@ async def run_ingestion(repo_id: int, job_id: int, max_commits: int) -> None:
                     dependency_density=dependency_density,
                     has_cycles=has_cycles,
                     hotspot_files=hotspot_files,
+                    persistent_hotspots=persistent_hotspots,
                 )
 
                 commit_obj = Commit(

@@ -111,6 +111,21 @@ class TopFileMetric(BaseModel):
     loc: int
 
 
+class RiskReason(BaseModel):
+    code: str
+    severity: str
+    label: str
+    detail: str
+    impact: float
+
+
+class PersistentHotspot(BaseModel):
+    path: str
+    recent_commit_count: int
+    complexity: float
+    loc: int
+
+
 class HealthSnapshotOut(BaseModel):
     id: int | None = None
     repo_id: int | None = None
@@ -143,6 +158,9 @@ class HealthSnapshotOut(BaseModel):
     semantic_health_score: float = 100.0
     high_drift_files: int = 0
     semantic_drift_method: str = "none"
+    risk_reasons: list[RiskReason] = Field(default_factory=list)
+    hotspot_persistence_score: float = 0.0
+    persistent_hotspots: list[PersistentHotspot] = Field(default_factory=list)
     top_files: list[TopFileMetric] = Field(default_factory=list)
     computed_at: datetime | None = None
 

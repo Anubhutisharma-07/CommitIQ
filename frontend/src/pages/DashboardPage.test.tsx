@@ -129,6 +129,9 @@ function makeSnapshot(overrides: Partial<HealthSnapshot>): HealthSnapshot {
     avg_semantic_drift: 0.08,
     semantic_health_score: 92,
     semantic_drift_method: 'fallback_levenshtein',
+    risk_reasons: [],
+    hotspot_persistence_score: 0,
+    persistent_hotspots: [],
     top_files: [],
     ...overrides,
   }
@@ -159,7 +162,25 @@ describe('DashboardPage', () => {
     getRepoBySlugMock.mockResolvedValue(makeRepo())
     getHealthTimelineMock.mockResolvedValue([
       makeSnapshot({ sha: 'abc123', full_sha: 'abc123', message: 'Initial import', health_score: 76 }),
-      makeSnapshot({ sha: 'def456', full_sha: 'def456', message: 'Improve ingestion resilience', health_score: 91 }),
+      makeSnapshot({
+        sha: 'def456',
+        full_sha: 'def456',
+        message: 'Improve ingestion resilience',
+        health_score: 91,
+        risk_reasons: [
+          {
+            code: 'single_owner',
+            severity: 'critical',
+            label: 'Single-owner risk',
+            detail: 'At least one critical module has only one active contributor.',
+            impact: 30,
+          },
+        ],
+        hotspot_persistence_score: 37.5,
+        persistent_hotspots: [
+          { path: 'src/service.py', recent_commit_count: 3, complexity: 7.25, loc: 160 },
+        ],
+      }),
     ])
     getBusFactorMock.mockResolvedValue({
       repo_id: 7,
@@ -226,6 +247,8 @@ describe('DashboardPage', () => {
     expect(screen.getByTestId('cost-meter')).toHaveTextContent('provider calls: 1')
     expect(screen.getByTestId('narrative-card')).toHaveTextContent('narrative 7:def456')
     expect(screen.getByTestId('hotspots')).toHaveTextContent('hotspots 7:def456')
+    expect(screen.getByText('Single-owner risk')).toBeInTheDocument()
+    expect(screen.getByText('src/service.py')).toBeInTheDocument()
 
     await waitFor(() => {
       expect(getGraphMock).toHaveBeenCalledWith(7, 'def456')

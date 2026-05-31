@@ -91,6 +91,9 @@ class HealthSnapshot(Base):
     semantic_health_score   = Column(Float, nullable=False, default=100.0)
     high_drift_files        = Column(Integer, nullable=False, default=0)
     semantic_drift_method   = Column(String, nullable=False, default="none")
+    risk_reasons_json       = Column(Text, nullable=True)
+    hotspot_persistence_score = Column(Float, nullable=False, default=0.0)
+    persistent_hotspots_json = Column(Text, nullable=True)
     top_files_json    = Column(Text, nullable=True)
     computed_at       = Column(DateTime(timezone=True), server_default=func.now())
 

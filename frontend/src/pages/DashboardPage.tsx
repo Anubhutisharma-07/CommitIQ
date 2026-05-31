@@ -29,6 +29,8 @@ export default function DashboardPage() {
   const graphState = useSWR(repoId && selected ? ['graph', repoId, selected.sha] : null, () => getGraph(repoId as number, selected?.sha))
   const usageState = useSWR(repoId ? ['llm-usage', repoId] : null, () => getLLMUsage(repoId as number))
   const selectedChurnPct = selected ? Math.min(Math.max(selected.churn_rate * 100, 0), 100) : 0
+  const selectedRiskReasons = selected?.risk_reasons?.slice(0, 4) || []
+  const selectedPersistentHotspots = selected?.persistent_hotspots?.slice(0, 3) || []
 
   useEffect(() => {
     if (commits.length && !selected) {
@@ -255,6 +257,59 @@ export default function DashboardPage() {
                   </div>
                 ))}
               </div>
+              {(selectedRiskReasons.length > 0 || selectedPersistentHotspots.length > 0) && (
+                <div className="mt-4 grid grid-cols-1 xl:grid-cols-2 gap-4">
+                  {selectedRiskReasons.length > 0 && (
+                    <div className="border border-white/5 bg-white/[0.03] rounded-[20px] p-4">
+                      <div className="font-head text-[10px] text-slate-400 font-semibold uppercase tracking-wider mb-3">
+                        Top Risk Reasons
+                      </div>
+                      <div className="space-y-2">
+                        {selectedRiskReasons.map((reason) => (
+                          <div key={`${reason.code}-${reason.label}`} className="flex items-start justify-between gap-3 text-xs">
+                            <div className="min-w-0">
+                              <div className="text-slate-100 font-semibold">{reason.label}</div>
+                              <div className="text-slate-500 leading-relaxed mt-0.5">{reason.detail}</div>
+                            </div>
+                            <span className={`flex-shrink-0 rounded-full px-2 py-0.5 font-mono text-[9px] uppercase border ${
+                              reason.severity === 'critical'
+                                ? 'bg-rose-500/10 text-rose-300 border-rose-500/20'
+                                : reason.severity === 'high'
+                                  ? 'bg-orange-500/10 text-orange-300 border-orange-500/20'
+                                  : 'bg-amber-500/10 text-amber-300 border-amber-500/20'
+                            }`}>
+                              {reason.severity}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedPersistentHotspots.length > 0 && (
+                    <div className="border border-white/5 bg-white/[0.03] rounded-[20px] p-4">
+                      <div className="flex items-center justify-between gap-3 mb-3">
+                        <div className="font-head text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
+                          Persistent Hotspots
+                        </div>
+                        <span className="font-mono text-[10px] text-purple-300">
+                          {(selected.hotspot_persistence_score || 0).toFixed(0)}/100
+                        </span>
+                      </div>
+                      <div className="space-y-2">
+                        {selectedPersistentHotspots.map((hotspot) => (
+                          <div key={hotspot.path} className="flex items-center justify-between gap-3 text-xs">
+                            <span className="font-mono text-slate-200 truncate min-w-0">{hotspot.path}</span>
+                            <span className="flex-shrink-0 text-slate-500">
+                              {hotspot.recent_commit_count} commits / cx {hotspot.complexity.toFixed(1)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
               <div className="mt-4">
                 <NarrativeCard repoId={repoId as number} commitSha={selected.sha} />
               </div>
