@@ -51,7 +51,7 @@ Incomplete or fragile:
 - Schema evolution gap: create-all plus absent migrations hides incompatible model changes until existing deployments break.
 - Metric contract ambiguity: names like "codebase health" are presented broadly, but many calculations operate on commit-touched files and shallow clone data.
 - Semantic analysis default risk: `ENABLE_SEMANTIC_ANALYSIS` defaults to true, which can trigger large model downloads/imports unless optional ML dependencies and cache strategy are deliberately configured.
-- Security/abuse surface: ingestion clones arbitrary public GitHub repositories with user-controlled max commits and runs git commands over repo contents; limits, timeouts, storage quotas, and URL validation need hardening.
+- Security/abuse surface: ingestion clones arbitrary public GitHub repositories and runs git commands over repo contents; URL validation and max-commit caps are now stronger, but storage quotas, concurrency controls, and operational limits still need hardening.
 - API/base URL fragility: frontend defaults to `http://localhost:8000`; acceptable locally but needs environment-driven deployment config and documented production behavior.
 - UI maintainability drift: many custom Tailwind classes depend on missing theme configuration and heavy one-off styling, making visual regressions likely.
 
@@ -110,9 +110,10 @@ Missing but obviously needed:
 - 2026-05-31: Added ESLint 9 flat config and typed graph explorer integration points instead of weakening `no-explicit-any`, so `npm run lint` is now a usable gate.
 - 2026-05-31: Added Vitest with jsdom and focused frontend smoke tests for health display logic and SSE narrative parsing; deferred route/e2e coverage to the next testing increment.
 - 2026-05-31: Added GitHub Actions CI to run backend pytest and frontend npm ci/test/lint/build on pushes to `main` and pull requests.
+- 2026-05-31: Capped `IngestRequest.max_commits` at the configured backend maximum and exposed the 500-commit UI max to prevent accidental oversized ingestion jobs.
 
 ## Test coverage status
-- Backend unit tests: initial pure-logic coverage exists for repo URL parsing/validation, slug generation, import extraction/resolution, bus-factor file filtering, health snapshot aggregation, LLM cache keys, provider mapping, cost estimation, and prompt builders.
+- Backend unit tests: initial pure-logic coverage exists for repo URL parsing/validation, max-commit cap validation, slug generation, import extraction/resolution, bus-factor file filtering, health snapshot aggregation, LLM cache keys, provider mapping, cost estimation, and prompt builders.
 - Backend integration/API tests: none.
 - Frontend unit/component tests: initial Vitest coverage exists for health status/formatting helpers, `HealthBadge`, and `streamNarrative` success/error parsing.
 - Frontend e2e/smoke tests: none.
@@ -129,3 +130,5 @@ Missing but obviously needed:
 - `4f5940b` test: add frontend smoke coverage for dashboard utilities. Added Vitest/jsdom setup and 7 frontend tests around health utilities, `HealthBadge`, and narrative stream parsing.
 - `00a4c17` docs: update project brain after frontend tests. Recorded the frontend test baseline and current local gate status.
 - `40d4663` ci: run backend and frontend quality gates. Added GitHub Actions for backend pytest and frontend npm ci/test/lint/build on pushes and pull requests.
+- `d840474` docs: update project brain after ci setup. Recorded the CI workflow and updated quality-gate status.
+- `6fb83c3` fix: cap ingestion commit limits to protect analysis jobs. Enforced the configured max commit cap in backend validation, added regression coverage, and reflected the limit in the landing form.
