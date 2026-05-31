@@ -57,10 +57,12 @@ Incomplete or fragile:
 
 ## Discovered issues
 - Critical: zero tests exist across backend and frontend.
-- Critical: no reproducible frontend install because no lockfile is checked in.
-- High: no CI, lint/test automation, or deployment health gate.
+- Critical: frontend has no automated tests, though lint/build gates now run locally.
+- High: no CI, test automation, or deployment health gate.
+- High: npm audit reports 9 frontend dependency vulnerabilities after lockfile generation.
 - High: no migration files despite migration-aware database code.
 - High: demo route references seeded data that the repo does not provide.
+- Medium: production frontend bundle is about 919 kB minified, triggering the configured Vite chunk warning.
 - Medium: backend startup uses `print` in database initialization instead of structured logging.
 - Medium: default CORS allows several localhost origins only; production CORS must be explicit.
 - Medium: LLM usage summary counts persisted narratives, not runtime cache-hit events; cache hit metrics are therefore misleading.
@@ -104,15 +106,20 @@ Missing but obviously needed:
 - 2026-05-31: Added a "Discovered issues" section because critical production-readiness gaps were found during the audit.
 - 2026-05-31: Added backend pytest infrastructure before broader feature work, because pure parser/scoring/LLM helpers are the safest first regression boundary.
 - 2026-05-31: Hardened GitHub URL validation after tests exposed that non-GitHub HTTPS URLs and `.`/`..` path segments could pass low-level parsing.
+- 2026-05-31: Generated and committed the frontend npm lockfile to make installs reproducible before adding more frontend testing or dependency changes.
+- 2026-05-31: Added ESLint 9 flat config and typed graph explorer integration points instead of weakening `no-explicit-any`, so `npm run lint` is now a usable gate.
 
 ## Test coverage status
 - Backend unit tests: initial pure-logic coverage exists for repo URL parsing/validation, slug generation, import extraction/resolution, bus-factor file filtering, health snapshot aggregation, LLM cache keys, provider mapping, cost estimation, and prompt builders.
 - Backend integration/API tests: none.
 - Frontend unit/component tests: none.
 - Frontend e2e/smoke tests: none.
+- Local quality gates: `python -m pytest`, `npm run lint`, and `npm run build` pass as of 2026-05-31. `npm run build` still emits a chunk-size warning.
 - CI quality gates: none.
 - Must be tested before shipping: GitHub URL parsing, repo slug generation, cache key generation, cost guard behavior, health scoring, semantic fallback behavior, graph import/co-change generation, bus-factor risk levels, ingestion progress SSE payloads, timeline/graph API responses, narrative streaming parser, and landing/analyze/dashboard user flows.
 
 ## Commit log summary
 - `1132a0d` docs: initial PROJECT_BRAIN.md — full codebase understanding. Added the required living project understanding document before feature work.
 - `e2fc631` test: add backend logic coverage and harden repo URL validation. Established pytest configuration/dev requirements, added 19 backend pure-logic tests, and fixed URL validation gaps those tests exposed.
+- `d1e0cef` docs: update project brain after backend test baseline. Recorded the backend test baseline and parser-hardening decision.
+- `aa471ab` chore: make frontend builds reproducible and enforce lint. Added `package-lock.json`, ESLint flat config, and graph explorer type cleanup so lint/build are actionable.
