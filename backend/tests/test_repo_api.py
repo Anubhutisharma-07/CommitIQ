@@ -1,5 +1,6 @@
 from collections.abc import AsyncIterator
 from datetime import datetime, timezone
+import json
 
 import pytest
 from fastapi import HTTPException
@@ -13,6 +14,7 @@ from backend.features.repo_ingestion.router import (
     get_bus_factor,
     get_commit_detail,
     get_graph,
+    ingest_progress,
     get_llm_usage,
     get_repo_by_slug,
     get_timeline,
@@ -72,6 +74,13 @@ class BackgroundTaskRecorder:
 
     def add_task(self, func, *args, **kwargs):
         self.tasks.append((func, args, kwargs))
+
+
+async def _read_sse_payload(response) -> dict:
+    chunk = await anext(response.body_iterator)
+    text = chunk.decode("utf-8") if isinstance(chunk, bytes) else chunk
+    assert text.startswith("data: ")
+    return json.loads(text.removeprefix("data: ").strip())
 
 
 def _seed_repo(session: Session) -> None:
@@ -404,3 +413,103 @@ async def test_cancel_ingestion_requires_active_job(db_session: AsyncSessionAdap
 
     assert exc_info.value.status_code == 404
     assert exc_info.value.headers["X-CommitIQ-Error"] == "job_not_found"
+
+
+async def test_ingest_progress_streams_error_payload_when_job_is_missing(db_session: AsyncSessionAdapter):
+    response = await ingest_progress(repo_id=1, db=db_session)
+
+    payload = await _read_sse_payload(response)
+
+    assert response.media_type == "text/event-stream"
+    assert payload == {"status": "error", "error_message": "Job not found"}
+    with pytest.raises(StopAsyncIteration):
+        await anext(response.body_iterator)
+
+
+async def test_ingest_progress_streams_terminal_job_once(db_session: AsyncSessionAdapter):
+    job = AnalysisJob(
+        repo_id=1,
+        status="ready",
+        total_commits=3,
+        processed_commits=3,
+        current_sha="def456abc123",
+        current_stage="Complete",
+        progress_pct=100.0,
+        triggered_by="user",
+    )
+    db_session.session.add(job)
+    db_session.session.commit()
+
+    response = await ingest_progress(repo_id=1, db=db_session)
+    payload = await _read_sse_payload(response)
+
+    assert payload == {
+        "current": 3,
+        "total": 3,
+        "current_sha": "def456abc123",
+        "stage": "Complete",
+        "progress_pct": 100.0,
+        "status": "ready",
+        "error_message": None,
+    }
+    with pytest.raises(StopAsyncIteration):
+        await anext(response.body_iterator)
+
+
+async def test_ingest_progress_stream_picks_up_cancelled_job_updates(monkeypatch):
+    class FakeExecuteResult:
+        def __init__(self, job):
+            self.job = job
+
+        def scalar_one_or_none(self):
+            return self.job
+
+    class FakeProgressDb:
+        def __init__(self):
+            self.jobs = [
+                AnalysisJob(
+                    repo_id=1,
+                    status="queued",
+                    total_commits=5,
+                    processed_commits=0,
+                    current_stage="Queued",
+                    progress_pct=0.0,
+                    triggered_by="user",
+                ),
+                AnalysisJob(
+                    repo_id=1,
+                    status="cancelled",
+                    total_commits=5,
+                    processed_commits=0,
+                    current_stage="Cancelled",
+                    progress_pct=0.0,
+                    error_message="Ingestion cancelled by user.",
+                    triggered_by="user",
+                ),
+            ]
+            self.rollback_count = 0
+
+        async def execute(self, statement):
+            return FakeExecuteResult(self.jobs.pop(0))
+
+        async def rollback(self):
+            self.rollback_count += 1
+
+    async def skip_sleep(seconds: float):
+        return None
+
+    db = FakeProgressDb()
+    monkeypatch.setattr("backend.features.repo_ingestion.router.asyncio.sleep", skip_sleep)
+
+    response = await ingest_progress(repo_id=1, db=db)
+    first_payload = await _read_sse_payload(response)
+    assert first_payload["status"] == "queued"
+
+    second_payload = await _read_sse_payload(response)
+
+    assert second_payload["status"] == "cancelled"
+    assert second_payload["stage"] == "Cancelled"
+    assert second_payload["error_message"] == "Ingestion cancelled by user."
+    assert db.rollback_count == 1
+    with pytest.raises(StopAsyncIteration):
+        await anext(response.body_iterator)
