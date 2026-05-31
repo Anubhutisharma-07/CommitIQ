@@ -68,6 +68,8 @@ The frontend runs at `http://localhost:5173` by default. In local development, V
 
 ```env
 DATABASE_URL=your_database_url_here
+ENVIRONMENT=development
+CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
 REPO_STORAGE_PATH=/tmp/commitiq_repos
 LLM_MAX_CALLS=25
 MAX_COMMITS=150
@@ -75,6 +77,8 @@ GITHUB_TOKEN=your_github_token_here
 ANTHROPIC_API_KEY=your_anthropic_api_key_here
 GEMINI_API_KEY=your_gemini_api_key_here
 ```
+
+Set `ENVIRONMENT=production` in deployed environments and provide the exact browser origins allowed to call the API in `CORS_ORIGINS`.
 
 Frontend variables live in `frontend/.env`:
 

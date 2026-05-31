@@ -16,6 +16,20 @@ def _parse_csv(value: str) -> list[str]:
     return [item.strip() for item in value.split(",") if item.strip()]
 
 
+DEFAULT_LOCAL_CORS_ORIGINS = (
+    "http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174,"
+    "http://localhost:5175,http://127.0.0.1:5175,http://localhost:3000,http://127.0.0.1:3000"
+)
+
+
+def _cors_origins(environment: str, raw_origins: str | None) -> list[str]:
+    if raw_origins is not None:
+        return _parse_csv(raw_origins)
+    if environment.lower() == "production":
+        return []
+    return _parse_csv(DEFAULT_LOCAL_CORS_ORIGINS)
+
+
 ANTHROPIC_API_KEY  = os.getenv("ANTHROPIC_API_KEY", "")
 GEMINI_API_KEY     = os.getenv("GEMINI_API_KEY", "")
 GITHUB_TOKEN       = os.getenv("GITHUB_TOKEN", "")
@@ -26,10 +40,6 @@ LLM_MAX_CALLS      = int(os.getenv("LLM_BUDGET_PER_REPO", os.getenv("LLM_MAX_CAL
 LLM_BUDGET_PER_REPO_USD = float(os.getenv("LLM_BUDGET_PER_REPO_USD", "0.50"))
 ENABLE_SEMANTIC_ANALYSIS = os.getenv("ENABLE_SEMANTIC_ANALYSIS", "true").lower() not in {"0", "false", "no"}
 ENVIRONMENT        = os.getenv("ENVIRONMENT", "development")
-CORS_ORIGINS       = _parse_csv(os.getenv(
-    "CORS_ORIGINS",
-    "http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174,"
-    "http://localhost:5175,http://127.0.0.1:5175,http://localhost:3000,http://127.0.0.1:3000",
-))
+CORS_ORIGINS       = _cors_origins(ENVIRONMENT, os.getenv("CORS_ORIGINS"))
 
 REPO_STORAGE_PATH.mkdir(parents=True, exist_ok=True)
