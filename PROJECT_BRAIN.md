@@ -132,16 +132,17 @@ Missing but obviously needed:
 - 2026-05-31: Added an app-level landing-to-dashboard smoke test inside Vitest rather than adding Playwright immediately, because it closes the main route orchestration risk using existing tooling while keeping a true browser e2e runner as a separate infrastructure decision.
 - 2026-05-31: Added `NarrativeCard` UI state coverage for disabled, streaming, completed metadata, callback error, and request failure paths, because the user-facing LLM flow needs regression coverage beyond the low-level SSE parser.
 - 2026-05-31: Made co-change graph edges count each file pair at most once per commit and emit stable sorted output, because duplicate file entries should not inflate hidden-coupling scores or create self-edges.
+- 2026-05-31: Added ingestion progress SSE edge-case tests for missing jobs, terminal jobs, and active-to-cancelled polling updates, because the analyze page depends on this stream for user-facing progress and recovery states.
 
 ## Test coverage status
 - Backend unit tests: initial pure-logic coverage exists for config parsing/CORS defaults, boolean env parsing, repo URL parsing/validation, max-commit cap validation, slug generation, clone cleanup success/failure, import extraction/resolution, co-change edge generation, top-file frequency, bus-factor file filtering, semantic fallback behavior, health snapshot aggregation, LLM cache keys, provider mapping, cost estimation, usage/budget accounting, and prompt builders.
-- Backend integration/API tests: database-backed coverage exists for repo listing/lookup, timeline payloads, graph payloads, bus factor payloads, LLM usage payloads, commit detail composition, active ingestion job reuse, background job scheduling arguments, and ingestion cancellation.
+- Backend integration/API tests: database-backed coverage exists for repo listing/lookup, timeline payloads, graph payloads, bus factor payloads, LLM usage payloads, commit detail composition, active ingestion job reuse, background job scheduling arguments, ingestion cancellation, and ingestion progress SSE payloads for missing/terminal/polled jobs.
 - Backend migration tests: coverage exists for sorted SQL migration application, applied-file tracking, skip-on-reapply behavior, and SQLite duplicate-column protection.
 - Frontend unit/component tests: Vitest coverage exists for health status/formatting helpers, `HealthBadge`, `streamNarrative` success/error parsing, and `NarrativeCard` disabled/streaming/done/error states, including same-origin `/api` stream URL behavior.
 - Frontend route/smoke tests: landing-page repository validation/submission coverage, analyze-page cancellation/completion coverage, demo-page bounded-analysis coverage, dashboard repository error/latest-commit/empty-timeline/detail-navigation coverage, and app-level landing-to-dashboard navigation coverage exist with mocked API/SSE calls.
-- Local quality gates: `python -m pytest` (42 tests), `npm run test` (23 tests), `npm run lint`, `npm run build`, and `npm audit --audit-level=moderate` pass as of 2026-05-31.
+- Local quality gates: `python -m pytest` (45 tests), `npm run test` (23 tests), `npm run lint`, `npm run build`, and `npm audit --audit-level=moderate` pass as of 2026-05-31.
 - CI quality gates: GitHub Actions workflow exists for backend tests and frontend tests/lint/build.
-- Must be tested before shipping: ingestion progress SSE payload edge cases and at least one real-browser landing-to-dashboard e2e flow.
+- Must be tested before shipping: at least one real-browser landing-to-dashboard e2e flow.
 
 ## Commit log summary
 - `1132a0d` docs: initial PROJECT_BRAIN.md — full codebase understanding. Added the required living project understanding document before feature work.
@@ -190,3 +191,5 @@ Missing but obviously needed:
 - docs: update project brain after narrative UI coverage. Recorded the narrative UI testing decision, updated frontend test counts, and removed narrative UI behavior from the must-test-before-shipping list.
 - `b0759e7` fix: count co-change graph pairs once per commit. Deduplicated per-commit file lists before pairing, stabilized co-change edge ordering, and added regression tests for co-change edges and top-file frequency.
 - docs: update project brain after co-change graph hardening. Recorded the graph decision, updated backend test counts, and removed co-change generation from the must-test-before-shipping list.
+- `4661e6d` test: cover ingestion progress stream edge cases. Added direct SSE endpoint coverage for missing jobs, terminal ready jobs, and active-to-cancelled polling updates.
+- docs: update project brain after ingestion progress SSE coverage. Recorded the SSE testing decision, updated backend test counts, and narrowed remaining shipping test gaps to real-browser e2e coverage.
