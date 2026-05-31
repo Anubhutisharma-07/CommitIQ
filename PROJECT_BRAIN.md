@@ -33,8 +33,8 @@ Incomplete or fragile:
 - The database migration hook exists, but no `migrations/` directory is present. Startup relies mostly on `Base.metadata.create_all`, which cannot safely evolve existing schemas.
 - Backend ingestion performs long CPU/disk/network work inside FastAPI `BackgroundTasks`; this is fragile for restarts, concurrency, cancellation, and production scaling.
 - Graph and health metrics are often based only on files changed in each commit, not a stable whole-repo snapshot, so dashboard labels can overstate "codebase" health.
-- Some frontend classes reference Tailwind tokens not defined in the local Tailwind config because there is no Tailwind config checked in.
-- Demo flow expects preseeded `facebook-react` data, but no seed command or seed data exists.
+- Frontend Tailwind tokens now have checked-in PostCSS/Tailwind config, so production builds emit real utility CSS instead of raw `@tailwind` directives.
+- Demo flow now runs live bounded analysis, but still lacks a fast fixture-backed offline demo.
 
 ## User flows (as-is)
 - New analysis: user opens `/`, enters a GitHub URL or `owner/repo`, optionally sets max commits, submits, then lands on `/analyze?repo_id=...`.
@@ -42,7 +42,7 @@ Incomplete or fragile:
 - Dashboard: user views latest health score, commit timeline, recent commit list, selected commit metrics, graph explorer, bus factor table, hotspot map, and LLM cost meter.
 - Commit selection: user can select commits from the timeline/list or step through graph playback. Commit detail route shows metadata, metrics, graph, structural diff vs previous commit, and narrative controls.
 - Narrative generation: user clicks the narrative card, frontend streams generated chunks, then displays provider/cache/cost metadata.
-- Demo: `/demo` attempts to load `facebook-react`; if absent, it shows an error and asks for an undocumented seed command.
+- Demo: `/demo` starts a bounded `facebook/react` analysis and then routes to the normal analysis progress page.
 
 ## Identified problems (root causes, not symptoms)
 - Missing verification foundation: no unit/integration/e2e tests means changes to parsers, scoring, ingestion, or UI flows cannot be made safely.
@@ -53,13 +53,13 @@ Incomplete or fragile:
 - Semantic analysis default risk: `ENABLE_SEMANTIC_ANALYSIS` defaults to true, which can trigger large model downloads/imports unless optional ML dependencies and cache strategy are deliberately configured.
 - Security/abuse surface: ingestion clones arbitrary public GitHub repositories and runs git commands over repo contents; URL validation and max-commit caps are now stronger, but storage quotas, concurrency controls, and operational limits still need hardening.
 - API/base URL fragility: frontend defaults to `http://localhost:8000`; acceptable locally but needs environment-driven deployment config and documented production behavior.
-- UI maintainability drift: many custom Tailwind classes depend on missing theme configuration and heavy one-off styling, making visual regressions likely.
+- UI maintainability drift: Tailwind token configuration now exists, but heavy one-off styling still makes visual regressions likely without broader route-level visual/e2e coverage.
 
 ## Discovered issues
 - Critical: zero tests exist across backend and frontend.
 - Critical: frontend still lacks route-level/e2e coverage, though focused Vitest coverage now exists for health utilities, `HealthBadge`, and narrative stream parsing.
 - High: no deployment health gate; CI now exists for tests/lint/build.
-- High: npm audit reports 9 frontend dependency vulnerabilities after lockfile generation.
+- High: npm audit previously reported 9 frontend dependency vulnerabilities; dependency upgrades now leave `npm audit --audit-level=moderate` clean as of 2026-05-31.
 - High: no migration files despite migration-aware database code.
 - High: demo route no longer depends on missing seeded data; it now starts a bounded `facebook/react` analysis, but a true instant fixture demo is still not available.
 - Medium: route-level code splitting reduced the initial frontend JS chunk to about 168 kB; dashboard and narrative code are now separate chunks.
@@ -116,13 +116,15 @@ Missing but obviously needed:
 - 2026-05-31: Added landing-page route smoke coverage for invalid repo input, shorthand submission normalization, full GitHub URL normalization, and commit-limit submission.
 - 2026-05-31: Replaced the broken `/demo` seed-data dependency with a bounded `facebook/react` analysis flow and added tests for success/error behavior.
 - 2026-05-31: Added route-level lazy loading so graph/dashboard dependencies are no longer part of the first-load bundle.
+- 2026-05-31: Upgraded vulnerable frontend dependencies, including the Vite 8 toolchain move, because the remaining audit findings had no non-major fix path and the local Node version satisfies Vite 8 requirements.
+- 2026-05-31: Added explicit Tailwind/PostCSS config after build output showed raw `@tailwind` directives, preserving the app's existing CSS-variable design tokens rather than introducing a new theme.
 
 ## Test coverage status
 - Backend unit tests: initial pure-logic coverage exists for repo URL parsing/validation, max-commit cap validation, slug generation, import extraction/resolution, bus-factor file filtering, health snapshot aggregation, LLM cache keys, provider mapping, cost estimation, and prompt builders.
 - Backend integration/API tests: database-backed coverage exists for repo listing/lookup, timeline payloads, graph payloads, bus factor payloads, LLM usage payloads, and commit detail composition.
 - Frontend unit/component tests: Vitest coverage exists for health status/formatting helpers, `HealthBadge`, and `streamNarrative` success/error parsing.
 - Frontend route/smoke tests: landing-page repository validation/submission coverage and demo-page bounded-analysis coverage exist with mocked API calls.
-- Local quality gates: `python -m pytest`, `npm run test`, `npm run lint`, and `npm run build` pass as of 2026-05-31. `npm run test` emits Vite React plugin deprecation warnings.
+- Local quality gates: `python -m pytest`, `npm run test`, `npm run lint`, `npm run build`, and `npm audit --audit-level=moderate` pass as of 2026-05-31.
 - CI quality gates: GitHub Actions workflow exists for backend tests and frontend tests/lint/build.
 - Must be tested before shipping: GitHub URL parsing, repo slug generation, cache key generation, cost guard behavior, health scoring, semantic fallback behavior, graph import/co-change generation, bus-factor risk levels, ingestion progress SSE payloads, timeline/graph API responses, narrative streaming parser, and landing/analyze/dashboard user flows.
 
@@ -145,3 +147,5 @@ Missing but obviously needed:
 - `93e8972` fix: replace missing demo seed path with bounded analysis. Replaced the nonexistent seed-data dependency with a real bounded demo analysis flow and tests.
 - `edf6bcf` docs: update project brain after demo fix. Recorded the demo route fix and updated route test status.
 - `4145e84` perf: split route bundles to reduce initial payload. Added route-level lazy loading and removed the Vite chunk-size warning by splitting dashboard/narrative code out of the initial bundle.
+- `c049a3b` docs: update project brain after route splitting. Recorded the lazy-loading decision and updated the known bundle-risk status.
+- `4ac3ee0` chore: close frontend audit findings and restore Tailwind build. Upgraded vulnerable frontend dependencies, moved to Vite 8 with the compatible React plugin, and added PostCSS/Tailwind config so production CSS includes generated utilities.
