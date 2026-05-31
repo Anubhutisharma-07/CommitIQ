@@ -5,7 +5,12 @@ from pydantic import ValidationError
 
 from backend.config import MAX_COMMITS
 from backend.features.repo_ingestion.bus_factor import is_code_file
-from backend.features.repo_ingestion.clone_service import make_repo_slug, parse_github_url
+from backend.features.repo_ingestion.clone_service import (
+    cleanup_repo,
+    get_clone_path,
+    make_repo_slug,
+    parse_github_url,
+)
 from backend.features.repo_ingestion.graph_builder import (
     extract_js_imports,
     extract_python_imports,
@@ -45,6 +50,29 @@ def test_parse_github_url_rejects_invalid_or_unsafe_forms(raw):
 
 def test_make_repo_slug_is_stable_and_filesystem_safe():
     assert make_repo_slug("Open-AI", "Repo.Name") == "open-ai-repo-name"
+
+
+def test_cleanup_repo_deletes_clone_directory(monkeypatch, tmp_path):
+    monkeypatch.setattr("backend.features.repo_ingestion.clone_service.REPO_STORAGE_PATH", tmp_path)
+    clone_path = get_clone_path(42)
+    clone_path.mkdir()
+    (clone_path / "README.md").write_text("temporary clone", encoding="utf-8")
+
+    assert cleanup_repo(42) is True
+    assert not clone_path.exists()
+
+
+def test_cleanup_repo_does_not_mask_cleanup_failures(monkeypatch, tmp_path):
+    monkeypatch.setattr("backend.features.repo_ingestion.clone_service.REPO_STORAGE_PATH", tmp_path)
+    clone_path = get_clone_path(42)
+    clone_path.mkdir()
+
+    def fail_rmtree(path):
+        raise OSError("permission denied")
+
+    monkeypatch.setattr("backend.features.repo_ingestion.clone_service.shutil.rmtree", fail_rmtree)
+
+    assert cleanup_repo(42) is False
 
 
 def test_ingest_request_normalizes_shorthand_and_http_github_url():

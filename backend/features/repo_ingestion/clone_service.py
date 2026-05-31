@@ -1,9 +1,12 @@
+import logging
 import subprocess
 from pathlib import Path
 import shutil
 from backend.config import REPO_STORAGE_PATH, GITHUB_TOKEN
 import httpx
 import re
+
+logger = logging.getLogger(__name__)
 
 
 def _redact_secret(value: str) -> str:
@@ -73,7 +76,8 @@ def clone_repo(repo_url: str, repo_id: int, max_commits: int = 150) -> Path:
     """Shallow clone to local disk. Returns clone path."""
     target = get_clone_path(repo_id)
     if target.exists():
-        shutil.rmtree(target)
+        if not cleanup_repo(repo_id):
+            raise RuntimeError(f"Could not clean existing clone directory for repo_id={repo_id}")
     target.mkdir(parents=True, exist_ok=True)
 
     # Use git clone via HTTPS — never uses GitHub REST API, no rate limits
@@ -100,7 +104,7 @@ def clone_repo(repo_url: str, repo_id: int, max_commits: int = 150) -> Path:
     )
 
     if result.returncode != 0:
-        shutil.rmtree(target, ignore_errors=True)
+        cleanup_repo(repo_id)
         raise RuntimeError(f"git clone failed: {_redact_secret(result.stderr)[:500]}")
 
     return target
@@ -122,11 +126,20 @@ def count_available_commits(repo_path: Path) -> int:
         return 0
 
 
-def cleanup_repo(repo_id: int):
+def cleanup_repo(repo_id: int) -> bool:
     """Delete cloned repo after ingestion to reclaim disk space."""
     target = get_clone_path(repo_id)
-    if target.exists():
+    if not target.exists():
+        return True
+    try:
         shutil.rmtree(target)
+        return True
+    except OSError as exc:
+        logger.warning(
+            "Could not clean cloned repo directory",
+            extra={"repo_id": repo_id, "path": str(target), "error": str(exc)},
+        )
+        return False
 
 
 async def fetch_github_metadata(owner: str, repo: str) -> dict:
