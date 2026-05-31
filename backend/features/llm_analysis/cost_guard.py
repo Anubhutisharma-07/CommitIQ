@@ -1,5 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select
 from backend.shared.models import LLMNarrative
 from backend.config import LLM_BUDGET_PER_REPO_USD, LLM_MAX_CALLS
 from backend.features.llm_analysis.llm_router import provider_from_model
@@ -14,16 +14,11 @@ PROVIDER_COSTS_PER_1K_OUTPUT = {
 
 async def check_budget(repo_id: int, db: AsyncSession) -> bool:
     """Returns True if we have budget for another call, False otherwise."""
-    result = await db.execute(
-        select(
-            func.count(LLMNarrative.id).label("total_calls"),
-            func.sum(LLMNarrative.cost_usd).label("total_cost"),
-        )
-        .where(LLMNarrative.repo_id == repo_id)
-    )
-    row = result.one()
-    total_calls = row.total_calls or 0
-    total_cost = float(row.total_cost or 0.0)
+    result = await db.execute(select(LLMNarrative).where(LLMNarrative.repo_id == repo_id))
+    rows = result.scalars().all()
+    billable_rows = [row for row in rows if _is_provider_call(row)]
+    total_calls = len(billable_rows)
+    total_cost = sum(float(row.cost_usd or 0.0) for row in billable_rows)
     return total_calls < LLM_MAX_CALLS and total_cost < LLM_BUDGET_PER_REPO_USD
 
 
@@ -36,23 +31,32 @@ def estimate_cost_usd(tokens_input: int, tokens_output: int, provider: str) -> f
     return 0.0
 
 
+def _is_provider_call(row: LLMNarrative) -> bool:
+    if row.is_pre_cached:
+        return False
+    return provider_from_model(row.model_used) in {"anthropic", "gemini"}
+
+
 async def get_usage_summary(repo_id: int, db: AsyncSession) -> dict:
     result = await db.execute(select(LLMNarrative).where(LLMNarrative.repo_id == repo_id))
     rows = result.scalars().all()
-    total_tokens = sum(row.tokens_input + row.tokens_output for row in rows)
-    total_cost = sum(row.cost_usd for row in rows)
-    anthropic_calls = sum(1 for row in rows if provider_from_model(row.model_used) == "anthropic")
-    gemini_calls = sum(1 for row in rows if provider_from_model(row.model_used) == "gemini")
-    cache_hits = sum(1 for row in rows if row.is_pre_cached)
+    provider_rows = [row for row in rows if _is_provider_call(row)]
+    cached_rows = [row for row in rows if row.is_pre_cached]
+    total_tokens = sum(row.tokens_input + row.tokens_output for row in provider_rows)
+    total_cost = sum(float(row.cost_usd or 0.0) for row in provider_rows)
+    anthropic_calls = sum(1 for row in provider_rows if provider_from_model(row.model_used) == "anthropic")
+    gemini_calls = sum(1 for row in provider_rows if provider_from_model(row.model_used) == "gemini")
+    cached_tokens = sum(row.tokens_input + row.tokens_output for row in cached_rows)
+    cache_hits = len(cached_rows)
     return {
         "repo_id": repo_id,
-        "total_calls": len(rows),
+        "total_calls": len(provider_rows),
         "cache_hits": cache_hits,
         "anthropic_calls": anthropic_calls,
         "gemini_calls": gemini_calls,
         "total_tokens": total_tokens,
         "total_cost_usd": round(float(total_cost or 0.0), 6),
-        "cache_savings_usd": round((total_tokens / 1000.0) * PROVIDER_COSTS_PER_1K_OUTPUT["anthropic"], 6),
-        "budget_remaining": max(0, LLM_MAX_CALLS - len(rows)),
+        "cache_savings_usd": round((cached_tokens / 1000.0) * PROVIDER_COSTS_PER_1K_OUTPUT["anthropic"], 6),
+        "budget_remaining": max(0, LLM_MAX_CALLS - len(provider_rows)),
         "max_calls": LLM_MAX_CALLS,
     }
