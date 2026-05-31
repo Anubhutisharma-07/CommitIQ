@@ -155,14 +155,13 @@ def build_cochange_edges(commit_history: list[dict], min_cooccurrence: int = 3) 
     cochange_counts = defaultdict(int)
 
     for commit in commit_history:
-        files = commit.get('files_list', [])
+        files = sorted({file_path for file_path in commit.get('files_list', []) if file_path})
         for i, f1 in enumerate(files):
             for f2 in files[i+1:]:
-                key = tuple(sorted([f1, f2]))
-                cochange_counts[key] += 1
+                cochange_counts[(f1, f2)] += 1
 
     edges = []
-    for (f1, f2), count in cochange_counts.items():
+    for (f1, f2), count in sorted(cochange_counts.items()):
         if count >= min_cooccurrence:
             edges.append({
                 "source_file":    f1,

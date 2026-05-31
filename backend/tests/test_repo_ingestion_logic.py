@@ -12,8 +12,10 @@ from backend.features.repo_ingestion.clone_service import (
     parse_github_url,
 )
 from backend.features.repo_ingestion.graph_builder import (
+    build_cochange_edges,
     extract_js_imports,
     extract_python_imports,
+    get_top_files_by_frequency,
     resolve_import_to_file,
 )
 from backend.features.repo_ingestion.health_scorer import compute_full_snapshot
@@ -128,6 +130,45 @@ def test_import_extractors_and_resolver_cover_common_python_and_ts_patterns():
     assert resolve_import_to_file("./types", "src/App.tsx", files) == "src/types.ts"
     assert resolve_import_to_file("./Button", "src/App.tsx", files) == "src/Button/index.ts"
     assert resolve_import_to_file("../lib/mod", "src/App.tsx", files) == "lib/mod.ts"
+
+
+def test_cochange_edges_count_unique_file_pairs_per_commit():
+    history = [
+        {"files_list": ["src/a.py", "src/b.py", "src/a.py", ""]},
+        {"files_list": ["src/b.py", "src/a.py", "src/c.py"]},
+        {"files_list": ["src/a.py", "src/b.py"]},
+        {"files_list": ["src/a.py", "src/c.py"]},
+    ]
+
+    edges = build_cochange_edges(history, min_cooccurrence=2)
+
+    assert edges == [
+        {
+            "source_file": "src/a.py",
+            "target_file": "src/b.py",
+            "edge_type": "co_change",
+            "weight": 3,
+            "cochange_count": 3,
+        },
+        {
+            "source_file": "src/a.py",
+            "target_file": "src/c.py",
+            "edge_type": "co_change",
+            "weight": 2,
+            "cochange_count": 2,
+        },
+    ]
+    assert not any(edge["source_file"] == edge["target_file"] for edge in edges)
+
+
+def test_top_files_by_frequency_counts_repeated_history_changes():
+    history = [
+        {"files_list": ["src/a.py", "src/b.py"]},
+        {"files_list": ["src/a.py"]},
+        {"files_list": ["src/c.py", "src/b.py"]},
+    ]
+
+    assert get_top_files_by_frequency(history, top_n=2) == ["src/a.py", "src/b.py"]
 
 
 def test_bus_factor_file_filter_keeps_code_and_ignores_docs_configs():
