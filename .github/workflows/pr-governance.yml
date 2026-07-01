@@ -18,7 +18,7 @@ permissions:
 jobs:
   pr-metadata:
     name: PR Metadata
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     steps:
       - name: Validate conventional PR title
@@ -45,6 +45,7 @@ jobs:
 
   repository-hygiene:
     name: Repository Hygiene
+    if: github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -83,7 +84,7 @@ jobs:
 
   project-brain:
     name: Project Brain Updated
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
