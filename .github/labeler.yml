@@ -1,0 +1,15 @@
+frontend:
+  - changed-files:
+      - any-glob-to-any-file: 'frontend/**/*'
+backend:
+  - changed-files:
+      - any-glob-to-any-file: 'backend/**/*'
+docs:
+  - changed-files:
+      - any-glob-to-any-file: ['docs/**/*', 'README.md', '**/*.md']
+ci:
+  - changed-files:
+      - any-glob-to-any-file: '.github/**/*'
+migrations:
+  - changed-files:
+      - any-glob-to-any-file: 'migrations/**/*'
