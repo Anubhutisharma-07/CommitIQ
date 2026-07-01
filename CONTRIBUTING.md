@@ -19,6 +19,8 @@ Frontend:
 cd frontend
 npm ci
 npm run test
+npx playwright install chromium
+npm run test:e2e
 npm run lint
 npm run build
 ```
@@ -35,6 +37,7 @@ npm run build
 
 - [ ] Backend tests pass with `python -m pytest`
 - [ ] Frontend tests pass with `npm run test`
+- [ ] Frontend e2e tests pass with `npm run test:e2e`
 - [ ] Frontend lint passes with `npm run lint`
 - [ ] Frontend build passes with `npm run build`
 - [ ] New behavior has tests

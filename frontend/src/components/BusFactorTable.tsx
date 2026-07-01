@@ -53,14 +53,8 @@ export function BusFactorTable({ modules }: BusFactorTableProps) {
                     <tr 
                       key={module.module_path} 
                       className="hover:bg-white/[0.03] transition-colors group relative"
+                      style={isCritical ? { borderLeft: `2px solid rgb(${rgb})` } : undefined}
                     >
-                      {isCritical && (
-                        <div 
-                          className="absolute left-0 top-0 bottom-0 w-0.5" 
-                          style={{ backgroundColor: `rgb(${rgb})` }} 
-                        />
-                      )}
-                      
                       <td className="px-5 py-3.5 font-mono text-[11px] text-slate-300 max-w-[150px]">
                         <span className="block truncate" dir="rtl" title={module.module_path}>
                           {module.module_path}

@@ -1,11 +1,24 @@
 import { useEffect, useState } from 'react'
 
+function getStoredTheme(): 'light' | 'dark' | null {
+  try {
+    const saved = window.localStorage?.getItem('theme')
+    return saved === 'light' || saved === 'dark' ? saved : null
+  } catch {
+    return null
+  }
+}
+
+function storeTheme(theme: 'light' | 'dark') {
+  try {
+    window.localStorage?.setItem('theme', theme)
+  } catch {
+    // Theme switching still works when storage is unavailable.
+  }
+}
+
 export function ThemeToggle() {
-  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
-    const saved = localStorage.getItem('theme')
-    if (saved === 'light' || saved === 'dark') return saved
-    return 'dark'
-  })
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => getStoredTheme() || 'dark')
 
   useEffect(() => {
     const root = document.documentElement
@@ -14,7 +27,7 @@ export function ThemeToggle() {
     } else {
       root.classList.remove('dark')
     }
-    localStorage.setItem('theme', theme)
+    storeTheme(theme)
   }, [theme])
 
   const toggleTheme = () => {

@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from backend.database import Base
 from backend.features.llm_analysis.cache import make_cache_key
+from backend.features.llm_analysis.router import explain_commit_stream
 from backend.features.repo_ingestion.router import (
     cancel_ingestion,
     get_bus_factor,
@@ -32,7 +33,7 @@ from backend.shared.models import (
     LLMNarrative,
     Repo,
 )
-from backend.shared.schemas import IngestRequest
+from backend.shared.schemas import IngestRequest, NarrativeRequest
 
 pytestmark = pytest.mark.anyio
 
@@ -81,6 +82,54 @@ async def _read_sse_payload(response) -> dict:
     text = chunk.decode("utf-8") if isinstance(chunk, bytes) else chunk
     assert text.startswith("data: ")
     return json.loads(text.removeprefix("data: ").strip())
+
+
+async def _read_sse_payloads(response) -> list[dict]:
+    payloads = []
+    async for chunk in response.body_iterator:
+        text = chunk.decode("utf-8") if isinstance(chunk, bytes) else chunk
+        for event in text.split("\n\n"):
+            if not event.startswith("data: "):
+                continue
+            payloads.append(json.loads(event.removeprefix("data: ").strip()))
+    return payloads
+
+
+class FakeExecuteResult:
+    def __init__(self, job):
+        self.job = job
+
+    def scalar_one_or_none(self):
+        return self.job
+
+
+class FakeProgressDb:
+    def __init__(self, jobs):
+        self.jobs = list(jobs)
+        self.close_count = 0
+
+    async def execute(self, statement):
+        return FakeExecuteResult(self.jobs.pop(0) if self.jobs else None)
+
+
+class FakeProgressSessionFactory:
+    def __init__(self, db: FakeProgressDb):
+        self.db = db
+
+    async def __aenter__(self):
+        return self.db
+
+    async def __aexit__(self, exc_type, exc, traceback):
+        self.db.close_count += 1
+
+
+def _mock_progress_db(monkeypatch, jobs) -> FakeProgressDb:
+    db = FakeProgressDb(jobs)
+    monkeypatch.setattr(
+        "backend.database.AsyncSessionLocal",
+        lambda: FakeProgressSessionFactory(db),
+    )
+    return db
 
 
 def _seed_repo(session: Session) -> None:
@@ -329,6 +378,35 @@ async def test_commit_detail_includes_nested_snapshot_graph_and_cached_narrative
     assert detail["narrative"]["explanation"] == "Complexity increased in the service layer."
 
 
+async def test_streaming_narrative_falls_back_to_demo_mode(db_session: AsyncSessionAdapter, monkeypatch):
+    async def failing_stream(prompt: str):
+        raise RuntimeError("provider keys missing")
+        yield prompt, None
+
+    monkeypatch.setattr("backend.features.llm_analysis.router.stream_narrative", failing_stream)
+
+    response = await explain_commit_stream(
+        NarrativeRequest(repo_id=1, commit_sha="abc123def456", prompt_type="explain_drop"),
+        db=db_session,
+    )
+    payloads = await _read_sse_payloads(response)
+
+    final_payload = payloads[-1]
+    assert final_payload["done"] is True
+    assert final_payload["demo_mode"] is True
+    assert final_payload["provider"] == "none"
+    assert final_payload["model"] == "demo-mode"
+    assert "DEMO MODE" in final_payload["explanation"]
+    assert "error" not in final_payload
+
+    cached = db_session.session.query(LLMNarrative).filter(
+        LLMNarrative.cache_key
+        == make_cache_key(1, "abc123def4567890abc123def4567890abc123de", "explain_drop")
+    ).one()
+    assert cached.model_used == "demo-mode"
+    assert cached.cost_usd == 0.0
+
+
 async def test_ingest_repo_reuses_active_job_without_scheduling_duplicate(db_session: AsyncSessionAdapter):
     active_job = AnalysisJob(
         repo_id=1,
@@ -413,6 +491,29 @@ async def test_cancel_ingestion_marks_active_job_cancelled(db_session: AsyncSess
     assert repo.error_message == "Ingestion cancelled by user."
 
 
+async def test_cancel_ingestion_handles_sqlite_naive_started_at(db_session: AsyncSessionAdapter):
+    active_job = AnalysisJob(
+        repo_id=1,
+        status="analyzing",
+        total_commits=50,
+        processed_commits=10,
+        current_stage="Analyzing",
+        started_at=datetime(2026, 1, 1, 12, 0, 0),
+        triggered_by="user",
+    )
+    repo = db_session.session.get(Repo, 1)
+    repo.status = "processing"
+    db_session.session.add(active_job)
+    db_session.session.commit()
+
+    response = await cancel_ingestion(repo_id=1, db=db_session)
+
+    cancelled_job = db_session.session.get(AnalysisJob, active_job.id)
+    assert response.status == "cancelled"
+    assert cancelled_job.duration_seconds is not None
+    assert cancelled_job.duration_seconds >= 0
+
+
 async def test_cancel_ingestion_requires_active_job(db_session: AsyncSessionAdapter):
     with pytest.raises(HTTPException) as exc_info:
         await cancel_ingestion(repo_id=1, db=db_session)
@@ -421,8 +522,10 @@ async def test_cancel_ingestion_requires_active_job(db_session: AsyncSessionAdap
     assert exc_info.value.headers["X-CommitIQ-Error"] == "job_not_found"
 
 
-async def test_ingest_progress_streams_error_payload_when_job_is_missing(db_session: AsyncSessionAdapter):
-    response = await ingest_progress(repo_id=1, db=db_session)
+async def test_ingest_progress_streams_error_payload_when_job_is_missing(monkeypatch):
+    db = _mock_progress_db(monkeypatch, [None])
+
+    response = await ingest_progress(repo_id=1)
 
     payload = await _read_sse_payload(response)
 
@@ -430,9 +533,10 @@ async def test_ingest_progress_streams_error_payload_when_job_is_missing(db_sess
     assert payload == {"status": "error", "error_message": "Job not found"}
     with pytest.raises(StopAsyncIteration):
         await anext(response.body_iterator)
+    assert db.close_count == 1
 
 
-async def test_ingest_progress_streams_terminal_job_once(db_session: AsyncSessionAdapter):
+async def test_ingest_progress_streams_terminal_job_once(monkeypatch):
     job = AnalysisJob(
         repo_id=1,
         status="ready",
@@ -443,10 +547,9 @@ async def test_ingest_progress_streams_terminal_job_once(db_session: AsyncSessio
         progress_pct=100.0,
         triggered_by="user",
     )
-    db_session.session.add(job)
-    db_session.session.commit()
+    db = _mock_progress_db(monkeypatch, [job])
 
-    response = await ingest_progress(repo_id=1, db=db_session)
+    response = await ingest_progress(repo_id=1)
     payload = await _read_sse_payload(response)
 
     assert payload == {
@@ -458,56 +561,39 @@ async def test_ingest_progress_streams_terminal_job_once(db_session: AsyncSessio
         "status": "ready",
         "error_message": None,
     }
+    assert db.close_count == 1
     with pytest.raises(StopAsyncIteration):
         await anext(response.body_iterator)
 
 
 async def test_ingest_progress_stream_picks_up_cancelled_job_updates(monkeypatch):
-    class FakeExecuteResult:
-        def __init__(self, job):
-            self.job = job
-
-        def scalar_one_or_none(self):
-            return self.job
-
-    class FakeProgressDb:
-        def __init__(self):
-            self.jobs = [
-                AnalysisJob(
-                    repo_id=1,
-                    status="queued",
-                    total_commits=5,
-                    processed_commits=0,
-                    current_stage="Queued",
-                    progress_pct=0.0,
-                    triggered_by="user",
-                ),
-                AnalysisJob(
-                    repo_id=1,
-                    status="cancelled",
-                    total_commits=5,
-                    processed_commits=0,
-                    current_stage="Cancelled",
-                    progress_pct=0.0,
-                    error_message="Ingestion cancelled by user.",
-                    triggered_by="user",
-                ),
-            ]
-            self.rollback_count = 0
-
-        async def execute(self, statement):
-            return FakeExecuteResult(self.jobs.pop(0))
-
-        async def rollback(self):
-            self.rollback_count += 1
-
     async def skip_sleep(seconds: float):
         return None
 
-    db = FakeProgressDb()
+    db = _mock_progress_db(monkeypatch, [
+        AnalysisJob(
+            repo_id=1,
+            status="queued",
+            total_commits=5,
+            processed_commits=0,
+            current_stage="Queued",
+            progress_pct=0.0,
+            triggered_by="user",
+        ),
+        AnalysisJob(
+            repo_id=1,
+            status="cancelled",
+            total_commits=5,
+            processed_commits=0,
+            current_stage="Cancelled",
+            progress_pct=0.0,
+            error_message="Ingestion cancelled by user.",
+            triggered_by="user",
+        ),
+    ])
     monkeypatch.setattr("backend.features.repo_ingestion.router.asyncio.sleep", skip_sleep)
 
-    response = await ingest_progress(repo_id=1, db=db)
+    response = await ingest_progress(repo_id=1)
     first_payload = await _read_sse_payload(response)
     assert first_payload["status"] == "queued"
 
@@ -515,7 +601,7 @@ async def test_ingest_progress_stream_picks_up_cancelled_job_updates(monkeypatch
 
     assert second_payload["status"] == "cancelled"
     assert second_payload["stage"] == "Cancelled"
+    assert db.close_count == 2
     assert second_payload["error_message"] == "Ingestion cancelled by user."
-    assert db.rollback_count == 1
     with pytest.raises(StopAsyncIteration):
         await anext(response.body_iterator)

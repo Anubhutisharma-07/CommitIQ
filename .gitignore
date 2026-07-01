@@ -10,6 +10,8 @@ venv/
 commitiq_repos/
 node_modules/
 dist/
+playwright-report/
+test-results/
 *.tsbuildinfo
 .DS_Store
 *.log

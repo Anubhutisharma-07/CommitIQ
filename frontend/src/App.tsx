@@ -19,7 +19,7 @@ function RouteFallback() {
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <div className="relative min-h-screen text-[var(--color-primary)] selection:bg-purple-500/30 selection:text-white">
         <AmbientBackground />
         <Suspense fallback={<RouteFallback />}>

@@ -26,6 +26,28 @@ router = APIRouter(prefix="", tags=["llm"])
 logger = logging.getLogger(__name__)
 
 
+def _build_demo_narrative(
+    commit_message: str,
+    before: dict,
+    after: dict,
+) -> str:
+    health_delta = float(after.get("health_score", 0) or 0) - float(before.get("health_score", 0) or 0)
+    complexity_delta = float(after.get("avg_complexity", 0) or 0) - float(before.get("avg_complexity", 0) or 0)
+    risk_level = "High" if health_delta <= -15 or after.get("bus_factor_min", 1) <= 1 else "Medium" if health_delta < 0 else "Low"
+    top_files = after.get("top_files_json") or "[]"
+
+    return (
+        "DEMO MODE: Configure ANTHROPIC_API_KEY or GEMINI_API_KEY for provider-backed narratives.\n"
+        f"- Commit: {(commit_message or 'No commit message')[:90]}\n"
+        f"- Health moved from {before.get('health_score', 0)} to {after.get('health_score', 0)} "
+        f"({health_delta:+.1f}).\n"
+        f"- Average complexity changed by {complexity_delta:+.2f}; churn is "
+        f"{after.get('churn_rate', 0)} across {after.get('num_files_changed', 0)} changed files.\n"
+        f"- Bus factor minimum is {after.get('bus_factor_min', 1)}. Top changed-file metrics: {top_files[:220]}.\n"
+        f"Risk level: {risk_level}"
+    )
+
+
 def _map_error(exc: Exception) -> HTTPException:
     if isinstance(exc, PermissionError):
         return HTTPException(status_code=429, detail=str(exc))
@@ -171,8 +193,27 @@ async def explain_commit_stream(
             await db.commit()
             yield f"data: {json.dumps({'done': True, 'explanation': response_text, 'tokens_total': tokens_in + tokens_out, 'cost_usd': cost, 'cached': False, 'model': model_used, 'provider': provider_value, 'demo_mode': False})}\n\n"
         except Exception as exc:
-            logger.error("Narrative stream failed: %s", exc)
-            yield f"data: {json.dumps({'done': True, 'error': 'AI narrative temporarily unavailable. Metrics above are from static analysis.'})}\n\n"
+            logger.warning("Narrative stream provider unavailable, using demo mode: %s", exc)
+            response_text = _build_demo_narrative(commit.message or "", before, after)
+            tokens_in = int(len((EXPLAIN_DROP_SYSTEM + prompt).split()) * 1.3)
+            tokens_out = int(len(response_text.split()) * 1.3)
+            narrative = LLMNarrative(
+                repo_id=request.repo_id,
+                commit_id=commit.id,
+                full_sha=commit.full_sha,
+                prompt_type=request.prompt_type,
+                cache_key=cache_key,
+                prompt_input=prompt,
+                response_text=response_text,
+                tokens_input=tokens_in,
+                tokens_output=tokens_out,
+                cost_usd=0.0,
+                model_used="demo-mode",
+                is_pre_cached=False,
+            )
+            db.add(narrative)
+            await db.commit()
+            yield f"data: {json.dumps({'done': True, 'explanation': response_text, 'tokens_total': tokens_in + tokens_out, 'cost_usd': 0.0, 'cached': False, 'model': 'demo-mode', 'provider': LLMProvider.NONE.value, 'demo_mode': True})}\n\n"
 
     return StreamingResponse(
         event_generator(),

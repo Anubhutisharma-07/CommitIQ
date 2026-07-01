@@ -8,8 +8,8 @@ CommitIQ is a full-stack repository health analyzer for GitHub projects. It inge
 - Repository analysis: GitPython, git subprocess calls, radon for Python complexity, lizard for JS/TS/Java/Go/C/C++ metrics, custom import/co-change graph extraction, git blame for bus factor.
 - Semantic analysis: difflib fallback enabled by default, optional GraphCodeBERT via transformers and torch only when `ENABLE_GRAPHCODEBERT=true`.
 - LLM layer: Anthropic Claude first, Google Gemini fallback, persisted narrative cache and per-repo cost/call guard.
-- Frontend: React 18, TypeScript, Vite, SWR, axios, Recharts, react-force-graph-2d, d3-force, lucide-react, Tailwind CSS-style utility classes plus custom CSS tokens.
-- Deployment/config: backend `.env.example`, frontend `.env.example`, frontend lockfile, GitHub Actions CI/governance checks, contribution/security templates, Dependabot config, CODEOWNERS, and GitHub issue/PR templates are checked in; no Dockerfile, backend lockfile, or deployment manifest exists yet.
+- Frontend: React 18, TypeScript, Vite, SWR, axios, Recharts, react-force-graph-2d, d3-force, lucide-react, Tailwind CSS-style utility classes plus custom CSS tokens, Vitest, and Playwright.
+- Deployment/config: backend `.env.example`, frontend `.env.example`, frontend lockfile, GitHub Actions CI/governance checks including Chromium e2e, contribution/security templates, Dependabot config, CODEOWNERS, and GitHub issue/PR templates are checked in; no Dockerfile, backend lockfile, or deployment manifest exists yet.
 
 ## Architecture overview
 - `backend/main.py` creates the FastAPI app, initializes database schema and SQL migrations on lifespan startup, configures CORS, and mounts repo ingestion plus LLM routers under `/api`.
@@ -19,7 +19,8 @@ CommitIQ is a full-stack repository health analyzer for GitHub projects. It inge
 - Ingestion clones a shallow single-branch repo, walks commits oldest-to-newest, checks out each commit, extracts file metrics and semantic drift, builds import and co-change graph rows, computes explainable health snapshots with risk reasons and hotspot persistence, computes bus factor at HEAD, and marks the repo ready/error.
 - The frontend entry is `frontend/src/App.tsx`, with routes for landing, ingestion progress, dashboard, commit detail, demo redirect, and 404.
 - Frontend data flow uses `frontend/src/lib/api.ts` for REST/SSE/fetch calls and SWR in dashboard/detail views. The landing page starts ingestion; the analyze page streams job progress; dashboard and detail pages read persisted snapshots/graphs/narratives.
-- LLM narratives are requested on demand from `NarrativeCard`, streamed over `/api/explain/stream`, cached in `llm_narratives`, and summarized in the cost meter with billable provider rows separated from demo/pre-cached rows.
+- `frontend/e2e/landing-to-dashboard.spec.ts` runs the frontend flow in Chromium with deterministic REST/SSE interception, while backend API tests cover the corresponding server contracts.
+- LLM narratives are requested on demand from `NarrativeCard`, streamed over `/api/explain/stream`, cached in `llm_narratives`, and summarized in the cost meter with billable provider rows separated from demo/pre-cached rows. When provider keys are absent or a provider call fails, the stream returns a deterministic demo-mode narrative instead of a failure card.
 
 ## Current state assessment
 Working well:
@@ -29,7 +30,7 @@ Working well:
 - The UI has loading/error/empty states in many places and exposes high-value analysis concepts rather than raw tables only.
 
 Incomplete or fragile:
-- Test runner config, focused backend/frontend tests, a frontend lockfile, and CI quality gates now exist; backend dependency locking is still absent.
+- Test runner config, focused backend/frontend tests, a real-browser frontend e2e, a frontend lockfile, and CI quality gates now exist; backend dependency locking is still absent.
 - A tracked SQL migration workflow now exists with `schema_migrations` applied-file tracking, but there are not yet model-changing migration files because the current schema is still bootstrapped from SQLAlchemy metadata.
 - Backend ingestion performs long CPU/disk/network work inside FastAPI `BackgroundTasks`; active duplicate submissions now reuse the existing job and users can request cooperative cancellation, but restarts and production scaling remain fragile.
 - Graph and health metrics are often based only on files changed in each commit, not a stable whole-repo snapshot, so dashboard labels can overstate "codebase" health.
@@ -41,27 +42,26 @@ Incomplete or fragile:
 - Ingestion progress: `/analyze` opens an EventSource to `/api/repos/ingest/progress/{repo_id}`, displays clone/analyze/bus-factor/finalize progress, allows cancellation through `/api/repos/ingest/cancel/{repo_id}`, then redirects to `/dashboard/{repo_slug}` when ready.
 - Dashboard: user views latest health score, commit timeline, recent commit list, selected commit metrics, top risk reasons, persistent hotspots, graph explorer, bus factor table, hotspot map, and LLM cost meter.
 - Commit selection: user can select commits from the timeline/list or step through graph playback. Commit detail route shows metadata, metrics, graph, structural diff vs previous commit, and narrative controls.
-- Narrative generation: user clicks the narrative card, frontend streams generated chunks, then displays provider/cache/cost metadata.
+- Narrative generation: user clicks the narrative card, frontend streams generated chunks, then displays provider/cache/cost metadata. Without Claude/Gemini keys, the same stream returns and caches a zero-cost demo-mode explanation from static metrics.
 - Demo: `/demo` starts a bounded `facebook/react` analysis and then routes to the normal analysis progress page.
 
 ## Identified problems (root causes, not symptoms)
-- Missing verification foundation: no unit/integration/e2e tests means changes to parsers, scoring, ingestion, or UI flows cannot be made safely.
-- Missing dependency reproducibility: no `package-lock.json`, `requirements` pins, or lock tooling means installs can drift and break builds.
+- Verification breadth: unit, integration, route smoke, and one real-browser frontend e2e now protect the main flow, but there is no staging test that performs a live GitHub clone and backend ingestion.
+- Backend dependency reproducibility: the frontend lockfile is committed, but broad Python requirement ranges and no backend lock tooling mean backend installs can still drift.
 - No production ingestion boundary: FastAPI background tasks are not a durable job system. Active job reuse and cooperative cancellation reduce user-facing harm, but long repo analysis is still tied to a web worker process lifecycle.
 - Schema evolution gap: the project now has a tracked SQL migration runner, but future model changes still need explicit migration files and review discipline.
 - Metric contract ambiguity: names like "codebase health" are presented broadly, but many calculations operate on commit-touched files and shallow clone data. Risk reasons and hotspot persistence now make the score more explainable, but the snapshot scope still needs clearer product labeling.
 - Semantic analysis model risk is now gated: lightweight difflib drift remains enabled by default, while GraphCodeBERT requires explicit `ENABLE_GRAPHCODEBERT=true`; operators still need to plan ML cache/storage before enabling it.
 - Security/abuse surface: ingestion clones arbitrary public GitHub repositories and runs git commands over repo contents; URL validation and max-commit caps are now stronger, but storage quotas, concurrency controls, and operational limits still need hardening.
 - API/base URL behavior is now deployment-safe by default: frontend calls same-origin `/api`, with optional `VITE_API_BASE_URL` for separate API origins and a Vite dev proxy target for local development.
-- UI maintainability drift: Tailwind token configuration now exists, but heavy one-off styling still makes visual regressions likely without broader route-level visual/e2e coverage.
+- UI maintainability drift: Tailwind token configuration and one browser e2e now exist, but heavy one-off styling still makes visual regressions likely without broader route-level visual coverage.
 
 ## Discovered issues
-- Critical: baseline backend and frontend tests now exist, and a Vitest app-flow smoke covers landing-to-dashboard navigation with mocked API/SSE; true browser e2e coverage is still absent.
-- Critical: full browser e2e coverage is still absent, though Vitest route smoke coverage now exists for landing, analyze, demo, dashboard, narrative UI, and app-level landing-to-dashboard flows.
-- High: no deployment health gate; CI now exists for tests/lint/build and repository hygiene checks now run on pushes and pull requests.
-- High: npm audit previously reported 9 frontend dependency vulnerabilities; dependency upgrades now leave `npm audit --audit-level=moderate` clean as of 2026-05-31.
+- High: no deployment health gate; CI now exists for unit/e2e tests, lint, build, and repository hygiene checks on pushes and pull requests.
+- High: npm audit previously reported 9 frontend dependency vulnerabilities; dependency upgrades now leave `npm audit --audit-level=moderate` clean as of 2026-06-04.
 - High: migration workflow now exists, but no model-changing migration files have been needed or authored yet.
 - High: demo route no longer depends on missing seeded data; it now starts a bounded `facebook/react` analysis, but a true instant fixture demo is still not available.
+- High: live scan regressions around SQLite timestamp duration math, stale selected commits after rescans, and progress-stream disconnect handling were fixed and verified against a real `octocat/Hello-World` browser scan on 2026-06-07.
 - Medium: route-level code splitting reduced the initial frontend JS chunk to about 168 kB; dashboard and narrative code are now separate chunks.
 - Medium: backend startup now logs database initialization through the module logger; broader request/job observability is still limited.
 - Medium: production CORS now requires explicit `CORS_ORIGINS`; local development still gets localhost defaults when not in production.
@@ -71,17 +71,16 @@ Incomplete or fragile:
 
 ## Feature analysis
 Exists:
-- GitHub URL ingestion, shallow clone, commit walk, metric extraction, health scoring, dependency/co-change graph storage, bus-factor table, hot spot map, timeline, graph explorer, commit detail, LLM narratives, cost meter, dark/light theme toggle.
+- GitHub URL ingestion, shallow clone, commit walk, metric extraction, health scoring, dependency/co-change graph storage, bus-factor table, hot spot map, timeline, graph explorer, commit detail, LLM narratives, cost meter, dark/light theme toggle, and a Chromium landing-to-dashboard e2e.
 
 Half-done:
-- Demo mode exists as a route and LLM fallback concept but lacks seed data/scripts and a complete no-backend demo experience.
+- Demo mode exists as a route and LLM fallback concept. Narrative streams now have a no-key demo fallback, but the product still lacks seed data/scripts and a complete no-backend demo experience.
 - Migration support exists as a startup SQL runner with applied-file tracking and directory docs; it still lacks a generated-diff/revision authoring process.
 - Semantic drift is implemented with a default lightweight fallback; GraphCodeBERT is documented and opt-in but not productionized for cache/storage management.
 - Structural graph diff exists but uses separate visual language from the rest of the UI and likely relies on undefined design tokens.
 - LLM cache exists and usage reporting separates provider, demo, and pre-cached rows, but runtime cache-hit telemetry is not persisted as its own event stream.
 
 Missing but obviously needed:
-- Real-browser e2e coverage for the full ingest-to-dashboard behavior.
 - Backend lockfiles or pinned dependency management.
 - Deployment health checks; basic CI secret/debug/conflict scans now exist.
 - Durable job processing or at least safer ingestion state management with retry and stronger cancellation semantics around long-running subprocesses.
@@ -137,16 +136,21 @@ Missing but obviously needed:
 - 2026-05-31: Added professional GitHub repository materials and a deeper repo-health metrics roadmap, because maintainers need contribution/security workflows and the product needs a clear path from raw metrics to explainable risk signals.
 - 2026-05-31: Added persisted risk reasons and hotspot persistence to health snapshots, because users need to understand why a score moved and which risky files are recurring across recent commits.
 - 2026-05-31: Added repository governance checks for pushes and pull requests, plus PR metadata enforcement, Dependabot, and CODEOWNERS, because open-source-style repositories need automated guardrails beyond test execution.
+- 2026-06-04: Added Playwright Chromium coverage for the landing-to-dashboard flow with intercepted REST/SSE contracts, because the existing jsdom app smoke did not exercise actual browser routing, EventSource, or rendering.
+- 2026-06-04: Made theme persistence non-fatal when browser storage is unavailable, because theme controls should still render and switch under restricted storage environments.
+- 2026-06-07: Fixed local end-to-end scan regressions after browser testing exposed proxy env loading, a missing SQLAlchemy `greenlet` runtime dependency, SQLite naive timestamp duration math, stale dashboard commit selections after rescans, invalid bus-factor table markup, and progress-stream disconnect errors.
+- 2026-06-07: Made streaming LLM narratives match the non-streaming demo fallback, because a no-key local/demo environment should still show a useful static-metrics explanation instead of a failure card.
+- 2026-06-07: Opted into React Router v7 future flags to remove route deprecation warnings in development; remaining Recharts dev warnings come from the installed `recharts@2.12.7` internals.
 
 ## Test coverage status
 - Backend unit tests: initial pure-logic coverage exists for config parsing/CORS defaults, boolean env parsing, repo URL parsing/validation, max-commit cap validation, slug generation, clone cleanup success/failure, import extraction/resolution, co-change edge generation, top-file frequency, bus-factor file filtering, semantic fallback behavior, health snapshot aggregation, risk reasons/hotspot persistence, LLM cache keys, provider mapping, cost estimation, usage/budget accounting, and prompt builders.
-- Backend integration/API tests: database-backed coverage exists for repo listing/lookup, timeline payloads including risk reasons and persistent hotspots, graph payloads, bus factor payloads, LLM usage payloads, commit detail composition, active ingestion job reuse, background job scheduling arguments, ingestion cancellation, and ingestion progress SSE payloads for missing/terminal/polled jobs.
+- Backend integration/API tests: database-backed coverage exists for repo listing/lookup, timeline payloads including risk reasons and persistent hotspots, graph payloads, bus factor payloads, LLM usage payloads, commit detail composition, active ingestion job reuse, background job scheduling arguments, ingestion cancellation, SQLite-safe duration math, ingestion progress SSE payloads for missing/terminal/polled jobs, and streaming narrative demo fallback.
 - Backend migration tests: coverage exists for sorted SQL migration application, applied-file tracking, skip-on-reapply behavior, and SQLite duplicate-column protection.
-- Frontend unit/component tests: Vitest coverage exists for health status/formatting helpers, `HealthBadge`, `streamNarrative` success/error parsing, and `NarrativeCard` disabled/streaming/done/error states, including same-origin `/api` stream URL behavior.
+- Frontend unit/component tests: Vitest coverage exists for health status/formatting helpers, `HealthBadge`, restricted-storage `ThemeToggle` behavior, valid bus-factor table markup, `streamNarrative` success/error parsing, and `NarrativeCard` disabled/streaming/done/error states, including same-origin `/api` stream URL behavior.
 - Frontend route/smoke tests: landing-page repository validation/submission coverage, analyze-page cancellation/completion coverage, demo-page bounded-analysis coverage, dashboard repository error/latest-commit/empty-timeline/detail-navigation/risk-reason rendering coverage, and app-level landing-to-dashboard navigation coverage exist with mocked API/SSE calls.
-- Local quality gates: `python -m pytest` (45 tests), `npm run test` (23 tests), `npm run lint`, `npm run build`, and `npm audit --audit-level=moderate` pass as of 2026-05-31.
-- CI quality gates: GitHub Actions workflow exists for backend tests and frontend tests/lint/build. Repository governance also rejects conflict markers, obvious secrets, and debug output on pushes and pull requests; PRs additionally require conventional titles, bodies, and `PROJECT_BRAIN.md` updates for behavior-affecting files.
-- Must be tested before shipping: at least one real-browser landing-to-dashboard e2e flow.
+- Frontend browser e2e: Playwright Chromium coverage exercises repository submission, REST payload normalization, EventSource completion, dashboard navigation, and risk-reason rendering against deterministic intercepted API contracts.
+- Local quality gates: `python -m pytest` (47 tests), `npm run test` (25 tests), `npm run test:e2e` (1 Chromium test), `npm run lint`, `npm run build`, and `git diff --check` pass as of 2026-06-07. A real browser scan of `octocat/Hello-World` with `max_commits=1` also completed through the local frontend/backend stack.
+- CI quality gates: GitHub Actions runs backend tests and frontend unit/e2e tests, lint, and build. Repository governance also rejects conflict markers, obvious secrets, and debug output on pushes and pull requests; PRs additionally require conventional titles, bodies, and `PROJECT_BRAIN.md` updates for behavior-affecting files.
 
 ## Commit log summary
 - `1132a0d` docs: initial PROJECT_BRAIN.md — full codebase understanding. Added the required living project understanding document before feature work.
@@ -203,3 +207,6 @@ Missing but obviously needed:
 - docs: update project brain after explainable health metrics. Recorded the score-explainability decision and updated coverage notes.
 - `f2c8d31` ci: add repository governance checks. Added push/PR hygiene scans, PR title/body validation, project-brain update enforcement for PRs, Dependabot, and CODEOWNERS.
 - docs: update project brain after repository governance. Recorded the governance decision and updated CI/deployment-risk notes.
+- test: add real-browser landing-to-dashboard coverage. Added Playwright Chromium configuration, deterministic REST/SSE interception, CI execution, and non-fatal theme storage handling.
+- docs: update project brain after browser e2e coverage. Recorded the closed browser testing gap and current quality-gate status.
+- fix: stabilize local scan and narrative flows. Added the missing backend async DB runtime dependency, fixed Vite proxy env loading, made ingestion progress streams use independent DB sessions, handled SQLite naive timestamps, reset stale dashboard commit selections after rescans, hardened storage/markup edge cases, and made streaming narratives fall back to cached demo-mode output when LLM providers are unavailable.

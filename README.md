@@ -1,6 +1,6 @@
 # CommitIQ
 
-[![CI](https://github.com/eshaanag/CommitIQ---/actions/workflows/ci.yml/badge.svg)](https://github.com/eshaanag/CommitIQ---/actions/workflows/ci.yml)
+[![CI](https://github.com/eshaanag/CommitIQ---/actions/workflows/ci.yml/badge.svg)](https://github.com/eshaanag/CommitIQ---/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 Repository health intelligence for GitHub projects.
 
@@ -28,7 +28,7 @@ Live app: https://commit-iq-iota.vercel.app
 - Health timelines built from complexity, churn, dependency, semantic, and ownership signals.
 - Import and co-change graph exploration for architectural risk discovery.
 - Hotspot and bus-factor views for maintainability and ownership risk.
-- Optional Claude/Gemini-generated narratives with cache and budget controls.
+- Optional Claude/Gemini-generated narratives with cache, budget controls, and demo fallback when provider keys are not configured.
 - Streaming ingestion progress with cancellation support.
 - Light/dark React dashboard with Vite, SWR, Recharts, and force graph tooling.
 - CI coverage for backend tests, frontend tests, linting, builds, and repository hygiene checks.
@@ -125,6 +125,8 @@ Run these before opening a pull request:
 python -m pytest
 cd frontend
 npm run test
+npx playwright install chromium
+npm run test:e2e
 npm run lint
 npm run build
 npm audit --audit-level=moderate
@@ -146,3 +148,7 @@ CI also checks for merge conflict markers, obvious secrets, debug output in prod
 - Add a fixture-backed instant demo path.
 - Improve deployment packaging and health checks.
 - Deepen health scoring with risk reasons, hotspot persistence, ownership entropy, coupling surprise, blast radius, and cycle severity.
+
+## License
+
+This project is licensed under the [MIT](LICENSE) License.

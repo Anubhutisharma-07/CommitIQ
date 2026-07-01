@@ -119,6 +119,18 @@ def _detect_cycles(edges: list[dict]) -> bool:
     return any(visit(node) for node in graph)
 
 
+def _utc_datetime(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
+def _duration_seconds(started_at: datetime | None, completed_at: datetime) -> float | None:
+    if not started_at:
+        return None
+    return (_utc_datetime(completed_at) - _utc_datetime(started_at)).total_seconds()
+
+
 def _hotspot_files(
     commit_history: list[dict],
     current_index: int,
@@ -494,7 +506,6 @@ async def run_ingestion(repo_id: int, job_id: int, max_commits: int) -> None:
             repo.last_updated_at = datetime.now(tz=timezone.utc)
 
             completed = datetime.now(tz=timezone.utc)
-            duration = (completed - job.started_at).total_seconds() if job.started_at else None
             await _update_job(
                 db,
                 job,
@@ -503,7 +514,7 @@ async def run_ingestion(repo_id: int, job_id: int, max_commits: int) -> None:
                 processed_commits=len(commit_history),
                 progress_pct=100.0,
                 completed_at=completed,
-                duration_seconds=duration,
+                duration_seconds=_duration_seconds(job.started_at, completed),
             )
             await db.commit()
         except IngestionCancelled:
@@ -618,7 +629,7 @@ async def cancel_ingestion(repo_id: int, db: AsyncSession = Depends(get_db)):
     job.error_message = CANCELLED_MESSAGE
     job.completed_at = completed
     if job.started_at and not job.duration_seconds:
-        job.duration_seconds = (completed - job.started_at).total_seconds()
+        job.duration_seconds = _duration_seconds(job.started_at, completed)
     repo.status = "pending"
     repo.error_message = CANCELLED_MESSAGE
     await db.commit()
@@ -636,37 +647,45 @@ async def cancel_ingestion(repo_id: int, db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/ingest/progress/{repo_id}", response_model=None)
-async def ingest_progress(repo_id: int, db: AsyncSession = Depends(get_db)):
+async def ingest_progress(repo_id: int):
     async def event_generator():
-        while True:
-            result = await db.execute(
-                select(AnalysisJob)
-                .where(AnalysisJob.repo_id == repo_id)
-                .order_by(desc(AnalysisJob.created_at))
-                .limit(1)
-            )
-            job = result.scalar_one_or_none()
-            if not job:
-                yield f"data: {json.dumps({'status': 'error', 'error_message': 'Job not found'})}\n\n"
-                break
+        from backend.database import AsyncSessionLocal
 
-            payload = JobProgressOut(
-                current=job.processed_commits,
-                total=job.total_commits,
-                current_sha=job.current_sha,
-                stage=job.current_stage,
-                progress_pct=job.progress_pct,
-                status=job.status,
-                error_message=job.error_message,
-            ).model_dump(mode="json")
-            yield f"data: {json.dumps(payload)}\n\n"
+        try:
+            while True:
+                async with AsyncSessionLocal() as stream_db:
+                    result = await stream_db.execute(
+                        select(AnalysisJob)
+                        .where(AnalysisJob.repo_id == repo_id)
+                        .order_by(desc(AnalysisJob.created_at))
+                        .limit(1)
+                    )
+                    job = result.scalar_one_or_none()
 
-            if job.status in {"ready", "error", "cancelled"}:
-                break
-            
-            # Reset transaction to see fresh data from background job
-            await db.rollback()
-            await asyncio.sleep(0.75)
+                    if not job:
+                        yield f"data: {json.dumps({'status': 'error', 'error_message': 'Job not found'})}\n\n"
+                        break
+
+                    payload = JobProgressOut(
+                        current=job.processed_commits,
+                        total=job.total_commits,
+                        current_sha=job.current_sha,
+                        stage=job.current_stage,
+                        progress_pct=job.progress_pct,
+                        status=job.status,
+                        error_message=job.error_message,
+                    ).model_dump(mode="json")
+                    terminal = job.status in {"ready", "error", "cancelled"}
+
+                yield f"data: {json.dumps(payload)}\n\n"
+
+                if terminal:
+                    break
+
+                await asyncio.sleep(0.75)
+        except asyncio.CancelledError:
+            logger.debug("Ingestion progress stream disconnected for repo_id=%s", repo_id)
+            return
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 

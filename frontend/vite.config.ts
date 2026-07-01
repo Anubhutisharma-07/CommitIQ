@@ -1,26 +1,31 @@
 import { defineConfig } from 'vitest/config'
+import { loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 
-const devApiProxyTarget = process.env.VITE_DEV_API_PROXY_TARGET
-
 // https://vite.dev/config/
-export default defineConfig({
-  plugins: [react()],
-  server: devApiProxyTarget
-    ? {
-        proxy: {
-          '/api': {
-            target: devApiProxyTarget,
-            changeOrigin: true,
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '')
+  const devApiProxyTarget = env.VITE_DEV_API_PROXY_TARGET
+
+  return {
+    plugins: [react()],
+    server: devApiProxyTarget
+      ? {
+          proxy: {
+            '/api': {
+              target: devApiProxyTarget,
+              changeOrigin: true,
+            },
           },
-        },
-      }
-    : undefined,
-  build: {
-    chunkSizeWarningLimit: 900,
-  },
-  test: {
-    environment: 'jsdom',
-    setupFiles: './src/test/setup.ts',
-  },
+        }
+      : undefined,
+    build: {
+      chunkSizeWarningLimit: 900,
+    },
+    test: {
+      environment: 'jsdom',
+      include: ['src/**/*.test.{ts,tsx}'],
+      setupFiles: './src/test/setup.ts',
+    },
+  }
 })

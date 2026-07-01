@@ -33,8 +33,18 @@ export default function DashboardPage() {
   const selectedPersistentHotspots = selected?.persistent_hotspots?.slice(0, 3) || []
 
   useEffect(() => {
-    if (commits.length && !selected) {
-      setSelected(commits[commits.length - 1])
+    if (!commits.length) {
+      setSelected(null)
+      return
+    }
+
+    const matchingSelection = selected
+      ? commits.find((commit) => commit.sha === selected.sha)
+      : null
+    const nextSelection = matchingSelection || commits[commits.length - 1]
+
+    if (selected !== nextSelection) {
+      setSelected(nextSelection)
     }
   }, [commits, selected])
 

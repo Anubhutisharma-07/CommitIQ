@@ -7,7 +7,12 @@
     <title>CommitIQ</title>
     <script>
       (function() {
-        const theme = localStorage.getItem('theme') || 'dark';
+        let theme = 'dark';
+        try {
+          theme = localStorage.getItem('theme') || 'dark';
+        } catch (error) {
+          theme = 'dark';
+        }
         if (theme === 'dark') {
           document.documentElement.classList.add('dark');
         } else {
