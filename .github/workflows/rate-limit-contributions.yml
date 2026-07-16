@@ -1,0 +1,93 @@
+name: Contribution Rate Limit
+
+# Caps how many PRs/issues a single contributor can have open at once,
+# and how many they can open within a rolling time window (anti-spam / anti-farming).
+#
+# Uses pull_request_target (not pull_request) so the bot has write access
+# even for PRs coming from forks.
+
+on:
+  pull_request_target:
+    types: [opened]
+  issues:
+    types: [opened]
+
+permissions:
+  pull-requests: write
+  issues: write
+  contents: read
+
+jobs:
+  rate-limit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enforce contribution limits
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // ---- tune these ----
+            const MAX_OPEN_PRS = 3;       // max simultaneous open PRs per user
+            const MAX_OPEN_ISSUES = 5;    // max simultaneous open issues per user
+            const WINDOW_HOURS = 24;      // rolling window to catch bursts
+            const MAX_IN_WINDOW = 6;      // max PRs+issues opened within WINDOW_HOURS
+            const AUTO_CLOSE = true;      // false = comment only, don't close
+            // ---------------------
+
+            const isPR = !!context.payload.pull_request;
+            const author = isPR ? context.payload.pull_request.user.login : context.payload.issue.user.login;
+            const number = isPR ? context.payload.pull_request.number : context.payload.issue.number;
+
+            // Don't rate-limit maintainers/owners
+            const { data: perm } = await github.rest.repos
+              .getCollaboratorPermissionLevel({ owner: context.repo.owner, repo: context.repo.repo, username: author })
+              .catch(() => ({ data: { permission: 'none' } }));
+            if (['admin', 'write'].includes(perm.permission)) return;
+
+            const items = await github.paginate(github.rest.issues.listForRepo, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              creator: author,
+              per_page: 100,
+            });
+
+            const openPRs = items.filter(i => i.pull_request);
+            const openIssues = items.filter(i => !i.pull_request);
+
+            const since = new Date(Date.now() - WINDOW_HOURS * 60 * 60 * 1000);
+            const recent = items.filter(i => new Date(i.created_at) > since);
+
+            let reason = null;
+            if (isPR && openPRs.length > MAX_OPEN_PRS) {
+              reason = `you currently have ${openPRs.length} open pull requests (limit: ${MAX_OPEN_PRS}).`;
+            } else if (!isPR && openIssues.length > MAX_OPEN_ISSUES) {
+              reason = `you currently have ${openIssues.length} open issues (limit: ${MAX_OPEN_ISSUES}).`;
+            } else if (recent.length > MAX_IN_WINDOW) {
+              reason = `you've opened ${recent.length} items in the last ${WINDOW_HOURS} hours (limit: ${MAX_IN_WINDOW}).`;
+            }
+
+            if (!reason) return;
+
+            const body = [
+              `Hey @${author}, thanks for your interest in contributing! 🙌`,
+              ``,
+              `This ${isPR ? 'pull request' : 'issue'} ${AUTO_CLOSE ? 'is being closed automatically' : 'is flagged'} because ${reason}`,
+              ``,
+              `To keep review quality high, please get your existing open items reviewed/merged first before opening new ones. See [CONTRIBUTING.md](../blob/main/CONTRIBUTING.md) for our contribution limits.`,
+            ].join('\n');
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner, repo: context.repo.repo, issue_number: number, body,
+            });
+
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner, repo: context.repo.repo, issue_number: number, labels: ['rate-limited'],
+            });
+
+            if (AUTO_CLOSE) {
+              if (isPR) {
+                await github.rest.pulls.update({ owner: context.repo.owner, repo: context.repo.repo, pull_number: number, state: 'closed' });
+              } else {
+                await github.rest.issues.update({ owner: context.repo.owner, repo: context.repo.repo, issue_number: number, state: 'closed' });
+              }
+            }
