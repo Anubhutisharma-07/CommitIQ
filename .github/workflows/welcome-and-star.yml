@@ -1,0 +1,45 @@
+name: Welcome Contributor
+
+# Greets first-time contributors on their first PR/issue, mentions the project's
+# participation in ECSoC / Elusoc, and asks for a star. Only fires once per person
+# (checked via author_association).
+
+on:
+  pull_request_target:
+    types: [opened]
+  issues:
+    types: [opened]
+
+permissions:
+  pull-requests: write
+  issues: write
+
+jobs:
+  welcome:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const isPR = !!context.payload.pull_request;
+            const payload = isPR ? context.payload.pull_request : context.payload.issue;
+            const association = payload.author_association; // FIRST_TIME_CONTRIBUTOR, FIRST_TIMER, NONE, etc.
+            const number = payload.number;
+
+            const firstTimeAssociations = ['FIRST_TIME_CONTRIBUTOR', 'FIRST_TIMER', 'NONE'];
+            if (!firstTimeAssociations.includes(association)) return;
+
+            const body = [
+              `Welcome, and thanks for opening this ${isPR ? 'pull request' : 'issue'}! 🎉`,
+              ``,
+              `Heads up — this project is participating in **ECSoC** and **Elusoc** this cycle, so quality contributions here count toward those programs. Please make sure it follows the [contribution guidelines](../blob/main/CONTRIBUTING.md) before review.`,
+              ``,
+              `If you find the project useful, a ⭐ on the repo helps a lot — thanks for supporting us!`,
+            ].join('\n');
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: number,
+              body,
+            });
