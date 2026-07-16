@@ -1,14 +1,16 @@
 name: Welcome Contributor
 
-# Greets first-time contributors on their first PR/issue, mentions the project's
-# participation in ECSoC / Elusoc, and asks for a star. Only fires once per person
-# (checked via author_association).
+# Two triggers:
+# 1. First-time PR/issue opened -> generic welcome + star ask.
+# 2. Someone gets assigned to an issue -> assignment-specific welcome with
+#    program label reminder. Fires every time an assignment happens (not just
+#    first-time contributors), since assignment is a distinct, deliberate action.
 
 on:
   pull_request_target:
     types: [opened]
   issues:
-    types: [opened]
+    types: [opened, assigned]
 
 permissions:
   pull-requests: write
@@ -22,20 +24,40 @@ jobs:
         with:
           script: |
             const isPR = !!context.payload.pull_request;
+            const isAssignment = context.payload.action === 'assigned';
             const payload = isPR ? context.payload.pull_request : context.payload.issue;
-            const association = payload.author_association; // FIRST_TIME_CONTRIBUTOR, FIRST_TIMER, NONE, etc.
             const number = payload.number;
 
-            const firstTimeAssociations = ['FIRST_TIME_CONTRIBUTOR', 'FIRST_TIMER', 'NONE'];
-            if (!firstTimeAssociations.includes(association)) return;
+            let body;
 
-            const body = [
-              `Welcome, and thanks for opening this ${isPR ? 'pull request' : 'issue'}! 🎉`,
-              ``,
-              `Heads up — this project is participating in **ECSoC** and **Elusoc** this cycle, so quality contributions here count toward those programs. Please make sure it follows the [contribution guidelines](../blob/main/CONTRIBUTING.md) before review.`,
-              ``,
-              `If you find the project useful, a ⭐ on the repo helps a lot — thanks for supporting us!`,
-            ].join('\n');
+            if (isAssignment) {
+              const assignee = context.payload.assignee?.login;
+              if (!assignee) return; // safety guard, shouldn't happen on 'assigned' events
+
+              body = [
+                `You're assigned! Welcome, and thanks for picking this up, @${assignee}.`,
+                ``,
+                `A couple of things before you start:`,
+                `- This project is participating in **ECSoC 2026** and **ELUSOC 2026** — once your PR is merged, make sure it has the correct program label (\`ECSoC26\` or \`ELUSOC\`) so it gets tracked for scoring.`,
+                `- Please follow the [contributing guidelines](../blob/main/CONTRIBUTING.md) and fill out the PR template fully (program, description, checklist) when you open your PR.`,
+                `- If you find the project useful, a ⭐ on the repo helps a lot — thanks for supporting us!`,
+                ``,
+                `Let me know if you have any questions about the codebase or the acceptance criteria.`,
+              ].join('\n');
+            } else {
+              // first-time opener path (original behavior)
+              const association = payload.author_association;
+              const firstTimeAssociations = ['FIRST_TIME_CONTRIBUTOR', 'FIRST_TIMER', 'NONE'];
+              if (!firstTimeAssociations.includes(association)) return;
+
+              body = [
+                `Welcome, and thanks for opening this ${isPR ? 'pull request' : 'issue'}! 🎉`,
+                ``,
+                `Heads up — this project is participating in **ECSoC** and **ELUSOC** this cycle, so quality contributions here count toward those programs. Please make sure it follows the [contribution guidelines](../blob/main/CONTRIBUTING.md) before review.`,
+                ``,
+                `If you find the project useful, a ⭐ on the repo helps a lot — thanks for supporting us!`,
+              ].join('\n');
+            }
 
             await github.rest.issues.createComment({
               owner: context.repo.owner,
