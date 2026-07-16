@@ -54,3 +54,19 @@ Use conventional commit prefixes:
 - `docs:` for documentation
 - `refactor:` for behavior-preserving restructuring
 - `chore:` for tooling and dependency maintenance
+
+## Contribution limits (anti-spam policy)
+
+To keep review quality high and prevent low-effort/farmed contributions, we enforce:
+
+- **Max 3 open pull requests** per contributor at a time.
+- **Max 5 open issues** per contributor at a time.
+- **Max 6 items (PRs + issues combined)** opened by one person within a rolling 24-hour window.
+
+If you exceed these limits, new PRs/issues will be automatically closed with a comment
+explaining why, and labeled `rate-limited`. This isn't personal — please get your existing
+open items reviewed and merged first, then open new ones.
+
+We also expect:
+- One issue per distinct bug/feature — no duplicate or vague issues opened just to later "resolve" them.
+- PRs should be scoped, tested, and pass CI (`Auto Format`, `CI / Backend Tests`, `CI / Frontend Tests`) before requesting review.
