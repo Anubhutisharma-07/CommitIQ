@@ -4,7 +4,7 @@ import pytest
 from pydantic import ValidationError
 
 from backend.config import MAX_COMMITS
-from backend.features.repo_ingestion.bus_factor import is_code_file
+from backend.features.repo_ingestion.bus_factor import is_code_file, _blame_authors
 from backend.features.repo_ingestion.clone_service import (
     cleanup_repo,
     get_clone_path,
@@ -177,6 +177,18 @@ def test_bus_factor_file_filter_keeps_code_and_ignores_docs_configs():
     assert not is_code_file("README.md")
     assert not is_code_file(".github/workflows/ci.yml")
     assert not is_code_file("package.json")
+
+
+def test_blame_authors_handles_timeout(monkeypatch, tmp_path):
+    import subprocess
+
+    def mock_run(*args, **kwargs):
+        raise subprocess.TimeoutExpired(cmd=args[0], timeout=60)
+    
+    monkeypatch.setattr("backend.features.repo_ingestion.bus_factor.subprocess.run", mock_run)
+
+    result = _blame_authors(tmp_path, "some_file.py")
+    assert result == {}
 
 
 def test_semantic_drift_uses_fallback_without_graphcodebert(monkeypatch):
