@@ -68,6 +68,19 @@ def make_repo_slug(owner: str, repo: str) -> str:
     return slug
 
 
+def get_storage_usage_mb(path: Path) -> float:
+    if not path.exists():
+        return 0.0
+    total = 0
+    for p in path.rglob('*'):
+        try:
+            if p.is_file() and not p.is_symlink():
+                total += p.stat().st_size
+        except OSError:
+            pass
+    return total / (1024 * 1024)
+
+
 def get_clone_path(repo_id: int) -> Path:
     return REPO_STORAGE_PATH / str(repo_id)
 
@@ -78,6 +91,14 @@ def clone_repo(repo_url: str, repo_id: int, max_commits: int = 150) -> Path:
     if target.exists():
         if not cleanup_repo(repo_id):
             raise RuntimeError(f"Could not clean existing clone directory for repo_id={repo_id}")
+
+    from backend.config import MAX_REPO_STORAGE_MB
+    current_usage = get_storage_usage_mb(REPO_STORAGE_PATH)
+    if current_usage >= MAX_REPO_STORAGE_MB:
+        raise ValueError(
+            f"Storage quota exceeded. Current: {current_usage:.1f} MB, Limit: {MAX_REPO_STORAGE_MB} MB"
+        )
+
     target.mkdir(parents=True, exist_ok=True)
 
     # Use git clone via HTTPS — never uses GitHub REST API, no rate limits

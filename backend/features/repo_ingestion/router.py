@@ -61,16 +61,25 @@ class IngestionCancelled(RuntimeError):
     pass
 
 
-async def _update_job(db: AsyncSession, job: AnalysisJob, **kwargs) -> None:
-    for key, value in kwargs.items():
-        setattr(job, key, value)
-    await db.commit()
+async def _update_job(job_id: int, **kwargs) -> None:
+    from backend.database import AsyncSessionLocal
+    async with AsyncSessionLocal() as session:
+        job = await session.get(AnalysisJob, job_id)
+        if job:
+            for key, value in kwargs.items():
+                setattr(job, key, value)
+            await session.commit()
 
 
-async def _raise_if_cancelled(db: AsyncSession, job: AnalysisJob) -> None:
-    await db.refresh(job)
-    if job.status == "cancelled":
-        raise IngestionCancelled(CANCELLED_MESSAGE)
+async def _raise_if_cancelled(job_id: int) -> None:
+    from backend.database import AsyncSessionLocal
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(AnalysisJob.status).where(AnalysisJob.id == job_id)
+        )
+        status = result.scalar_one_or_none()
+        if status == "cancelled":
+            raise IngestionCancelled(CANCELLED_MESSAGE)
 
 
 def _parse_top_files(raw: str | None) -> list[dict]:
@@ -339,7 +348,6 @@ async def _commit_graph_rows(db: AsyncSession, repo_id: int, sha: str) -> tuple[
 async def _clear_repo_data(db: AsyncSession, repo_id: int) -> None:
     for model in (LLMNarrative, GraphEdge, GraphNode, HealthSnapshot, Commit, BusFactor):
         await db.execute(delete(model).where(model.repo_id == repo_id))
-    await db.commit()
 
 
 async def _latest_active_job(db: AsyncSession, repo_id: int) -> AnalysisJob | None:
@@ -356,6 +364,7 @@ async def run_ingestion(repo_id: int, job_id: int, max_commits: int) -> None:
     from backend.database import AsyncSessionLocal
     from backend.features.repo_ingestion.metrics_extractor import checkout_commit, extract_commit_metrics
 
+    # --- early validation (own session, committed immediately) ---
     async with AsyncSessionLocal() as db:
         repo = await db.get(Repo, repo_id)
         if not repo:
@@ -366,50 +375,53 @@ async def run_ingestion(repo_id: int, job_id: int, max_commits: int) -> None:
             logger.warning("Skipping ingestion for repo_id=%s because job_id=%s was not found", repo_id, job_id)
             return
 
-        clone_path = None
-        try:
-            await _update_job(
-                db,
-                job,
-                status="cloning",
-                current_stage="Cloning repository",
-                started_at=datetime.now(tz=timezone.utc),
+        repo_url = repo.url  # snapshot immutable fields for later use
+
+        await _update_job(
+            job_id,
+            status="cloning",
+            current_stage="Cloning repository",
+            started_at=datetime.now(tz=timezone.utc),
+        )
+        repo.status = "processing"
+        repo.error_message = None
+        await db.commit()
+
+    clone_path = None
+    try:
+        clone_path = clone_repo(repo_url, repo_id, max_commits)
+        await _raise_if_cancelled(job_id)
+        available_commits = count_available_commits(clone_path)
+        if available_commits < 1:
+            raise RuntimeError(
+                f"Repository must have at least 1 commit for CommitIQ analysis; found {available_commits}."
             )
-            repo.status = "processing"
-            repo.error_message = None
-            await db.commit()
 
-            clone_path = clone_repo(repo.url, repo_id, max_commits)
-            await _raise_if_cancelled(db, job)
-            available_commits = count_available_commits(clone_path)
-            if available_commits < 1:
-                raise RuntimeError(
-                    f"Repository must have at least 1 commit for CommitIQ analysis; found {available_commits}."
-                )
+        await _update_job(job_id, status="analyzing", current_stage="Walking commit history")
+        await _raise_if_cancelled(job_id)
+        commit_history = list(walk_commits(clone_path, max_commits))
+        if not commit_history:
+            raise RuntimeError("No commits were found in this repository.")
+        await _update_job(job_id, total_commits=len(commit_history))
+        await _raise_if_cancelled(job_id)
 
-            await _update_job(db, job, status="analyzing", current_stage="Walking commit history")
-            await _raise_if_cancelled(db, job)
-            commit_history = list(walk_commits(clone_path, max_commits))
-            if not commit_history:
-                raise RuntimeError("No commits were found in this repository.")
-            await _update_job(db, job, total_commits=len(commit_history))
-            await _raise_if_cancelled(db, job)
+        await _update_job(job_id, status="computing_bus_factor", current_stage="Computing bus factor")
+        await _raise_if_cancelled(job_id)
+        checkout_commit(clone_path, commit_history[-1]["full_sha"])
+        bus_entries = compute_bus_factor_from_history(commit_history, clone_path)
+        min_bus_factor = min((entry["contributor_count"] for entry in bus_entries), default=1)
 
+        # --- single atomic transaction: clear old data + write all new data ---
+        async with AsyncSessionLocal() as db:
             await _clear_repo_data(db, repo_id)
-            await _raise_if_cancelled(db, job)
-            await _update_job(db, job, status="computing_bus_factor", current_stage="Computing bus factor")
-            await _raise_if_cancelled(db, job)
-            checkout_commit(clone_path, commit_history[-1]["full_sha"])
-            bus_entries = compute_bus_factor_from_history(commit_history, clone_path)
-            min_bus_factor = min((entry["contributor_count"] for entry in bus_entries), default=1)
+            await _raise_if_cancelled(job_id)
 
             prev_health = None
             prev_avg_complexity = 0.0
             for idx, commit_data in enumerate(commit_history):
-                await _raise_if_cancelled(db, job)
+                await _raise_if_cancelled(job_id)
                 await _update_job(
-                    db,
-                    job,
+                    job_id,
                     status="analyzing",
                     current_stage=f"Analyzing commit {idx + 1}/{len(commit_history)}",
                     processed_commits=idx,
@@ -494,52 +506,65 @@ async def run_ingestion(repo_id: int, job_id: int, max_commits: int) -> None:
 
                 prev_health = snapshot_data["health_score"]
                 prev_avg_complexity = snapshot_data["avg_complexity"]
-                await db.commit()
 
-            await _update_job(db, job, status="computing_bus_factor", current_stage="Computing bus factor")
+            await _update_job(job_id, status="computing_bus_factor", current_stage="Computing bus factor")
             for entry in bus_entries:
                 db.add(BusFactor(repo_id=repo_id, **entry))
 
-            repo.status = "ready"
-            repo.analyzed_commits = len(commit_history)
-            repo.total_commits = available_commits
-            repo.last_updated_at = datetime.now(tz=timezone.utc)
+            # Single commit for all data writes (clear + inserts)
+            await db.commit()
 
-            completed = datetime.now(tz=timezone.utc)
-            await _update_job(
-                db,
-                job,
-                status="ready",
-                current_stage="Complete",
-                processed_commits=len(commit_history),
-                progress_pct=100.0,
-                completed_at=completed,
-                duration_seconds=_duration_seconds(job.started_at, completed),
-            )
-            await db.commit()
-        except IngestionCancelled:
-            logger.info("Repository ingestion cancelled for repo_id=%s job_id=%s", repo_id, job_id)
-            repo.status = "pending"
-            repo.error_message = CANCELLED_MESSAGE
-            job.current_stage = "Cancelled"
-            job.error_message = CANCELLED_MESSAGE
-            if not job.completed_at:
-                job.completed_at = datetime.now(tz=timezone.utc)
-            await db.commit()
-        except Exception as exc:
-            logger.exception("Repository ingestion failed for repo_id=%s", repo_id)
-            repo.status = "error"
-            repo.error_message = str(exc)[:500]
-            await _update_job(
-                db,
-                job,
-                status="error",
-                current_stage="Error",
-                error_message=repo.error_message,
-            )
-            await db.commit()
-        finally:
-            cleanup_repo(repo_id)
+        # --- mark repo as ready (own session) ---
+        async with AsyncSessionLocal() as db:
+            repo = await db.get(Repo, repo_id)
+            if repo:
+                repo.status = "ready"
+                repo.analyzed_commits = len(commit_history)
+                repo.total_commits = available_commits
+                repo.last_updated_at = datetime.now(tz=timezone.utc)
+                await db.commit()
+
+        completed = datetime.now(tz=timezone.utc)
+        await _update_job(
+            job_id,
+            status="ready",
+            current_stage="Complete",
+            processed_commits=len(commit_history),
+            progress_pct=100.0,
+            completed_at=completed,
+        )
+    except IngestionCancelled:
+        logger.info("Repository ingestion cancelled for repo_id=%s job_id=%s", repo_id, job_id)
+        async with AsyncSessionLocal() as db:
+            repo = await db.get(Repo, repo_id)
+            if repo:
+                repo.status = "pending"
+                repo.error_message = CANCELLED_MESSAGE
+                await db.commit()
+        await _update_job(
+            job_id,
+            status="cancelled",
+            current_stage="Cancelled",
+            error_message=CANCELLED_MESSAGE,
+            completed_at=datetime.now(tz=timezone.utc),
+        )
+    except Exception as exc:
+        logger.exception("Repository ingestion failed for repo_id=%s", repo_id)
+        error_msg = str(exc)[:500]
+        async with AsyncSessionLocal() as db:
+            repo = await db.get(Repo, repo_id)
+            if repo:
+                repo.status = "error"
+                repo.error_message = error_msg
+                await db.commit()
+        await _update_job(
+            job_id,
+            status="error",
+            current_stage="Error",
+            error_message=error_msg,
+        )
+    finally:
+        cleanup_repo(repo_id)
 
 
 @router.post("/ingest", response_model=IngestResponse, status_code=202)

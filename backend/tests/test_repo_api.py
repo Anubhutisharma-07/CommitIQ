@@ -605,3 +605,207 @@ async def test_ingest_progress_stream_picks_up_cancelled_job_updates(monkeypatch
     assert second_payload["error_message"] == "Ingestion cancelled by user."
     with pytest.raises(StopAsyncIteration):
         await anext(response.body_iterator)
+
+
+async def test_ingestion_rollback_preserves_old_data_on_mid_ingestion_failure(
+    monkeypatch, tmp_path
+):
+    """When ingestion fails mid-way, old repo data must be preserved, not deleted."""
+    import sys
+    import types
+
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine as _create
+
+    from backend.database import Base
+    from backend.shared.models import AnalysisJob, Commit, Repo
+
+    # --- set up an isolated async sqlite database ---
+    db_url = f"sqlite+aiosqlite:///{tmp_path / 'test.db'}"
+    test_engine = _create(db_url, connect_args={"check_same_thread": False, "timeout": 30})
+    TestSession = async_sessionmaker(test_engine, class_=AsyncSession, expire_on_commit=False)
+
+    async with test_engine.begin() as conn:
+        from sqlalchemy import text as sa_text
+        await conn.execute(sa_text("PRAGMA journal_mode=WAL"))
+        await conn.execute(sa_text("PRAGMA synchronous=NORMAL"))
+        await conn.run_sync(Base.metadata.create_all)
+
+    # --- seed a repo with existing data ---
+    async with TestSession() as db:
+        repo = Repo(
+            id=1,
+            url="https://github.com/test/project",
+            name="test/project",
+            owner="test",
+            repo_slug="test-project",
+            default_branch="main",
+            total_commits=1,
+            analyzed_commits=1,
+            status="ready",
+            max_commits_setting=50,
+        )
+        db.add(repo)
+        await db.flush()
+
+        job = AnalysisJob(
+            repo_id=1,
+            status="queued",
+            total_commits=0,
+            processed_commits=0,
+            current_stage="Queued",
+            triggered_by="user",
+        )
+        db.add(job)
+        await db.flush()
+
+        old_commit = Commit(
+            repo_id=1,
+            sha="oldsha12",
+            full_sha="oldsha12" * 5,
+            message="old commit that should survive",
+            author_name="Tester",
+            author_email="test@example.com",
+            committed_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            insertions=10,
+            deletions=5,
+            files_changed=1,
+        )
+        db.add(old_commit)
+        await db.commit()
+        job_id = job.id
+
+    # --- patch AsyncSessionLocal to use our test database ---
+    monkeypatch.setattr("backend.database.AsyncSessionLocal", TestSession)
+
+    # --- patch _update_job and _raise_if_cancelled as no-ops ---
+    # These open separate DB sessions for job status updates, which causes
+    # SQLite "database is locked" errors when the main transaction is open.
+    # The test focus is data rollback safety, not job status tracking.
+    async def _noop_update(job_id, **kwargs):
+        pass
+
+    async def _noop_cancel_check(job_id):
+        pass
+
+    monkeypatch.setattr("backend.features.repo_ingestion.router._update_job", _noop_update)
+    monkeypatch.setattr("backend.features.repo_ingestion.router._raise_if_cancelled", _noop_cancel_check)
+
+    # --- patch clone_repo to return a fake path ---
+    fake_clone = tmp_path / "fake_repo"
+    fake_clone.mkdir()
+    monkeypatch.setattr(
+        "backend.features.repo_ingestion.router.clone_repo",
+        lambda url, repo_id, max_commits: fake_clone,
+    )
+
+    # --- patch count_available_commits ---
+    monkeypatch.setattr(
+        "backend.features.repo_ingestion.router.count_available_commits",
+        lambda path: 2,
+    )
+
+    # --- patch walk_commits to return two fake commits ---
+    fake_history = [
+        {
+            "sha": "newsha01",
+            "full_sha": "newsha01" * 5,
+            "message": "new commit 1",
+            "author_name": "Dev",
+            "author_email": "dev@test.com",
+            "committed_at": "2026-06-01T00:00:00+00:00",
+            "insertions": 5,
+            "deletions": 2,
+            "files_changed": 1,
+            "files_list": ["src/app.py"],
+            "parent_sha": None,
+        },
+        {
+            "sha": "newsha02",
+            "full_sha": "newsha02" * 5,
+            "message": "new commit 2",
+            "author_name": "Dev",
+            "author_email": "dev@test.com",
+            "committed_at": "2026-06-02T00:00:00+00:00",
+            "insertions": 3,
+            "deletions": 1,
+            "files_changed": 1,
+            "files_list": ["src/app.py"],
+            "parent_sha": "newsha01" * 5,
+        },
+    ]
+    monkeypatch.setattr(
+        "backend.features.repo_ingestion.router.walk_commits",
+        lambda path, max_commits: fake_history,
+    )
+
+    # --- patch checkout_commit and extract_commit_metrics via fake module ---
+    # metrics_extractor imports lizard at module level which may not be installed;
+    # we inject a fake module into sys.modules so the lazy import in run_ingestion works.
+    call_count = 0
+
+    def failing_extract(path, commit_data):
+        nonlocal call_count
+        call_count += 1
+        if call_count >= 2:
+            raise RuntimeError("Simulated mid-ingestion failure")
+        return {
+            "src/app.py": {
+                "avg_complexity": 2.0,
+                "max_complexity": 3.0,
+                "loc": 50,
+                "semantic_drift_score": 0.0,
+                "drift_method": "none",
+            },
+        }
+
+    fake_metrics_mod = types.ModuleType("backend.features.repo_ingestion.metrics_extractor")
+    fake_metrics_mod.checkout_commit = lambda path, sha: None
+    fake_metrics_mod.extract_commit_metrics = failing_extract
+    monkeypatch.setitem(sys.modules, "backend.features.repo_ingestion.metrics_extractor", fake_metrics_mod)
+
+    # --- patch bus factor ---
+    monkeypatch.setattr(
+        "backend.features.repo_ingestion.router.compute_bus_factor_from_history",
+        lambda history, path: [{"file_path": "src/app.py", "contributor_count": 1, "contributors_json": "[]"}],
+    )
+
+    # --- patch graph builders (return empty) ---
+    monkeypatch.setattr(
+        "backend.features.repo_ingestion.router.build_import_edges",
+        lambda path, files: [],
+    )
+    monkeypatch.setattr(
+        "backend.features.repo_ingestion.router.build_cochange_edges",
+        lambda history, min_cooccurrence=2: [],
+    )
+
+    # --- patch cleanup_repo (no-op) ---
+    monkeypatch.setattr(
+        "backend.features.repo_ingestion.router.cleanup_repo",
+        lambda repo_id: True,
+    )
+
+    # --- run ingestion (should fail mid-way) ---
+    await run_ingestion(repo_id=1, job_id=job_id, max_commits=50)
+
+    # --- verify old data is PRESERVED ---
+    from sqlalchemy import select as sa_select
+
+    async with TestSession() as db:
+        result = await db.execute(sa_select(Commit).where(Commit.repo_id == 1))
+        commits = result.scalars().all()
+
+        # Old commit should still be there because the transaction rolled back
+        old_shas = [c.sha for c in commits]
+        assert "oldsha12" in old_shas, (
+            f"Old commit was deleted but should have been preserved. Found: {old_shas}"
+        )
+        # New commits should NOT be present (they were rolled back)
+        assert "newsha01" not in old_shas, "Partial new data should have been rolled back"
+
+        # Repo should be in error state
+        repo = await db.get(Repo, 1)
+        assert repo.status == "error"
+        assert "Simulated mid-ingestion failure" in (repo.error_message or "")
+
+    await test_engine.dispose()

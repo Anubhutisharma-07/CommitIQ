@@ -249,3 +249,33 @@ def test_compute_full_snapshot_aggregates_metric_and_semantic_inputs():
         "persistent_hotspots",
     }
     assert json.loads(snapshot["persistent_hotspots_json"]) == persistent_hotspots
+
+
+def test_clone_repo_rejects_when_storage_quota_exceeded(monkeypatch, tmp_path):
+    """Ingestion must be rejected when REPO_STORAGE_PATH usage exceeds MAX_REPO_STORAGE_MB."""
+    from backend.features.repo_ingestion.clone_service import clone_repo, get_storage_usage_mb
+
+    monkeypatch.setattr("backend.features.repo_ingestion.clone_service.REPO_STORAGE_PATH", tmp_path)
+    monkeypatch.setattr("backend.config.MAX_REPO_STORAGE_MB", 1)
+
+    # Create files totalling > 1 MB
+    big_file = tmp_path / "existing_repo" / "bigfile.bin"
+    big_file.parent.mkdir(parents=True, exist_ok=True)
+    big_file.write_bytes(b"\x00" * (2 * 1024 * 1024))  # 2 MB
+
+    assert get_storage_usage_mb(tmp_path) > 1.0
+
+    with pytest.raises(ValueError, match="Storage quota exceeded"):
+        clone_repo("https://github.com/test/repo", repo_id=999, max_commits=10)
+
+
+def test_clone_repo_allows_when_under_quota(monkeypatch, tmp_path):
+    """clone_repo should NOT raise when storage is under quota (it will fail at git clone, not quota)."""
+    from backend.features.repo_ingestion.clone_service import clone_repo
+
+    monkeypatch.setattr("backend.features.repo_ingestion.clone_service.REPO_STORAGE_PATH", tmp_path)
+    monkeypatch.setattr("backend.config.MAX_REPO_STORAGE_MB", 5000)
+
+    # Storage is empty, so quota check should pass; it will fail at git clone instead
+    with pytest.raises(RuntimeError):
+        clone_repo("https://github.com/test/nonexistent-repo-12345", repo_id=999, max_commits=10)
