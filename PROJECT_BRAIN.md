@@ -28,6 +28,7 @@ Working well:
 - Backend has structured schemas/models and separates ingestion, analysis, graph, bus factor, semantic, and LLM concerns.
 - LLM cost guard and cache are already part of the domain model, which is the right production instinct.
 - The UI has loading/error/empty states in many places and exposes high-value analysis concepts rather than raw tables only.
+- Removed dead compute_health_score function from metrics_extractor.py; health scoring now lives exclusively in health_scorer.py, eliminating duplicate logic.
 
 Incomplete or fragile:
 - Test runner config, focused backend/frontend tests, a real-browser frontend e2e, a frontend lockfile, and CI quality gates now exist; backend dependency locking is still absent.
