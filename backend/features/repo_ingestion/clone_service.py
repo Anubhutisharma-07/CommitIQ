@@ -1,5 +1,5 @@
 import logging
-import subprocess
+import asyncio
 from pathlib import Path
 import shutil
 from backend.config import REPO_STORAGE_PATH, GITHUB_TOKEN
@@ -85,7 +85,7 @@ def get_clone_path(repo_id: int) -> Path:
     return REPO_STORAGE_PATH / str(repo_id)
 
 
-def clone_repo(repo_url: str, repo_id: int, max_commits: int = 150) -> Path:
+async def clone_repo(repo_url: str, repo_id: int, max_commits: int = 150) -> Path:
     """Shallow clone to local disk. Returns clone path."""
     target = get_clone_path(repo_id)
     if target.exists():
@@ -111,38 +111,49 @@ def clone_repo(repo_url: str, repo_id: int, max_commits: int = 150) -> Path:
     else:
         auth_url = repo_url
 
-    result = subprocess.run(
-        [
-            "git", "clone",
-            "--depth", str(max_commits),
-            "--single-branch",
-            auth_url,
-            str(target)
-        ],
-        capture_output=True,
-        text=True,
-        timeout=300,
+    process = await asyncio.create_subprocess_exec(
+        "git", "clone",
+        "--depth", str(max_commits),
+        "--single-branch",
+        auth_url,
+        str(target),
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
     )
 
-    if result.returncode != 0:
+    try:
+        stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=300)
+    except asyncio.TimeoutError:
+        process.kill()
         cleanup_repo(repo_id)
-        raise RuntimeError(f"git clone failed: {_redact_secret(result.stderr)[:500]}")
+        raise RuntimeError(f"git clone timed out for repo_id={repo_id}")
+
+    if process.returncode != 0:
+        cleanup_repo(repo_id)
+        stderr_text = stderr.decode('utf-8', errors='replace')
+        raise RuntimeError(f"git clone failed: {_redact_secret(stderr_text)[:500]}")
 
     return target
 
 
-def count_available_commits(repo_path: Path) -> int:
-    result = subprocess.run(
-        ["git", "rev-list", "--count", "HEAD"],
-        cwd=repo_path,
-        capture_output=True,
-        text=True,
-        timeout=30,
+async def count_available_commits(repo_path: Path) -> int:
+    process = await asyncio.create_subprocess_exec(
+        "git", "rev-list", "--count", "HEAD",
+        cwd=str(repo_path),
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
     )
-    if result.returncode != 0:
+    
+    try:
+        stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=30)
+    except asyncio.TimeoutError:
+        process.kill()
+        return 0
+
+    if process.returncode != 0:
         return 0
     try:
-        return int(result.stdout.strip())
+        return int(stdout.decode('utf-8', errors='replace').strip())
     except ValueError:
         return 0
 
