@@ -693,15 +693,22 @@ async def test_ingestion_rollback_preserves_old_data_on_mid_ingestion_failure(
     # --- patch clone_repo to return a fake path ---
     fake_clone = tmp_path / "fake_repo"
     fake_clone.mkdir()
+    
+    async def mock_clone(*args, **kwargs):
+        return fake_clone
+        
     monkeypatch.setattr(
         "backend.features.repo_ingestion.router.clone_repo",
-        lambda url, repo_id, max_commits: fake_clone,
+        mock_clone,
     )
 
     # --- patch count_available_commits ---
+    async def mock_count(*args, **kwargs):
+        return 2
+        
     monkeypatch.setattr(
         "backend.features.repo_ingestion.router.count_available_commits",
-        lambda path: 2,
+        mock_count,
     )
 
     # --- patch walk_commits to return two fake commits ---

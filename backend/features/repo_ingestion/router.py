@@ -389,9 +389,9 @@ async def run_ingestion(repo_id: int, job_id: int, max_commits: int) -> None:
 
     clone_path = None
     try:
-        clone_path = clone_repo(repo_url, repo_id, max_commits)
+        clone_path = await clone_repo(repo_url, repo_id, max_commits)
         await _raise_if_cancelled(job_id)
-        available_commits = count_available_commits(clone_path)
+        available_commits = await count_available_commits(clone_path)
         if available_commits < 1:
             raise RuntimeError(
                 f"Repository must have at least 1 commit for CommitIQ analysis; found {available_commits}."
