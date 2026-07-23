@@ -114,6 +114,28 @@ def test_import_extractors_and_resolver_cover_common_python_and_ts_patterns():
     assert "os" in python_imports
     assert "package.module" in python_imports
 
+
+def test_extract_python_imports_preserves_relative_import_levels():
+    source = "\n".join([
+        "from .database import get_db",
+        "from ..shared.utils import helper",
+        "from ...config import settings",
+        "from . import models",
+        "from .. import api",
+        "import os",
+        "import pathlib",
+        "from collections import defaultdict",
+    ])
+    python_imports = extract_python_imports(source)
+    assert ".database" in python_imports
+    assert "..shared.utils" in python_imports
+    assert "...config" in python_imports
+    assert "." in python_imports
+    assert ".." in python_imports
+    assert "os" in python_imports
+    assert "pathlib" in python_imports
+    assert "collections" in python_imports
+
     js_imports = extract_js_imports(
         """
         import type { User } from './types'
