@@ -142,6 +142,11 @@ export default function DashboardPage() {
             <div className="min-w-0 flex-1">
               <div className="font-mono text-xs font-bold text-white truncate">{repo.name}</div>
               <div className="text-slate-400 text-[10px] mt-1 font-semibold uppercase tracking-wider">{repo.analyzed_commits} commits compiled</div>
+              <div className="flex items-center gap-2 mt-2 text-[10px] text-slate-500 font-mono">
+                <span title="Total Analyzed Files">{repo.total_file_count?.toLocaleString() || 0} files</span>
+                <span className="w-1 h-1 rounded-full bg-slate-700" />
+                <span title="Total Lines of Code">{repo.total_repo_loc?.toLocaleString() || 0} loc</span>
+              </div>
             </div>
             <button 
               onClick={() => setIsSidebarOpen(false)}

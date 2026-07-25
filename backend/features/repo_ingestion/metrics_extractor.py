@@ -164,3 +164,59 @@ def scan_repo_head(repo_path: Path, max_files: int = 200) -> dict[str, dict]:
 
     return file_metrics
 
+
+def count_repo_files_and_loc(repo_path: Path) -> tuple[int, int]:
+    """Fast count of supported files and their total LOC in the current checkout."""
+    file_count = 0
+    total_loc = 0
+
+    for root, dirs, files in os.walk(repo_path):
+        dirs[:] = [
+            d for d in dirs
+            if d not in {".git", "node_modules", "__pycache__", "dist", "build", "vendor"}
+        ]
+        for fname in files:
+            rel_path = os.path.relpath(os.path.join(root, fname), repo_path)
+            if _is_supported(rel_path):
+                full_path = Path(root) / fname
+                try:
+                    loc = sum(1 for line in open(full_path, "rb") if line.strip())
+                    total_loc += loc
+                    file_count += 1
+                except Exception:
+                    pass
+
+    return file_count, total_loc
+
+def compute_health_score(
+    insertions: int,
+    deletions: int,
+    files_changed: int,
+    avg_complexity: float,
+    total_loc: int,
+    bus_factor_min: int,
+    prev_health: float | None,
+) -> tuple[float, dict]:
+    loc_touched = insertions + deletions
+    churn_rate = min(loc_touched / max(total_loc, loc_touched, 1), 1.0)
+
+    cc_score = max(0.0, 100.0 - (avg_complexity * 10.0))
+    churn_score = max(0.0, 100.0 - (churn_rate * 100.0))
+    bus_score = min(100.0, float(bus_factor_min) * 20.0)
+    loc_score = max(0.0, 100.0 - (loc_touched / 20.0))
+
+    health = (
+        cc_score * 0.30 +
+        churn_score * 0.25 +
+        bus_score * 0.25 +
+        loc_score * 0.20
+    )
+    health = round(max(0.0, min(100.0, health)), 2)
+
+    return health, {
+        "churn_rate": round(churn_rate, 4),
+        "cc_score": round(cc_score, 2),
+        "churn_score": round(churn_score, 2),
+        "bus_score": round(bus_score, 2),
+        "loc_score": round(loc_score, 2),
+    }
