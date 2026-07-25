@@ -712,6 +712,26 @@ export function GraphExplorer({ graphData, selectedSha, commits = [], onSelectCo
     return currentScore - startScore
   }, [commits, activeCommitIndex])
 
+  if (!graphData) {
+    return (
+      <div className="glass-panel rounded-[32px] w-full min-h-[580px] flex items-center justify-center relative overflow-hidden">
+        <div className="absolute inset-0 bg-white/[0.02] animate-pulse" />
+        <div className="flex flex-col items-center gap-5 z-10">
+          <div className="relative">
+            <div className="absolute inset-0 bg-purple-500/20 rounded-full blur-xl animate-pulse" />
+            <div className="w-16 h-16 rounded-full bg-white/5 border border-purple-500/30 flex items-center justify-center relative shadow-[0_0_30px_rgba(167,139,250,0.15)]">
+              <Layers className="w-8 h-8 text-purple-400/80 animate-pulse" />
+            </div>
+          </div>
+          <div className="flex flex-col items-center gap-1.5">
+            <h3 className="text-white font-head text-lg tracking-tight">Constructing Knowledge Graph</h3>
+            <p className="text-slate-400 font-mono text-[11px] animate-pulse">Rendering dependency structures and mapping connections...</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div 
       ref={wrapperRef}
