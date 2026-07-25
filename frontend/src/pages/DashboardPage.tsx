@@ -10,6 +10,7 @@ import { GraphExplorer } from '../components/GraphExplorer'
 import { HealthTimeline } from '../components/HealthTimeline'
 import { HotspotMap } from '../components/HotspotMap'
 import { NarrativeCard } from '../components/NarrativeCard'
+import { TimeRangeSelector, type TimeRangePreset } from '../components/TimeRangeSelector'
 import { HealthBadge } from '../components/ui/HealthBadge'
 import { ThemeToggle } from '../components/ui/ThemeToggle'
 import { Layers, Compass, BarChart2, Activity, GitBranch } from 'lucide-react'
@@ -19,11 +20,44 @@ export default function DashboardPage() {
   const navigate = useNavigate()
   const [selected, setSelected] = useState<HealthSnapshot | null>(null)
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  const [timeRangePreset, setTimeRangePreset] = useState<TimeRangePreset>('all')
+  const [customStartDate, setCustomStartDate] = useState<string>('')
+  const [customEndDate, setCustomEndDate] = useState<string>('')
+
+  const { startDate, endDate } = useMemo(() => {
+    if (timeRangePreset === 'all') {
+      return { startDate: undefined, endDate: undefined }
+    }
+    if (timeRangePreset === 'custom') {
+      return {
+        startDate: customStartDate ? new Date(customStartDate).toISOString() : undefined,
+        endDate: customEndDate ? new Date(`${customEndDate}T23:59:59.999Z`).toISOString() : undefined,
+      }
+    }
+    const now = new Date()
+    let start: Date
+    if (timeRangePreset === '7d') {
+      start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+    } else if (timeRangePreset === '30d') {
+      start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+    } else if (timeRangePreset === '1y') {
+      start = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000)
+    } else {
+      return { startDate: undefined, endDate: undefined }
+    }
+    return {
+      startDate: start.toISOString(),
+      endDate: now.toISOString(),
+    }
+  }, [timeRangePreset, customStartDate, customEndDate])
 
   const repoState = useSWR(repoSlug ? ['repo', repoSlug] : null, () => getRepoBySlug(repoSlug))
   const repo = repoState.data
   const repoId = repo?.id
-  const timelineState = useSWR(repoId ? ['timeline', repoId] : null, () => getHealthTimeline(repoId as number))
+  const timelineState = useSWR(
+    repoId ? ['timeline', repoId, startDate, endDate] : null,
+    () => getHealthTimeline(repoId as number, startDate, endDate)
+  )
   const commits = useMemo(() => timelineState.data || [], [timelineState.data])
   const busState = useSWR(repoId ? ['bus-factor', repoId] : null, () => getBusFactor(repoId as number))
   const graphState = useSWR(repoId && selected ? ['graph', repoId, selected.sha] : null, () => getGraph(repoId as number, selected?.sha))
@@ -172,6 +206,17 @@ export default function DashboardPage() {
         </aside>
 
         <main className="flex-grow overflow-y-auto p-4 sm:p-6 space-y-6 relative z-10">
+          <TimeRangeSelector
+            selectedPreset={timeRangePreset}
+            onSelectPreset={setTimeRangePreset}
+            customStartDate={customStartDate}
+            customEndDate={customEndDate}
+            onCustomDateChange={(start, end) => {
+              setCustomStartDate(start)
+              setCustomEndDate(end)
+            }}
+          />
+
           {timelineState.isLoading ? (
             <div className="glass-panel rounded-[28px] p-6 h-64 flex items-center justify-center text-slate-400 border border-white/10">
               <Activity className="w-6 h-6 text-purple-400 animate-spin mr-2" />
@@ -350,7 +395,7 @@ export default function DashboardPage() {
               <BusFactorTable modules={busState.data?.modules || []} />
             )}
             
-            {repoId && <HotspotMap repoId={repoId} sha={selected?.sha || null} />}
+            {repoId && <HotspotMap repoId={repoId} sha={selected?.sha || null} startDate={startDate} endDate={endDate} />}
           </div>
         </main>
       </div>
