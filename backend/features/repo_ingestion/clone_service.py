@@ -111,6 +111,9 @@ async def clone_repo(repo_url: str, repo_id: int, max_commits: int = 150) -> Pat
     else:
         auth_url = repo_url
 
+    import os
+    env = {**os.environ, "GIT_TERMINAL_PROMPT": "0", "GIT_ASKPASS": ""}
+
     process = await asyncio.create_subprocess_exec(
         "git", "clone",
         "--depth", str(max_commits),
@@ -119,6 +122,7 @@ async def clone_repo(repo_url: str, repo_id: int, max_commits: int = 150) -> Pat
         str(target),
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
+        env=env,
     )
 
     try:
@@ -131,6 +135,8 @@ async def clone_repo(repo_url: str, repo_id: int, max_commits: int = 150) -> Pat
     if process.returncode != 0:
         cleanup_repo(repo_id)
         stderr_text = stderr.decode('utf-8', errors='replace')
+        if "not found" in stderr_text.lower() or "could not read" in stderr_text.lower() or "authentication failed" in stderr_text.lower():
+            raise RuntimeError(f"Repository not found on GitHub or is private: {repo_url}")
         raise RuntimeError(f"git clone failed: {_redact_secret(stderr_text)[:500]}")
 
     return target
@@ -158,13 +164,26 @@ async def count_available_commits(repo_path: Path) -> int:
         return 0
 
 
+def _remove_readonly(func, path, _excinfo):
+    try:
+        import os
+        import stat
+        os.chmod(path, stat.S_IWRITE)
+        func(path)
+    except Exception:
+        pass
+
+
 def cleanup_repo(repo_id: int) -> bool:
     """Delete cloned repo after ingestion to reclaim disk space."""
     target = get_clone_path(repo_id)
     if not target.exists():
         return True
     try:
-        shutil.rmtree(target)
+        try:
+            shutil.rmtree(target, onerror=_remove_readonly)
+        except TypeError:
+            shutil.rmtree(target)
         return True
     except OSError as exc:
         logger.warning(

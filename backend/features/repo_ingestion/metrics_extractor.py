@@ -106,7 +106,7 @@ def _semantic_drift_for_file(repo_path: Path, commit_data: dict, rel_path: str) 
 def extract_commit_metrics(
     repo_path: Path,
     commit_data: dict,
-    max_files: int = 100,
+    max_files: int = 30,
 ) -> dict[str, dict]:
     """
     Checkout a commit and analyze the files changed by that commit.

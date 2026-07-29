@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import useSWR from 'swr'
-import { getBusFactor, getGraph, getHealthTimeline, getLLMUsage, getRepoBySlug } from '../lib/api'
+import { getBusFactor, getGraph, getHealthTimeline, getIngestProgress, getLLMUsage, getRepoBySlug, rescanRepo } from '../lib/api'
 import type { HealthSnapshot } from '../types'
 import { BusFactorTable } from '../components/BusFactorTable'
 import { CommitList } from '../components/CommitList'
@@ -12,13 +12,16 @@ import { HotspotMap } from '../components/HotspotMap'
 import { NarrativeCard } from '../components/NarrativeCard'
 import { HealthBadge } from '../components/ui/HealthBadge'
 import { ThemeToggle } from '../components/ui/ThemeToggle'
-import { Layers, Compass, BarChart2, Activity, GitBranch } from 'lucide-react'
+import { Layers, Compass, BarChart2, Activity, GitBranch, RefreshCw } from 'lucide-react'
 
 export default function DashboardPage() {
   const { repoSlug = '' } = useParams<{ repoSlug: string }>()
   const navigate = useNavigate()
   const [selected, setSelected] = useState<HealthSnapshot | null>(null)
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  const [isRescanning, setIsRescanning] = useState(false)
+  const [rescanStage, setRescanStage] = useState<string | null>(null)
+  const [rescanError, setRescanError] = useState<string | null>(null)
 
   const repoState = useSWR(repoSlug ? ['repo', repoSlug] : null, () => getRepoBySlug(repoSlug))
   const repo = repoState.data
@@ -28,6 +31,49 @@ export default function DashboardPage() {
   const busState = useSWR(repoId ? ['bus-factor', repoId] : null, () => getBusFactor(repoId as number))
   const graphState = useSWR(repoId && selected ? ['graph', repoId, selected.sha] : null, () => getGraph(repoId as number, selected?.sha))
   const usageState = useSWR(repoId ? ['llm-usage', repoId] : null, () => getLLMUsage(repoId as number))
+
+  const handleRescan = async () => {
+    if (!repoId || isRescanning) return
+    setIsRescanning(true)
+    setRescanStage('Initiating rescan...')
+    setRescanError(null)
+
+    try {
+      await rescanRepo(repoId)
+      const es = getIngestProgress(repoId)
+      es.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data)
+          if (data.stage) setRescanStage(data.stage)
+          if (data.status === 'ready' || data.status === 'error' || data.status === 'cancelled') {
+            es.close()
+            setIsRescanning(false)
+            setRescanStage(null)
+            if (data.status === 'error') {
+              setRescanError(data.error_message || 'Rescan failed.')
+            } else {
+              repoState.mutate()
+              timelineState.mutate()
+              busState.mutate()
+              graphState.mutate()
+              usageState.mutate()
+            }
+          }
+        } catch {
+          // ignore json parse error
+        }
+      }
+      es.onerror = () => {
+        es.close()
+        setIsRescanning(false)
+        setRescanStage(null)
+      }
+    } catch (err) {
+      setIsRescanning(false)
+      setRescanStage(null)
+      setRescanError(err instanceof Error ? err.message : 'Rescan request failed.')
+    }
+  }
   const selectedChurnPct = selected ? Math.min(Math.max(selected.churn_rate * 100, 0), 100) : 0
   const selectedRiskReasons = selected?.risk_reasons?.slice(0, 4) || []
   const selectedPersistentHotspots = selected?.persistent_hotspots?.slice(0, 3) || []
@@ -116,6 +162,15 @@ export default function DashboardPage() {
 
           <div className="flex items-center gap-3">
             <ThemeToggle />
+            <button
+              onClick={handleRescan}
+              disabled={isRescanning}
+              className="text-xs font-semibold text-purple-200 hover:text-white bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 rounded-full px-4 py-2 transition-all flex items-center gap-1.5 disabled:opacity-50"
+              title="Check for new remote commits and update metrics without wiping historical data"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isRescanning ? 'animate-spin text-purple-400' : ''}`} />
+              <span>{isRescanning ? (rescanStage || 'Updating...') : 'Update Analysis'}</span>
+            </button>
             <button 
               onClick={() => navigate('/')} 
               className="text-xs font-semibold text-slate-300 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 rounded-full px-4 py-2 transition-all"
@@ -172,6 +227,17 @@ export default function DashboardPage() {
         </aside>
 
         <main className="flex-grow overflow-y-auto p-4 sm:p-6 space-y-6 relative z-10">
+          {rescanError && (
+            <div className="glass-panel rounded-[20px] p-4 text-rose-300 border border-rose-500/30 bg-rose-500/10 flex items-center justify-between text-xs font-medium">
+              <span>Failed to update repository analysis: {rescanError}</span>
+              <button 
+                onClick={() => setRescanError(null)} 
+                className="text-slate-400 hover:text-white px-2 py-1 rounded bg-white/5"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
           {timelineState.isLoading ? (
             <div className="glass-panel rounded-[28px] p-6 h-64 flex items-center justify-center text-slate-400 border border-white/10">
               <Activity className="w-6 h-6 text-purple-400 animate-spin mr-2" />

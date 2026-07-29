@@ -28,11 +28,21 @@ const client = axios.create({
 
 function normalizeError(error: unknown): Error {
   if (axios.isAxiosError(error)) {
-    const axiosError = error as AxiosError<ApiError | string>
+    const axiosError = error as AxiosError<any>
     const data = axiosError.response?.data
     if (typeof data === 'string') return new Error(data)
-    if (data?.detail) return new Error(data.detail)
-    if (data?.message) return new Error(data.message)
+    if (data && typeof data === 'object') {
+      if ('detail' in data) {
+        if (typeof data.detail === 'string') return new Error(data.detail)
+        if (Array.isArray(data.detail)) {
+          const msgs = data.detail
+            .map((d: any) => d.msg?.replace(/^Value error,\s*/, '') || d.detail)
+            .filter(Boolean)
+          if (msgs.length > 0) return new Error(msgs.join('; '))
+        }
+      }
+      if ('message' in data && typeof data.message === 'string') return new Error(data.message)
+    }
     return new Error(axiosError.message)
   }
   return error instanceof Error ? error : new Error('Unexpected API error')
@@ -51,6 +61,10 @@ export async function ingestRepo(url: string, maxCommits?: number): Promise<Inge
   return request<IngestResponse>(
     client.post('/repos/ingest', { repo_url: url, max_commits: maxCommits || 500 })
   )
+}
+
+export async function rescanRepo(repoId: string | number): Promise<IngestResponse> {
+  return request<IngestResponse>(client.post(`/repos/${repoId}/rescan`))
 }
 
 export async function getRepoBySlug(slug: string): Promise<Repo> {

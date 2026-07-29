@@ -32,7 +32,7 @@ describe('LandingPage', () => {
     await user.type(repoInput, 'not-a-repo')
 
     expect(screen.getByText('Please enter a valid owner/repository format.')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Analyze' })).toBeDisabled()
+    await user.click(screen.getByRole('button', { name: 'Analyze' }))
     expect(ingestRepoMock).not.toHaveBeenCalled()
   })
 

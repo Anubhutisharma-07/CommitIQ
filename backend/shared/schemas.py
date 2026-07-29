@@ -67,6 +67,16 @@ class IngestResponse(BaseModel):
     message: str
 
 
+class RescanResponse(BaseModel):
+    repo_id: int
+    repo_slug: str
+    status: str
+    job_id: int
+    message: str
+    new_commits_found: int = 0
+
+
+
 class RepoOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
