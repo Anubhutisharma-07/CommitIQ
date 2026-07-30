@@ -215,4 +215,5 @@ Missing but obviously needed:
 - test: add real-browser landing-to-dashboard coverage. Added Playwright Chromium configuration, deterministic REST/SSE interception, CI execution, and non-fatal theme storage handling.
 - docs: update project brain after browser e2e coverage. Recorded the closed browser testing gap and current quality-gate status.
 - fix: sanitize commit messages to prevent unsafe HTML tags and XSS (#221). Added commit message sanitization helpers on both backend ingestion and frontend rendering components, along with comprehensive unit tests.
-
+- `cfc96af` fix: mark stale/orphaned ingestion jobs as error on startup #26. Added startup routine `mark_stale_jobs_as_error()` inside `init_db()` to query active `AnalysisJob` records, set them to error status with message "System restart aborted the analysis job", clean up matching repository storage folders under `REPO_STORAGE_PATH`, and added unit tests in `test_repo_api.py`.
+- docs: update project brain for stale ingestion job recovery on startup #26. Recorded stale job recovery implementation, storage cleanup details, and unit test coverage.
