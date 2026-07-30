@@ -776,13 +776,23 @@ async def get_repo(repo_id: int, db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/{repo_id}/timeline", response_model=TimelineResponse)
-async def get_timeline(repo_id: int, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(
+async def get_timeline(
+    repo_id: int,
+    start_date: datetime | None = Query(default=None),
+    end_date: datetime | None = Query(default=None),
+    db: AsyncSession = Depends(get_db),
+):
+    query = (
         select(Commit, HealthSnapshot)
         .join(HealthSnapshot, HealthSnapshot.commit_id == Commit.id)
         .where(Commit.repo_id == repo_id)
-        .order_by(Commit.committed_at)
     )
+    if isinstance(start_date, datetime):
+        query = query.where(Commit.committed_at >= start_date)
+    if isinstance(end_date, datetime):
+        query = query.where(Commit.committed_at <= end_date)
+    query = query.order_by(Commit.committed_at)
+    result = await db.execute(query)
     return {
         "repo_id": repo_id,
         "commits": [_snapshot_payload(commit, snap) for commit, snap in result.all()],
@@ -918,7 +928,13 @@ async def get_bus_factor(repo_id: int, db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/{repo_id}/hotspots")
-async def get_hotspots(repo_id: int, sha: str | None = None, db: AsyncSession = Depends(get_db)):
+async def get_hotspots(
+    repo_id: int,
+    sha: str | None = None,
+    start_date: datetime | None = Query(None),
+    end_date: datetime | None = Query(None),
+    db: AsyncSession = Depends(get_db),
+):
     commit = await _find_commit(db, repo_id, sha)
     if not commit:
         raise _http_error(404, "Commit not found.", "commit_not_found")
@@ -935,12 +951,18 @@ async def get_hotspots(repo_id: int, sha: str | None = None, db: AsyncSession = 
         return {"repo_id": repo_id, "commit_sha": commit.sha, "hotspots": []}
 
     file_paths = [node.file_path for node in nodes]
-    commits_result = await db.execute(
-        select(Commit)
-        .where(Commit.repo_id == repo_id)
-        .order_by(desc(Commit.committed_at))
-        .limit(20)
-    )
+    commits_query = select(Commit).where(Commit.repo_id == repo_id)
+    if isinstance(start_date, datetime):
+        commits_query = commits_query.where(Commit.committed_at >= start_date)
+    if isinstance(end_date, datetime):
+        commits_query = commits_query.where(Commit.committed_at <= end_date)
+
+    if not isinstance(start_date, datetime) and not isinstance(end_date, datetime):
+        commits_query = commits_query.order_by(desc(Commit.committed_at)).limit(20)
+    else:
+        commits_query = commits_query.order_by(desc(Commit.committed_at))
+
+    commits_result = await db.execute(commits_query)
     recent_commits = commits_result.scalars().all()
     churn_counts = {fpath: 0 for fpath in file_paths}
     for recent in recent_commits:

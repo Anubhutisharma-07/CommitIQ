@@ -15,6 +15,7 @@ from backend.features.repo_ingestion.router import (
     get_bus_factor,
     get_commit_detail,
     get_graph,
+    get_hotspots,
     ingest_progress,
     get_llm_usage,
     get_repo_by_slug,
@@ -905,4 +906,37 @@ async def test_mark_stale_jobs_as_error(tmp_path, monkeypatch):
     assert repo3_dir.exists()
 
     await test_engine.dispose()
+
+
+async def test_get_timeline_with_date_range_filtering(db_session: AsyncSessionAdapter):
+    res_all = await get_timeline(repo_id=1, db=db_session)
+    assert len(res_all["commits"]) == 2
+
+    res_after = await get_timeline(
+        repo_id=1,
+        start_date=datetime(2026, 1, 1, 12, 0, tzinfo=timezone.utc),
+        db=db_session,
+    )
+    assert len(res_after["commits"]) == 1
+    assert res_after["commits"][0]["sha"] == "def456abc123"
+
+    res_before = await get_timeline(
+        repo_id=1,
+        end_date=datetime(2026, 1, 1, 12, 0, tzinfo=timezone.utc),
+        db=db_session,
+    )
+    assert len(res_before["commits"]) == 1
+    assert res_before["commits"][0]["sha"] == "abc123def456"
+
+
+async def test_get_hotspots_with_date_range_filtering(db_session: AsyncSessionAdapter):
+    res = await get_hotspots(
+        repo_id=1,
+        start_date=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        end_date=datetime(2026, 1, 3, tzinfo=timezone.utc),
+        db=db_session,
+    )
+    assert res["repo_id"] == 1
+    assert "hotspots" in res
+
 

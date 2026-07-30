@@ -75,7 +75,7 @@ def test_cleanup_repo_does_not_mask_cleanup_failures(monkeypatch, tmp_path):
     clone_path = get_clone_path(42)
     clone_path.mkdir()
 
-    def fail_rmtree(path):
+    def fail_rmtree(path, **kwargs):
         raise OSError("permission denied")
 
     monkeypatch.setattr("backend.features.repo_ingestion.clone_service.shutil.rmtree", fail_rmtree)
@@ -359,4 +359,17 @@ def test_compute_full_snapshot_with_zero_code_files():
     assert snapshot["total_loc"] == 0
     assert snapshot["churn_rate"] == 0.0
     assert json.loads(snapshot["risk_reasons_json"]) == []
+
+
+def test_sanitize_commit_message():
+    from backend.features.repo_ingestion.commit_walker import sanitize_commit_message
+
+    assert sanitize_commit_message(None) == ""
+    assert sanitize_commit_message("") == ""
+    assert sanitize_commit_message("  ") == ""
+    assert sanitize_commit_message("fix: normal commit") == "fix: normal commit"
+    assert sanitize_commit_message("<script>alert('xss')</script> Fix issue") == "Fix issue"
+    assert sanitize_commit_message("fix: update <Header /> component") == "fix: update  component"
+    assert sanitize_commit_message("feat: value < 100") == "feat: value &lt; 100"
+
 
