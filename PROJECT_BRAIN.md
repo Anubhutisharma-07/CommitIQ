@@ -58,6 +58,7 @@ Incomplete or fragile:
 - UI maintainability drift: Tailwind token configuration and one browser e2e now exist, but heavy one-off styling still makes visual regressions likely without broader route-level visual coverage.
 
 ## Discovered issues
+- Medium: shutil.rmtree raised PermissionError on Windows when deleting read-only .git files; it now uses a custom onerror handler to clear the readonly bit.
 - High: clone_service and router used synchronous subprocesses that blocked the FastAPI event loop; they are now fully asynchronous.
 - High: no deployment health gate; CI now exists for unit/e2e tests, lint, build, and repository hygiene checks on pushes and pull requests.
 - High: npm audit previously reported 9 frontend dependency vulnerabilities; dependency upgrades now leave `npm audit --audit-level=moderate` clean as of 2026-06-04.
@@ -216,4 +217,8 @@ Missing but obviously needed:
 - fix: stabilize local scan and narrative flows. Added the missing backend async DB runtime dependency, fixed Vite proxy env loading, made ingestion progress streams use independent DB sessions, handled SQLite naive timestamps, reset stale dashboard commit selections after rescans, hardened storage/markup edge cases, and made streaming narratives fall back to cached demo-mode output when LLM providers are unavailable.
 - feat: add pagination to repo list endpoint. Added `limit`/`offset` query parameters to `list_repos` with defaults of 20/0 and a max limit of 100, plus backend integration tests for pagination behavior.
 - docs: update project brain after repo list pagination. Recorded the pagination decision and updated backend API test coverage.
+- fix: sanitize commit messages to prevent unsafe HTML tags and XSS (#221). Added commit message sanitization helpers on both backend ingestion and frontend rendering components, along with comprehensive unit tests.
+- `cfc96af` fix: mark stale/orphaned ingestion jobs as error on startup #26. Added startup routine `mark_stale_jobs_as_error()` inside `init_db()` to query active `AnalysisJob` records, set them to error status with message "System restart aborted the analysis job", clean up matching repository storage folders under `REPO_STORAGE_PATH`, and added unit tests in `test_repo_api.py`.
+- docs: update project brain for stale ingestion job recovery on startup #26. Recorded stale job recovery implementation, storage cleanup details, and unit test coverage.
 - feat: implement custom time range selector for commit timeline and hotspots (#223). Added preset filters (All Time, 7d, 30d, 1y, Custom) and custom date pickers, updated timeline and hotspots backend APIs with `start_date`/`end_date` parameters, integrated into Dashboard UI, and added test coverage.
+
