@@ -3,6 +3,8 @@ import subprocess
 from collections import defaultdict
 from pathlib import Path
 
+from backend.features.repo_ingestion.identity_normalizer import ContributorIdentityResolver
+
 logger = logging.getLogger(__name__)
 
 
@@ -43,10 +45,37 @@ CODE_EXTENSIONS = {
 
 def is_code_file(path: str) -> bool:
     normalized = path.replace("\\", "/")
-    upper_path = normalized.upper()
-    if any(pattern in normalized or pattern in upper_path for pattern in EXCLUDE_PATTERNS):
+
+    file_name = Path(normalized).name
+    upper_name = normalized.upper()
+    if ".github/" in normalized:
         return False
-    return Path(normalized).suffix.lower() in CODE_EXTENSIONS
+
+    if upper_name in {
+        "ISSUE_TEMPLATE",
+        "PULL_REQUEST_TEMPLATE",
+    }:
+        return False 
+
+    if upper_name == "README":
+        return False
+
+    if upper_name == "LICENSE":
+        return False 
+
+    if upper_name.startswith("CHANGELOG"):
+        return False
+
+    if Path(file_name).suffix.lower() in {
+        ".md",
+        ".txt",
+        ".json",
+        ".yml",
+        ".yaml",
+    }:
+        return False 
+
+    return Path(file_name).suffix.lower() in CODE_EXTENSIONS
 
 
 def _risk_level(contributor_count: int, top_pct: float) -> str:
@@ -59,7 +88,11 @@ def _risk_level(contributor_count: int, top_pct: float) -> str:
     return "low"
 
 
-def _blame_authors(repo_path: Path, file_path: str) -> dict[tuple[str, str | None], int]:
+def _blame_authors(
+    repo_path: Path,
+    file_path: str,
+    resolver: ContributorIdentityResolver | None = None,
+) -> dict[tuple[str, str | None], int]:
     try:
         result = subprocess.run(
             ["git", "blame", "--line-porcelain", "--", file_path],
@@ -85,7 +118,8 @@ def _blame_authors(repo_path: Path, file_path: str) -> dict[tuple[str, str | Non
         elif line.startswith("author-mail "):
             current_email = line.removeprefix("author-mail ").strip("<> ") or None
         elif line.startswith("\t"):
-            counts[(current_author, current_email)] += 1
+            identity = resolver.resolve(current_author, current_email) if resolver else (current_author, current_email)
+            counts[identity] += 1
 
     return counts
 
@@ -98,17 +132,19 @@ def compute_bus_factor_from_history(
     Compute per-module bus factor using git blame on files touched in the analyzed history.
     Falls back to commit authorship counts if a file no longer exists at HEAD.
     """
+    resolver = ContributorIdentityResolver(repo_path)
     touched_files: dict[str, str | None] = {}
     fallback_counts: dict[str, dict[tuple[str, str | None], int]] = defaultdict(lambda: defaultdict(int))
 
     for commit in commit_history:
         author = commit.get("author_name") or "unknown"
         email = commit.get("author_email")
+        identity = resolver.resolve(author, email)
         for fpath in commit.get("files_list", []):
             if not is_code_file(fpath):
                 continue
             touched_files[fpath] = commit.get("sha")
-            fallback_counts[fpath][(author, email)] += 1
+            fallback_counts[fpath][identity] += 1
 
     entries = []
     for module_path in sorted(touched_files):
