@@ -1,6 +1,5 @@
 import axios, { AxiosError } from 'axios'
 import type {
-  ApiError,
   BusFactorWrapper,
   CommitDetailResponse,
   GraphResponse,
@@ -26,18 +25,23 @@ const client = axios.create({
   timeout: 30000,
 })
 
+interface ErrorDetailItem {
+  msg?: string
+  detail?: string
+}
+
 function normalizeError(error: unknown): Error {
   if (axios.isAxiosError(error)) {
-    const axiosError = error as AxiosError<any>
+    const axiosError = error as AxiosError<Record<string, unknown>>
     const data = axiosError.response?.data
     if (typeof data === 'string') return new Error(data)
     if (data && typeof data === 'object') {
       if ('detail' in data) {
         if (typeof data.detail === 'string') return new Error(data.detail)
         if (Array.isArray(data.detail)) {
-          const msgs = data.detail
-            .map((d: any) => d.msg?.replace(/^Value error,\s*/, '') || d.detail)
-            .filter(Boolean)
+          const msgs = (data.detail as ErrorDetailItem[])
+            .map((d: ErrorDetailItem) => d.msg?.replace(/^Value error,\s*/, '') || d.detail)
+            .filter((val): val is string => Boolean(val))
           if (msgs.length > 0) return new Error(msgs.join('; '))
         }
       }

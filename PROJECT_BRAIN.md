@@ -145,6 +145,7 @@ Missing but obviously needed:
 - 2026-06-07: Opted into React Router v7 future flags to remove route deprecation warnings in development; remaining Recharts dev warnings come from the installed `recharts@2.12.7` internals.
 - 2026-07-21: Added pagination to the repo list endpoint with `limit` (default 20, max 100) and `offset` (default 0) query parameters, because unbounded list responses degrade as repositories accumulate.
 - 2026-07-21: Fixed Python import parsing to preserve relative import levels by using `ast.ImportFrom.level`, because dot-prefix context was being dropped and breaking dependency resolution for relative imports.
+- 2026-07-29: Added repository rescan endpoint POST /api/repos/{repo_id}/rescan, incremental commit analysis, dashboard Update Analysis button, startup stale job cleanup, and SQLite WAL mode connection listeners.
 
 ## Test coverage status
 - Backend unit tests: initial pure-logic coverage exists for config parsing/CORS defaults, boolean env parsing, repo URL parsing/validation, max-commit cap validation, slug generation, clone cleanup success/failure, import extraction/resolution, co-change edge generation, top-file frequency, bus-factor file filtering, semantic fallback behavior, health snapshot aggregation, risk reasons/hotspot persistence, LLM cache keys, provider mapping, cost estimation, usage/budget accounting, and prompt builders.
