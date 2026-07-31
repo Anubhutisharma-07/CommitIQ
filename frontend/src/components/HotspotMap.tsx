@@ -5,6 +5,8 @@ import { getHotspots } from '../lib/api'
 interface HotspotMapProps {
   repoId: string | number
   sha?: string | null
+  startDate?: string
+  endDate?: string
 }
 
 interface TreemapNode {
@@ -51,8 +53,11 @@ function HotspotCell(props: TreemapNode) {
   )
 }
 
-export function HotspotMap({ repoId, sha }: HotspotMapProps) {
-  const hotspotState = useSWR(['hotspots', repoId, sha], () => getHotspots(repoId, sha || undefined))
+export function HotspotMap({ repoId, sha, startDate, endDate }: HotspotMapProps) {
+  const hotspotState = useSWR(
+    ['hotspots', repoId, sha, startDate, endDate],
+    () => getHotspots(repoId, sha || undefined, startDate, endDate)
+  )
   const hotspots = hotspotState.data?.hotspots || []
   const treemapData: TreemapNode[] = hotspots.map((hotspot) => ({
     name: hotspot.file.split('/').pop() || hotspot.file,

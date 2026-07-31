@@ -10,6 +10,7 @@ import { GraphExplorer } from '../components/GraphExplorer'
 import { HealthTimeline } from '../components/HealthTimeline'
 import { HotspotMap } from '../components/HotspotMap'
 import { NarrativeCard } from '../components/NarrativeCard'
+import { TimeRangeSelector, type TimeRangePreset } from '../components/TimeRangeSelector'
 import { HealthBadge } from '../components/ui/HealthBadge'
 import { ThemeToggle } from '../components/ui/ThemeToggle'
 import { Layers, Compass, BarChart2, Activity, GitBranch, RefreshCw } from 'lucide-react'
@@ -26,7 +27,10 @@ export default function DashboardPage() {
   const repoState = useSWR(repoSlug ? ['repo', repoSlug] : null, () => getRepoBySlug(repoSlug))
   const repo = repoState.data
   const repoId = repo?.id
-  const timelineState = useSWR(repoId ? ['timeline', repoId] : null, () => getHealthTimeline(repoId as number))
+  const timelineState = useSWR(
+    repoId ? ['timeline', repoId, startDate, endDate] : null,
+    () => getHealthTimeline(repoId as number, startDate, endDate)
+  )
   const commits = useMemo(() => timelineState.data || [], [timelineState.data])
   const busState = useSWR(repoId ? ['bus-factor', repoId] : null, () => getBusFactor(repoId as number))
   const graphState = useSWR(repoId && selected ? ['graph', repoId, selected.sha] : null, () => getGraph(repoId as number, selected?.sha))
@@ -269,7 +273,7 @@ export default function DashboardPage() {
                   <span className="font-mono text-[10px] font-bold text-purple-300 bg-purple-500/10 px-2 py-0.5 rounded-full border border-purple-500/15">
                     {selected.sha.slice(0, 12)}
                   </span>
-                  <h3 className="font-head text-[18px] font-semibold text-white tracking-tight truncate mt-2">{selected.message || 'No commit message'}</h3>
+                  <h3 className="font-head text-[18px] font-semibold text-white tracking-tight truncate mt-2">{sanitizeCommitMessage(selected.message)}</h3>
                 </div>
                 <button 
                   onClick={() => navigate(`/dashboard/${repo.repo_slug}/commit/${selected.sha}`)} 
@@ -416,7 +420,7 @@ export default function DashboardPage() {
               <BusFactorTable modules={busState.data?.modules || []} />
             )}
             
-            {repoId && <HotspotMap repoId={repoId} sha={selected?.sha || null} />}
+            {repoId && <HotspotMap repoId={repoId} sha={selected?.sha || null} startDate={startDate} endDate={endDate} />}
           </div>
         </main>
       </div>

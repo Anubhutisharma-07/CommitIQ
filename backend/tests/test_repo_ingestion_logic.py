@@ -75,7 +75,7 @@ def test_cleanup_repo_does_not_mask_cleanup_failures(monkeypatch, tmp_path):
     clone_path = get_clone_path(42)
     clone_path.mkdir()
 
-    def fail_rmtree(path):
+    def fail_rmtree(path, **kwargs):
         raise OSError("permission denied")
 
     monkeypatch.setattr("backend.features.repo_ingestion.clone_service.shutil.rmtree", fail_rmtree)
@@ -289,7 +289,6 @@ def test_compute_full_snapshot_aggregates_metric_and_semantic_inputs():
     }
     assert json.loads(snapshot["persistent_hotspots_json"]) == persistent_hotspots
 
-
 @pytest.mark.anyio
 async def test_clone_repo_rejects_when_storage_quota_exceeded(monkeypatch, tmp_path):
     """Ingestion must be rejected when REPO_STORAGE_PATH usage exceeds MAX_REPO_STORAGE_MB."""
@@ -359,4 +358,30 @@ def test_compute_full_snapshot_with_zero_code_files():
     assert snapshot["total_loc"] == 0
     assert snapshot["churn_rate"] == 0.0
     assert json.loads(snapshot["risk_reasons_json"]) == []
+
+def test_sanitize_commit_message():
+    from backend.features.repo_ingestion.commit_walker import sanitize_commit_message
+
+    assert sanitize_commit_message(None) == ""
+    assert sanitize_commit_message("") == ""
+    assert sanitize_commit_message("  ") == ""
+    assert sanitize_commit_message("fix: normal commit") == "fix: normal commit"
+    assert sanitize_commit_message("<script>alert('xss')</script> Fix issue") == "Fix issue"
+    assert sanitize_commit_message("fix: update <Header /> component") == "fix: update  component"
+    assert sanitize_commit_message("feat: value < 100") == "feat: value &lt; 100"
+
+
+def test_is_code_file_allows_license_named_source_files():
+    assert is_code_file("src/hooks/useLicense.ts")
+    assert is_code_file("src/components/LicenseGate.tsx")
+
+
+def test_is_code_file_allows_changelog_named_source_files():
+    assert is_code_file("src/services/changelog.go")
+
+
+def test_is_code_file_excludes_documentation_files():
+    assert not is_code_file("LICENSE")
+    assert not is_code_file("README.md")
+    assert not is_code_file("CHANGELOG.md")
 

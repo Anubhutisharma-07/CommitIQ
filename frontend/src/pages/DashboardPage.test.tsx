@@ -275,4 +275,25 @@ describe('DashboardPage', () => {
     expect(screen.getByTestId('graph-explorer')).toHaveTextContent('graph none nodes 0')
     expect(getGraphMock).not.toHaveBeenCalled()
   })
+
+  it('renders time range selector buttons and handles preset switching', async () => {
+    const user = userEvent.setup()
+    renderDashboard()
+
+    expect(await screen.findByText('Time Range')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /all time/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /last 7 days/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /last 30 days/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /last year/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /custom range/i })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /last 7 days/i }))
+    await waitFor(() => {
+      expect(getHealthTimelineMock).toHaveBeenCalledWith(7, expect.any(String), expect.any(String))
+    })
+
+    await user.click(screen.getByRole('button', { name: /custom range/i }))
+    expect(screen.getByLabelText('Start Date')).toBeInTheDocument()
+    expect(screen.getByLabelText('End Date')).toBeInTheDocument()
+  })
 })
