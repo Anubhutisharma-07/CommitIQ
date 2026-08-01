@@ -151,6 +151,7 @@ Missing but obviously needed:
 - 2026-07-26: Added contributor identity resolution for bus factor calculations. Introduced `ContributorIdentityResolver` with `.mailmap` support and normalized contributor identities before both `git blame` and fallback commit-history aggregation to prevent duplicate contributor aliases from distorting ownership metrics.
 - 2026-08-03: Added styled alert/warning card under Bus Factor card on Dashboard when minimum bus factor is 1, warning users of single-point-of-failure risk.
 - 2026-08-04: Hardened `walk_commits` against missing author identity (#266). Added `resolve_author_name` / `resolve_author_email` helpers that substitute `"Unknown"` and `"unknown@example.com"` when the git Actor's name/email is None, empty, or whitespace-only; wrapped Actor access in a defensive try/except so a single corrupt commit never aborts the walk; emitted an INFO log line when a fallback was applied. Yielded dict shape is unchanged; only the value domain of `author_name`/`author_email` is tightened (no None, no empty strings).
+- 2026-07-31: Implemented 3-attempt transaction retry helper (commit_with_retry) and busy timeout connection parameter adjustments (timeout=30, PRAGMA busy_timeout=30000) to resolve transient SQLite lock errors during concurrent ingestion runs (#259).
 
 
 ## Test coverage status
