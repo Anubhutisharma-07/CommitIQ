@@ -69,8 +69,10 @@ export function HotspotMap({ repoId, sha, startDate, endDate }: HotspotMapProps)
   }))
 
   return (
-    <section className="glass-panel rounded-[28px] overflow-hidden shadow-2xl relative border border-white/10 p-5 flex flex-col justify-between">
-      <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 rounded-full blur-[60px] pointer-events-none" />
+    <section className="glass-panel rounded-[28px] shadow-2xl relative border border-white/10 p-5 flex flex-col justify-between">
+      <div className="absolute inset-0 overflow-hidden rounded-[28px] pointer-events-none">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 rounded-full blur-[60px]" />
+      </div>
 
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 relative z-10">
         <div>
@@ -98,6 +100,7 @@ export function HotspotMap({ repoId, sha, startDate, endDate }: HotspotMapProps)
               content={<HotspotCell />}
             >
               <Tooltip
+                allowEscapeViewBox={{ x: true, y: true }}
                 content={({ payload }) => {
                   if (!payload?.[0]) return null
                   const item = payload[0].payload as TreemapNode
