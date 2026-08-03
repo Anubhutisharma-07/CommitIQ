@@ -225,4 +225,5 @@ Missing but obviously needed:
 - feat: implement custom time range selector for commit timeline and hotspots (#223). Added preset filters (All Time, 7d, 30d, 1y, Custom) and custom date pickers, updated timeline and hotspots backend APIs with `start_date`/`end_date` parameters, integrated into Dashboard UI, and added test coverage.
 - `019b96e` fix: deduplicate contributor identities in bus factor calculation. Added `ContributorIdentityResolver` with `.mailmap` support, normalized contributor identities before ownership aggregation, integrated resolution into both `git blame` and fallback commit-history paths, and added comprehensive regression tests.
 - feat: highlight hotspots in Graph Explorer file tree (#215). Added hotspot visual warning icons and color coding to the file tree view of the Graph Explorer.
+- fix(frontend): allow chart tooltips to overflow viewBox dynamically on smaller screens (#217). Updated Recharts tooltips wrapper configurations so metrics aren't clipped on mobile.
 
