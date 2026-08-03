@@ -226,4 +226,5 @@ Missing but obviously needed:
 - `019b96e` fix: deduplicate contributor identities in bus factor calculation. Added `ContributorIdentityResolver` with `.mailmap` support, normalized contributor identities before ownership aggregation, integrated resolution into both `git blame` and fallback commit-history paths, and added comprehensive regression tests.
 - feat: highlight hotspots in Graph Explorer file tree (#215). Added hotspot visual warning icons and color coding to the file tree view of the Graph Explorer.
 - fix(frontend): allow chart tooltips to overflow viewBox dynamically on smaller screens (#217). Updated Recharts tooltips wrapper configurations so metrics aren't clipped on mobile.
+- fix(ingestion): normalize repository URLs and names to lowercase (#206). Prevents duplicate repository records in database caused by casing differences.
 
