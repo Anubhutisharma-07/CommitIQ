@@ -59,6 +59,7 @@ Incomplete or fragile:
 
 ## Discovered issues
 - Medium: shutil.rmtree raised PermissionError on Windows when deleting read-only .git files; it now uses a custom onerror handler to clear the readonly bit.
+- Medium: commit author name/email could be None or empty for malformed commits (shallow-clone boundaries, VCS-imported histories, plumbing-created commits), crashing downstream Pydantic models and DB inserts. The commit walker now falls back to "Unknown" / "unknown@example.com" and logs the substitution (#266).
 - High: clone_service and router used synchronous subprocesses that blocked the FastAPI event loop; they are now fully asynchronous.
 - High: no deployment health gate; CI now exists for unit/e2e tests, lint, build, and repository hygiene checks on pushes and pull requests.
 - High: npm audit previously reported 9 frontend dependency vulnerabilities; dependency upgrades now leave `npm audit --audit-level=moderate` clean as of 2026-06-04.
@@ -74,7 +75,7 @@ Incomplete or fragile:
 
 ## Feature analysis
 Exists:
-- GitHub URL ingestion, shallow clone, commit walk, metric extraction, health scoring, dependency/co-change graph storage, bus-factor table, hot spot map, timeline, graph explorer, commit detail, LLM narratives, cost meter, dark/light theme toggle, and a Chromium landing-to-dashboard e2e.
+- GitHub URL ingestion, shallow clone, commit walk, metric extraction, health scoring, dependency/co-change graph storage, bus-factor table, hot spot map, timeline, graph explorer, commit detail, LLM narratives, cost meter, dark/light theme toggle, floating 'Back to Top' scroll button, and a Chromium landing-to-dashboard e2e.
 
 Half-done:
 - Demo mode exists as a route and LLM fallback concept. Narrative streams now have a no-key demo fallback, but the product still lacks seed data/scripts and a complete no-backend demo experience.
@@ -149,9 +150,11 @@ Missing but obviously needed:
 - 2026-07-25: Implemented custom time range selector for Commit Timeline and Hotspots (#223), allowing users to filter codebase health data by preset intervals (7d, 30d, 1y, All Time) or custom start/end dates.
 - 2026-07-26: Added contributor identity resolution for bus factor calculations. Introduced `ContributorIdentityResolver` with `.mailmap` support and normalized contributor identities before both `git blame` and fallback commit-history aggregation to prevent duplicate contributor aliases from distorting ownership metrics.
 - 2026-08-03: Added styled alert/warning card under Bus Factor card on Dashboard when minimum bus factor is 1, warning users of single-point-of-failure risk.
+- 2026-08-04: Hardened `walk_commits` against missing author identity (#266). Added `resolve_author_name` / `resolve_author_email` helpers that substitute `"Unknown"` and `"unknown@example.com"` when the git Actor's name/email is None, empty, or whitespace-only; wrapped Actor access in a defensive try/except so a single corrupt commit never aborts the walk; emitted an INFO log line when a fallback was applied. Yielded dict shape is unchanged; only the value domain of `author_name`/`author_email` is tightened (no None, no empty strings).
+
 
 ## Test coverage status
-- Backend unit tests: initial pure-logic coverage exists for config parsing/CORS defaults, boolean env parsing, repo URL parsing/validation, max-commit cap validation, slug generation, clone cleanup success/failure, import extraction/resolution, co-change edge generation, top-file frequency, bus-factor file filtering, semantic fallback behavior, health snapshot aggregation, risk reasons/hotspot persistence, LLM cache keys, provider mapping, cost estimation, usage/budget accounting, prompt builders, contributor identity normalization, `.mailmap` parsing, canonical identity resolution, and bus factor contributor deduplication.
+- Backend unit tests: initial pure-logic coverage exists for config parsing/CORS defaults, boolean env parsing, repo URL parsing/validation, max-commit cap validation, slug generation, clone cleanup success/failure, import extraction/resolution, co-change edge generation, top-file frequency, bus-factor file filtering, semantic fallback behavior, health snapshot aggregation, risk reasons/hotspot persistence, LLM cache keys, provider mapping, cost estimation, usage/budget accounting, prompt builders, contributor identity normalization, `.mailmap` parsing, canonical identity resolution, bus factor contributor deduplication, and commit-walker author identity fallback resolution (#266).
 - Backend integration/API tests: database-backed coverage exists for repo listing/lookup with pagination, timeline payloads including risk reasons and persistent hotspots, timeline and hotspots date-range filtering (`start_date`/`end_date`), graph payloads, bus factor payloads, LLM usage payloads, commit detail composition, active ingestion job reuse, background job scheduling arguments, ingestion cancellation, SQLite-safe duration math, ingestion progress SSE payloads for missing/terminal/polled jobs, and streaming narrative demo fallback.
 
 - Backend migration tests: coverage exists for sorted SQL migration application, applied-file tracking, skip-on-reapply behavior, and SQLite duplicate-column protection.
@@ -225,4 +228,11 @@ Missing but obviously needed:
 - docs: update project brain for stale ingestion job recovery on startup #26. Recorded stale job recovery implementation, storage cleanup details, and unit test coverage.
 - feat: implement custom time range selector for commit timeline and hotspots (#223). Added preset filters (All Time, 7d, 30d, 1y, Custom) and custom date pickers, updated timeline and hotspots backend APIs with `start_date`/`end_date` parameters, integrated into Dashboard UI, and added test coverage.
 - `019b96e` fix: deduplicate contributor identities in bus factor calculation. Added `ContributorIdentityResolver` with `.mailmap` support, normalized contributor identities before ownership aggregation, integrated resolution into both `git blame` and fallback commit-history paths, and added comprehensive regression tests.
+- feat: highlight hotspots in Graph Explorer file tree (#215). Added hotspot visual warning icons and color coding to the file tree view of the Graph Explorer.
+- fix(frontend): allow chart tooltips to overflow viewBox dynamically on smaller screens (#217). Updated Recharts tooltips wrapper configurations so metrics aren't clipped on mobile.
+- fix(ingestion): normalize repository URLs and names to lowercase (#206). Prevents duplicate repository records in database caused by casing differences.
+- fix(ingestion): handle missing git commit author name or email gracefully (#266). Added `resolve_author_name`/`resolve_author_email` helpers in `commit_walker.py` with `"Unknown"` / `"unknown@example.com"` defaults, defensive Actor access, INFO logging when fallbacks apply, and five regression tests in `test_repo_ingestion_logic.py`.
+- docs: update project brain after commit-walker author fallback (#266). Recorded the identity-fallback decision, updated discovered-issues and test-coverage status.
+- feat: support sorting and filtering by metrics (LOC, Churn, Complexity) in the hotspots list (#260). Added a sortable table below the treemap in `HotspotMap.tsx` with clickable column headers for File, LOC, Churn, Complexity, and Risk. Sorting defaults to risk_score descending; clicking a header toggles asc/desc. Added `loc` field to the backend `get_hotspots` response and `HotspotEntry` type. Added 7 unit tests covering rendering, sorting by each metric, direction toggling, empty state, and loading state.
+- docs: update project brain after hotspot sorting enhancement (#260). Recorded the sortable hotspots table decision, backend `loc` field addition, and frontend test coverage.
 
