@@ -172,6 +172,15 @@ async def init_db():
     logger.info("Database initialized", extra={"migrations_applied": len(applied)})
     await mark_stale_jobs_as_error()
 
+    # Auto-seed the facebook-react demo data if database is empty
+    from backend.demo_seeder import seed_demo_data_if_empty
+    async with AsyncSessionLocal() as session:
+        try:
+            await seed_demo_data_if_empty(session)
+        except Exception as exc:
+            logger.error(f"Failed to auto-seed demo data: {exc}", exc_info=True)
+
+
 
 async def mark_stale_jobs_as_error() -> None:
     """Queries for any AnalysisJob in active statuses and marks them as error on startup.
