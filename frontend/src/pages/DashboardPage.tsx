@@ -172,7 +172,7 @@ export default function DashboardPage() {
           />
         )}
 
-        <aside className={`w-sidebar flex-shrink-0 flex flex-col overflow-hidden bg-[#0a0b10]/40 backdrop-blur-2xl transition-transform duration-300 ease-in-out z-40 border-r border-white/5
+        <aside className={`w-80 flex-shrink-0 flex flex-col overflow-hidden bg-[#0a0b10]/40 backdrop-blur-2xl transition-transform duration-300 ease-in-out z-40 border-r border-white/5
           fixed md:static inset-y-0 left-0 pt-[88px] md:pt-0
           ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
         `}>
