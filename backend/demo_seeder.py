@@ -59,6 +59,7 @@ async def seed_demo_data_if_empty(session: AsyncSession) -> None:
     commit_instances = []
     
     # We will generate 40 commits to make a nice timeline
+    health_scores = []
     for i in range(40):
         committed_at = base_time + timedelta(days=i * 1.5)
         author = authors[i % len(authors)]
@@ -74,6 +75,7 @@ async def seed_demo_data_if_empty(session: AsyncSession) -> None:
         else:
             health_score = 67.0 + ((i - 22) * 1.2)  # Recovery
 
+        health_scores.append(health_score)
         avg_complexity = 3.5 + (i * 0.05) if i < 20 else 4.5 - ((i - 20) * 0.03)
         max_complexity = 12.0 + (i % 5)
         total_loc = 45000 + (i * 150)
@@ -111,7 +113,7 @@ async def seed_demo_data_if_empty(session: AsyncSession) -> None:
             churn_rate=churn_rate,
             num_files_changed=num_files_changed,
             bus_factor_min=bus_factor_min,
-            health_delta=(health_score - commit_instances[-2].health_snapshot.health_score) if len(commit_instances) > 1 else None,
+            health_delta=(health_score - health_scores[-2]) if len(health_scores) > 1 else None,
             cc_score=health_score + 2.0,
             churn_score=100.0 - (churn_rate * 100),
             bus_score=bus_factor_min * 30.0,

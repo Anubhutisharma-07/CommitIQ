@@ -127,7 +127,7 @@ export default function LandingPage() {
               Interactive Demo
             </button>
             <a 
-              href="https://github.com/eshaanag/CommitIQ" 
+              href="https://github.com/eshaanag/CommitIQ---" 
               target="_blank" 
               rel="noreferrer" 
               className="text-slate-300 hover:text-white text-sm font-medium tracking-wide transition-colors"
