@@ -14,7 +14,7 @@ export default function DemoPage() {
     try {
       try {
         const existingRepo = await getRepoBySlug('facebook-react')
-        if (existingRepo && existingRepo.status === 'completed') {
+        if (existingRepo && existingRepo.status === 'ready') {
           navigate('/dashboard/facebook-react', { replace: true })
           return
         }

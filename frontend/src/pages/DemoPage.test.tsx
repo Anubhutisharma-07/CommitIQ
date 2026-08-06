@@ -64,8 +64,8 @@ describe('DemoPage', () => {
       name: 'facebook/react',
       owner: 'facebook',
       repo_slug: 'facebook-react',
-      status: 'completed',
-    })
+      status: 'ready',
+    } as any)
     renderDemoPage()
 
     await user.click(screen.getByRole('button', { name: /start demo analysis/i }))
