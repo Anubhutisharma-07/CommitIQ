@@ -14,7 +14,68 @@ async def seed_demo_data_if_empty(session: AsyncSession) -> None:
         logger.info("Demo repository 'facebook-react' already exists in the database. Skipping seeder.")
         return
 
-    logger.info("Seeding database with pre-populated 'facebook-react' demo data...")
+    import os
+    fixture_path = os.path.join("backend", "fixtures", "facebook-react.json")
+    if os.path.exists(fixture_path):
+        logger.info(f"Seeding database using real analyzed demo fixture from {fixture_path}...")
+        try:
+            with open(fixture_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+
+            def parse_dt(val: str | None) -> datetime | None:
+                if not val:
+                    return None
+                return datetime.fromisoformat(val.replace("Z", "+00:00"))
+
+            # 1. Create Repo
+            repo_data = data["repo"]
+            repo_data["ingested_at"] = parse_dt(repo_data.get("ingested_at"))
+            repo_data["last_updated_at"] = parse_dt(repo_data.get("last_updated_at"))
+            repo = Repo(**repo_data)
+            session.add(repo)
+            await session.flush()
+
+            # 2. Create Commits
+            commit_sha_to_id = {}
+            for c_data in data["commits"]:
+                c_data["committed_at"] = parse_dt(c_data.get("committed_at"))
+                commit = Commit(repo_id=repo.id, **c_data)
+                session.add(commit)
+                await session.flush()
+                commit_sha_to_id[commit.full_sha] = commit.id
+
+            # 3. Create HealthSnapshots
+            for s_data in data["snapshots"]:
+                s_data["computed_at"] = parse_dt(s_data.get("computed_at"))
+                commit_id = commit_sha_to_id.get(s_data["full_sha"])
+                snapshot = HealthSnapshot(repo_id=repo.id, commit_id=commit_id, **s_data)
+                session.add(snapshot)
+
+            # 4. Create GraphNodes
+            for n_data in data["nodes"]:
+                commit_id = commit_sha_to_id.get(n_data["commit_sha"])
+                node = GraphNode(repo_id=repo.id, commit_id=commit_id, **n_data)
+                session.add(node)
+
+            # 5. Create GraphEdges
+            for e_data in data["edges"]:
+                commit_id = commit_sha_to_id.get(e_data["commit_sha"])
+                edge = GraphEdge(repo_id=repo.id, commit_id=commit_id, **e_data)
+                session.add(edge)
+
+            # 6. Create BusFactor
+            for b_data in data["bus"]:
+                b_data["last_updated_at"] = parse_dt(b_data.get("last_updated_at"))
+                bf = BusFactor(repo_id=repo.id, **b_data)
+                session.add(bf)
+
+            await session.commit()
+            logger.info("Successfully seeded database using real analyzed 'facebook-react' demo data!")
+            return
+        except Exception as exc:
+            logger.error(f"Failed to seed demo data using real fixture: {exc}. Falling back to generating mock data...", exc_info=True)
+
+    logger.info("Seeding database with generated fallback 'facebook-react' demo data...")
 
     # 1. Create Repo
     repo = Repo(
