@@ -387,7 +387,7 @@ async def _latest_active_job(db: AsyncSession, repo_id: int) -> AnalysisJob | No
     return result.scalar_one_or_none()
 
 
-async def run_ingestion(repo_id: int, job_id: int, max_commits: int) -> None:
+async def run_ingestion(repo_id: int, job_id: int, max_commits: int,branch: str | None = None) -> None:
     from backend.database import AsyncSessionLocal
     from backend.features.repo_ingestion.metrics_extractor import (
         checkout_commit,
@@ -421,8 +421,7 @@ async def run_ingestion(repo_id: int, job_id: int, max_commits: int) -> None:
 
     clone_path = None
     try:
-        clone_path = await clone_repo(repo_url, repo_id, max_commits)
-        await _raise_if_cancelled(job_id)
+        clone_path = await clone_repo(repo_url, repo_id, max_commits,branch=branch,)
         available_commits = await count_available_commits(clone_path)
         if available_commits < 1:
             raise RuntimeError(
@@ -865,10 +864,15 @@ async def ingest_repo(
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
 ):
+    normalized_repo_url = request.repo_url.strip().lower()
+
     try:
-        owner, repo_name = parse_github_url(request.repo_url)
+        owner, repo_name = parse_github_url(normalized_repo_url)
     except ValueError as exc:
         raise _http_error(400, str(exc), "invalid_repo_url")
+
+    owner = owner.strip().lower()
+    repo_name = repo_name.strip().lower()
 
     url = f"https://github.com/{owner}/{repo_name}"
     repo_slug = make_repo_slug(owner, repo_name)
@@ -920,7 +924,7 @@ async def ingest_repo(
     await db.refresh(repo)
     await db.refresh(job)
 
-    background_tasks.add_task(run_ingestion, repo.id, job.id, max_c)
+    background_tasks.add_task(run_ingestion, repo.id, job.id, request.max_commits,request.branch,)
     return IngestResponse(
         repo_id=repo.id,
         repo_slug=repo.repo_slug,
@@ -1300,6 +1304,7 @@ async def get_hotspots(
                 "complexity": round(node.avg_complexity, 2),
                 "churn_count": churn_count,
                 "risk_score": round(risk_score, 1),
+                "loc": node.loc,
             }
         )
 
@@ -1315,3 +1320,4 @@ async def get_llm_usage(repo_id: int, db: AsyncSession = Depends(get_db)):
     from backend.features.llm_analysis.cost_guard import get_usage_summary
 
     return await get_usage_summary(repo_id, db)
+

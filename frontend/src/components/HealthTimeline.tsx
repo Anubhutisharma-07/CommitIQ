@@ -119,9 +119,11 @@ export function HealthTimeline({ commits, repoSlug, selectedSha, onSelectCommit 
   }
 
   return (
-    <div className="glass-panel rounded-[28px] p-6 shadow-2xl relative border border-white/10 overflow-hidden">
-      <div className="absolute -top-12 -left-12 w-48 h-48 bg-purple-500/10 rounded-full blur-[80px] pointer-events-none" />
-      <div className="absolute -bottom-12 -right-12 w-48 h-48 bg-blue-500/10 rounded-full blur-[80px] pointer-events-none" />
+    <div className="glass-panel rounded-[28px] p-6 shadow-2xl relative border border-white/10">
+      <div className="absolute inset-0 overflow-hidden rounded-[28px] pointer-events-none">
+        <div className="absolute -top-12 -left-12 w-48 h-48 bg-purple-500/10 rounded-full blur-[80px]" />
+        <div className="absolute -bottom-12 -right-12 w-48 h-48 bg-blue-500/10 rounded-full blur-[80px]" />
+      </div>
 
       <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4 mb-6 relative z-10">
         <div>
@@ -224,6 +226,7 @@ export function HealthTimeline({ commits, repoSlug, selectedSha, onSelectCommit 
               cursor={{ stroke: 'var(--glass-border)', strokeWidth: 1.5 }}
               wrapperStyle={{ zIndex: 999999, pointerEvents: 'none' }}
               useTranslate3d={true}
+              allowEscapeViewBox={{ x: true, y: true }}
             />
 
             <Area

@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from pathlib import Path
 
@@ -30,6 +31,28 @@ AsyncSessionLocal = async_sessionmaker(
     class_=AsyncSession,
     expire_on_commit=False,
 )
+
+
+async def commit_with_retry(session: AsyncSession, max_retries: int = 3, initial_delay: float = 0.1) -> None:
+    """Commit an AsyncSession transaction with a 3-attempt retry loop for transient SQLite database locks."""
+    for attempt in range(1, max_retries + 1):
+        try:
+            await session.commit()
+            return
+        except Exception as exc:
+            err_msg = str(exc).lower()
+            is_lock_error = "database is locked" in err_msg or "locked" in err_msg
+            if is_lock_error and attempt < max_retries:
+                delay = initial_delay * (2 ** (attempt - 1))
+                logger.warning(
+                    "SQLite database locked on commit (attempt %d/%d). Retrying in %.2fs...",
+                    attempt,
+                    max_retries,
+                    delay,
+                )
+                await asyncio.sleep(delay)
+            else:
+                raise
 
 
 class Base(DeclarativeBase):
@@ -148,6 +171,15 @@ async def init_db():
 
     logger.info("Database initialized", extra={"migrations_applied": len(applied)})
     await mark_stale_jobs_as_error()
+
+    # Auto-seed the facebook-react demo data if database is empty
+    from backend.demo_seeder import seed_demo_data_if_empty
+    async with AsyncSessionLocal() as session:
+        try:
+            await seed_demo_data_if_empty(session)
+        except Exception as exc:
+            logger.error(f"Failed to auto-seed demo data: {exc}", exc_info=True)
+
 
 
 async def mark_stale_jobs_as_error() -> None:

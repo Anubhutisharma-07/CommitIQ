@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import useSWR from 'swr'
 import { getBusFactor, getGraph, getHealthTimeline, getIngestProgress, getLLMUsage, getRepoBySlug, rescanRepo } from '../lib/api'
@@ -15,9 +15,11 @@ import { HealthBadge } from '../components/ui/HealthBadge'
 import { ThemeToggle } from '../components/ui/ThemeToggle'
 import { Layers, Compass, BarChart2, Activity, GitBranch, RefreshCw } from 'lucide-react'
 
+
 export default function DashboardPage() {
   const { repoSlug = '' } = useParams<{ repoSlug: string }>()
   const navigate = useNavigate()
+  const mainRef = useRef<HTMLElement>(null)
   const [selected, setSelected] = useState<HealthSnapshot | null>(null)
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [isRescanning, setIsRescanning] = useState(false)
@@ -193,7 +195,7 @@ export default function DashboardPage() {
           />
         )}
 
-        <aside className={`w-sidebar flex-shrink-0 flex flex-col overflow-hidden bg-[#0a0b10]/40 backdrop-blur-2xl transition-transform duration-300 ease-in-out z-40 border-r border-white/5
+        <aside className={`w-80 flex-shrink-0 flex flex-col overflow-hidden bg-[#0a0b10]/40 backdrop-blur-2xl transition-transform duration-300 ease-in-out z-40 border-r border-white/5
           fixed md:static inset-y-0 left-0 pt-[88px] md:pt-0
           ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
         `}>
@@ -417,13 +419,32 @@ export default function DashboardPage() {
                 Could not retrieve module ownership datasets.
               </div>
             ) : (
-              <BusFactorTable modules={busState.data?.modules || []} />
+              <div>
+                <BusFactorTable modules={busState.data?.modules || []} />
+                {(selected?.bus_factor_min === 1 || (busState.data?.modules && busState.data.modules.some(m => m.contributor_count === 1))) && (
+                  <div
+                    data-testid="bus-factor-warning"
+                    className="mt-4 p-4 rounded-[20px] bg-amber-500/10 border border-amber-500/30 text-amber-200 flex items-start gap-3 text-xs shadow-lg backdrop-blur-xl"
+                  >
+                    <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-head font-semibold text-amber-300 block text-xs mb-0.5 uppercase tracking-wider">
+                        Single Point of Failure Warning
+                      </span>
+                      <p className="text-slate-300 leading-relaxed text-[11px]">
+                        The computed minimum bus factor for this repository is <strong>1</strong>. Key modules depend entirely on a single principal contributor, leaving the repository vulnerable to a single-point-of-failure if that contributor becomes unavailable.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
             
             {repoId && <HotspotMap repoId={repoId} sha={selected?.sha || null} startDate={startDate} endDate={endDate} />}
           </div>
         </main>
       </div>
+      <ScrollToTop containerRef={mainRef} />
     </div>
   )
 }

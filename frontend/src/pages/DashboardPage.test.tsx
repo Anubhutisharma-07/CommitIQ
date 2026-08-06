@@ -296,4 +296,23 @@ describe('DashboardPage', () => {
     expect(screen.getByLabelText('Start Date')).toBeInTheDocument()
     expect(screen.getByLabelText('End Date')).toBeInTheDocument()
   })
+
+  it('displays single-point-of-failure warning card under bus factor card when bus_factor_min equals 1', async () => {
+    getHealthTimelineMock.mockResolvedValue([
+      makeSnapshot({ sha: 'xyz999', full_sha: 'xyz999', bus_factor_min: 1 }),
+    ])
+
+    renderDashboard()
+
+    expect(await screen.findByTestId('bus-factor-warning')).toBeInTheDocument()
+    expect(screen.getByText('Single Point of Failure Warning')).toBeInTheDocument()
+    expect(screen.getByText(/vulnerable to a single-point-of-failure/i)).toBeInTheDocument()
+  })
+
+  it('renders the floating back to top button on the dashboard', async () => {
+    renderDashboard()
+
+    expect(await screen.findByTestId('scroll-to-top')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /scroll back to top/i })).toBeInTheDocument()
+  })
 })

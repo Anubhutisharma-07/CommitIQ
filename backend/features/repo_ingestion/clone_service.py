@@ -85,7 +85,12 @@ def get_clone_path(repo_id: int) -> Path:
     return REPO_STORAGE_PATH / str(repo_id)
 
 
-async def clone_repo(repo_url: str, repo_id: int, max_commits: int = 150) -> Path:
+async def clone_repo(
+    repo_url: str,
+    repo_id: int,
+    max_commits: int = 150,
+    branch: str | None = None,
+) -> Path:
     """Shallow clone to local disk. Returns clone path."""
     target = get_clone_path(repo_id)
     if target.exists():
@@ -103,10 +108,9 @@ async def clone_repo(repo_url: str, repo_id: int, max_commits: int = 150) -> Pat
 
     # Use git clone via HTTPS — never uses GitHub REST API, no rate limits
     if GITHUB_TOKEN:
-        # This only speeds up clone for large repos — not required for public
-        auth_url = repo_url.replace(
-            'https://github.com/',
-            f'https://{GITHUB_TOKEN}@github.com/'
+         auth_url = repo_url.replace(
+            "https://github.com/",
+            f"https://{GITHUB_TOKEN}@github.com/"
         )
     else:
         auth_url = repo_url
@@ -118,15 +122,28 @@ async def clone_repo(repo_url: str, repo_id: int, max_commits: int = 150) -> Pat
         "git", "clone",
         "--depth", str(max_commits),
         "--single-branch",
+    ]
+
+    if branch:
+        clone_cmd.extend(["--branch", branch])
+
+    clone_cmd.extend([
         auth_url,
         str(target),
+    ])
+
+    process = await asyncio.create_subprocess_exec(
+        *clone_cmd,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
         env=env,
     )
 
     try:
-        stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=300)
+        stdout, stderr = await asyncio.wait_for(
+            process.communicate(),
+            timeout=300,
+        )
     except asyncio.TimeoutError:
         process.kill()
         cleanup_repo(repo_id)
