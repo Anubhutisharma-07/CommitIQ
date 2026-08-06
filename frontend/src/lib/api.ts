@@ -17,17 +17,6 @@ import type {
   TimelineResponse,
 } from '../types'
 
-import {
-  mockRepo,
-  mockTimeline,
-  mockGraph,
-  mockBusFactor,
-  mockHotspots,
-  mockLLMUsage,
-  getMockCommitDetail,
-  mockStreamNarrative
-} from './mockDemoData'
-
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '')
 const API_ROOT = `${API_BASE}/api`
 
@@ -59,31 +48,16 @@ async function request<T>(promise: Promise<{ data: T }>): Promise<T> {
 }
 
 export async function ingestRepo(url: string, maxCommits?: number,branch?: string,): Promise<IngestResponse> {
-  if (url.includes('facebook/react')) {
-    return {
-      repo_id: mockRepo.id,
-      repo_slug: mockRepo.repo_slug,
-      status: "processing",
-      job_id: 999999,
-      message: "Demo started"
-    }
-  }
   return request<IngestResponse>(
     client.post('/repos/ingest', { repo_url: url,branch, max_commits: maxCommits || 500 })
   )
 }
 
 export async function getRepoBySlug(slug: string): Promise<Repo> {
-  if (slug === 'facebook-react') {
-    return mockRepo
-  }
   return request<Repo>(client.get(`/repos/by-slug/${slug}`))
 }
 
 export async function getRepo(repoId: string | number): Promise<Repo> {
-  if (repoId === 'facebook-react' || repoId === 999999 || String(repoId) === '999999') {
-    return mockRepo
-  }
   return request<Repo>(client.get(`/repos/${repoId}`))
 }
 
@@ -92,9 +66,6 @@ export async function getHealthTimeline(
   startDate?: string,
   endDate?: string,
 ): Promise<HealthSnapshot[]> {
-  if (repoId === 'facebook-react' || repoId === 999999 || String(repoId) === '999999') {
-    return mockTimeline
-  }
   const params: Record<string, string> = {}
   if (startDate) params.start_date = startDate
   if (endDate) params.end_date = endDate
@@ -108,25 +79,16 @@ export async function getCommitDetail(
   repoId: string | number,
   sha: string,
 ): Promise<CommitDetailResponse> {
-  if (repoId === 'facebook-react' || repoId === 999999 || String(repoId) === '999999') {
-    return getMockCommitDetail(sha)
-  }
   return request<CommitDetailResponse>(client.get(`/repos/${repoId}/commit/${sha}`))
 }
 
 export async function getGraph(repoId: string | number, sha?: string): Promise<GraphResponse> {
-  if (repoId === 'facebook-react' || repoId === 999999 || String(repoId) === '999999') {
-    return mockGraph
-  }
   return request<GraphResponse>(
     client.get(`/repos/${repoId}/graph`, { params: sha ? { sha } : undefined })
   )
 }
 
 export async function getBusFactor(repoId: string | number): Promise<BusFactorWrapper> {
-  if (repoId === 'facebook-react' || repoId === 999999 || String(repoId) === '999999') {
-    return mockBusFactor
-  }
   return request<BusFactorWrapper>(client.get(`/repos/${repoId}/bus-factor`))
 }
 
@@ -148,9 +110,6 @@ export async function getHotspots(
   startDate?: string,
   endDate?: string,
 ): Promise<HotspotResponse> {
-  if (repoId === 'facebook-react' || repoId === 999999 || String(repoId) === '999999') {
-    return mockHotspots
-  }
   const params: Record<string, string> = {}
   if (sha) params.sha = sha
   if (startDate) params.start_date = startDate
@@ -161,18 +120,6 @@ export async function getHotspots(
 }
 
 export async function getNarrative(repoId: string | number, sha: string): Promise<LLMNarrative> {
-  if (repoId === 'facebook-react' || repoId === 999999 || String(repoId) === '999999') {
-    return {
-      repo_id: mockRepo.id,
-      commit_sha: sha,
-      prompt_type: "explain_drop",
-      explanation: "Demo narrative response",
-      tokens_used: 100,
-      cost_usd: 0.0,
-      cached: true,
-      model: "demo",
-    }
-  }
   return request<LLMNarrative>(
     client.post('/explain', {
       repo_id: Number(repoId),
@@ -183,18 +130,6 @@ export async function getNarrative(repoId: string | number, sha: string): Promis
 }
 
 export async function predictMerge(repoId: string | number, sha: string): Promise<LLMNarrative> {
-  if (repoId === 'facebook-react' || repoId === 999999 || String(repoId) === '999999') {
-    return {
-      repo_id: mockRepo.id,
-      commit_sha: sha,
-      prompt_type: "predict_merge",
-      explanation: "Demo prediction response",
-      tokens_used: 100,
-      cost_usd: 0.0,
-      cached: true,
-      model: "demo",
-    }
-  }
   const payload: PredictRequest = {
     repo_id: Number(repoId),
     commit_sha: sha,
@@ -204,9 +139,6 @@ export async function predictMerge(repoId: string | number, sha: string): Promis
 }
 
 export async function getLLMUsage(repoId: string | number): Promise<LLMUsage> {
-  if (repoId === 'facebook-react' || repoId === 999999 || String(repoId) === '999999') {
-    return mockLLMUsage
-  }
   return request<LLMUsage>(client.get(`/repos/${repoId}/llm-usage`))
 }
 
@@ -223,9 +155,6 @@ export async function streamNarrative(
   sha: string,
   onChunk: (chunk: NarrativeStreamChunk) => void,
 ): Promise<void> {
-  if (repoId === 'facebook-react' || repoId === 999999 || String(repoId) === '999999') {
-    return mockStreamNarrative(onChunk)
-  }
   const response = await fetch(`${API_ROOT}/explain/stream`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
