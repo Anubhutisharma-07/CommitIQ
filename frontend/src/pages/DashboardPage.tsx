@@ -55,6 +55,13 @@ export default function DashboardPage() {
     }
   }, [timeRangePreset, customStartDate, customEndDate])
 
+
+  const handleResetTimeRange = () => {
+    setTimeRangePreset('all')
+    setCustomStartDate('')
+    setCustomEndDate('')
+  }
+  
   const repoState = useSWR(repoSlug ? ['repo', repoSlug] : null, () => getRepoBySlug(repoSlug))
   const repo = repoState.data
   const repoId = repo?.id
@@ -106,8 +113,8 @@ export default function DashboardPage() {
           <p className="text-slate-400 text-xs leading-relaxed">
             The requested repository slug could not be verified or loaded into the active environment workspace.
           </p>
-          <button 
-            onClick={() => navigate('/')} 
+          <button
+            onClick={() => navigate('/')}
             className="liquid-button px-5 py-2.5 rounded-full text-xs font-semibold text-white tracking-wide shadow-lg w-full"
           >
             Return to Home
@@ -124,7 +131,7 @@ export default function DashboardPage() {
       <div className="w-full fixed top-0 left-0 right-0 z-50 select-none pointer-events-none px-4 sm:px-6 pt-4">
         <nav className="glass-panel rounded-full h-16 px-6 flex items-center justify-between shadow-2xl pointer-events-auto">
           <div className="flex items-center gap-4 min-w-0">
-            <button 
+            <button
               onClick={() => setIsSidebarOpen(true)}
               className="md:hidden p-2 -ml-1 text-slate-300 hover:text-white bg-white/5 rounded-full border border-white/5 flex-shrink-0"
               aria-label="Open sidebar"
@@ -133,17 +140,17 @@ export default function DashboardPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
               </svg>
             </button>
-            
-            <button 
-              onClick={() => navigate('/')} 
+
+            <button
+              onClick={() => navigate('/')}
               className="font-head text-[18px] font-bold text-white tracking-tight hover:opacity-80 transition-opacity hidden sm:flex items-center gap-2"
             >
               <Layers className="w-5 h-5 text-purple-400" />
               CommitIQ
             </button>
-            
+
             <span className="text-white/10 hidden sm:block">/</span>
-            
+
             <div className="flex items-center gap-2 bg-white/5 border border-white/5 px-3 py-1.5 rounded-full max-w-[150px] sm:max-w-[240px]">
               <GitBranch className="w-3.5 h-3.5 text-purple-300 flex-shrink-0" />
               <span className="font-mono text-xs text-slate-200 font-semibold truncate select-all">{repo.name}</span>
@@ -154,8 +161,8 @@ export default function DashboardPage() {
 
           <div className="flex items-center gap-3">
             <ThemeToggle />
-            <button 
-              onClick={() => navigate('/')} 
+            <button
+              onClick={() => navigate('/')}
               className="text-xs font-semibold text-slate-300 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 rounded-full px-4 py-2 transition-all"
             >
               New Repository
@@ -166,8 +173,8 @@ export default function DashboardPage() {
 
       <div className="flex flex-1 overflow-hidden relative pt-[88px]">
         {isSidebarOpen && (
-          <div 
-            onClick={() => setIsSidebarOpen(false)} 
+          <div
+            onClick={() => setIsSidebarOpen(false)}
             className="fixed inset-0 bg-black/65 z-35 md:hidden transition-opacity duration-300 backdrop-blur-sm"
           />
         )}
@@ -181,7 +188,7 @@ export default function DashboardPage() {
               <div className="font-mono text-xs font-bold text-white truncate">{repo.name}</div>
               <div className="text-slate-400 text-[10px] mt-1 font-semibold uppercase tracking-wider">{repo.analyzed_commits} commits compiled</div>
             </div>
-            <button 
+            <button
               onClick={() => setIsSidebarOpen(false)}
               className="md:hidden p-1.5 -mr-1.5 text-slate-400 hover:text-white bg-white/5 rounded-full transition-colors"
               aria-label="Close sidebar"
@@ -197,14 +204,14 @@ export default function DashboardPage() {
           </div>
 
           <div className="flex-grow overflow-hidden pt-5">
-            <CommitList 
-              commits={commits} 
-              repoSlug={repo.repo_slug} 
-              selectedSha={selected?.sha || null} 
+            <CommitList
+              commits={commits}
+              repoSlug={repo.repo_slug}
+              selectedSha={selected?.sha || null}
               onSelect={(commit) => {
                 setSelected(commit)
                 setIsSidebarOpen(false)
-              }} 
+              }}
             />
           </div>
         </aside>
@@ -219,6 +226,7 @@ export default function DashboardPage() {
               setCustomStartDate(start)
               setCustomEndDate(end)
             }}
+            onReset={handleResetTimeRange}
           />
 
           {timelineState.isLoading ? (
@@ -235,18 +243,18 @@ export default function DashboardPage() {
               No analyzed commits are currently compiled for this repository workspace.
             </div>
           ) : (
-            <HealthTimeline 
-              commits={commits} 
-              repoSlug={repo.repo_slug} 
-              selectedSha={selected?.sha} 
-              onSelectCommit={setSelected} 
+            <HealthTimeline
+              commits={commits}
+              repoSlug={repo.repo_slug}
+              selectedSha={selected?.sha}
+              onSelectCommit={setSelected}
             />
           )}
 
           {selected && (
             <div className="glass-panel rounded-[28px] p-6 shadow-2xl relative border border-white/10 overflow-hidden">
               <div className="absolute top-0 right-0 w-48 h-48 bg-purple-500/5 rounded-full blur-[80px] pointer-events-none" />
-              
+
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-white/5 pb-4 mb-5 gap-4">
                 <div className="min-w-0">
                   <span className="font-mono text-[10px] font-bold text-purple-300 bg-purple-500/10 px-2 py-0.5 rounded-full border border-purple-500/15">
@@ -254,8 +262,8 @@ export default function DashboardPage() {
                   </span>
                   <h3 className="font-head text-[18px] font-semibold text-white tracking-tight truncate mt-2">{sanitizeCommitMessage(selected.message)}</h3>
                 </div>
-                <button 
-                  onClick={() => navigate(`/dashboard/${repo.repo_slug}/commit/${selected.sha}`)} 
+                <button
+                  onClick={() => navigate(`/dashboard/${repo.repo_slug}/commit/${selected.sha}`)}
                   className="text-xs font-bold text-purple-300 hover:text-white bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/15 rounded-full px-4.5 py-2 transition-all flex-shrink-0"
                 >
                   Inspect Snapshot Details
@@ -263,21 +271,21 @@ export default function DashboardPage() {
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
                 {[
-                  { 
-                    label: 'Codebase Complexity', 
-                    value: selected.avg_complexity === 0 ? '-' : selected.avg_complexity.toFixed(1), 
+                  {
+                    label: 'Codebase Complexity',
+                    value: selected.avg_complexity === 0 ? '-' : selected.avg_complexity.toFixed(1),
                     unit: selected.avg_complexity === 0 ? 'no code changed' : 'Avg cyclomatic score',
                     icon: <BarChart2 className="w-4.5 h-4.5 text-rose-400" />
                   },
-                  { 
-                    label: 'Commit Churn', 
-                    value: `${selectedChurnPct.toFixed(0)}%`, 
+                  {
+                    label: 'Commit Churn',
+                    value: `${selectedChurnPct.toFixed(0)}%`,
                     unit: `${selected.num_files_changed} modified components`,
                     icon: <Activity className="w-4.5 h-4.5 text-sky-400" />
                   },
-                  { 
-                    label: 'Minimum Bus Factor', 
-                    value: String(selected.bus_factor_min), 
+                  {
+                    label: 'Minimum Bus Factor',
+                    value: String(selected.bus_factor_min),
                     unit: 'Crucial owners limit',
                     icon: <Compass className="w-4.5 h-4.5 text-emerald-400" />
                   },
@@ -289,8 +297,8 @@ export default function DashboardPage() {
                     icon: <Layers className="w-4.5 h-4.5 text-purple-400" />
                   },
                 ].map((metric) => (
-                  <div 
-                    key={metric.label} 
+                  <div
+                    key={metric.label}
                     className="bg-white/5 border border-white/5 hover:border-white/10 rounded-[20px] p-5 transition-all shadow-inner"
                   >
                     <div className="flex items-center justify-between mb-2">
@@ -330,13 +338,12 @@ export default function DashboardPage() {
                               <div className="text-slate-100 font-semibold">{reason.label}</div>
                               <div className="text-slate-500 leading-relaxed mt-0.5">{reason.detail}</div>
                             </div>
-                            <span className={`flex-shrink-0 rounded-full px-2 py-0.5 font-mono text-[9px] uppercase border ${
-                              reason.severity === 'critical'
+                            <span className={`flex-shrink-0 rounded-full px-2 py-0.5 font-mono text-[9px] uppercase border ${reason.severity === 'critical'
                                 ? 'bg-rose-500/10 text-rose-300 border-rose-500/20'
                                 : reason.severity === 'high'
                                   ? 'bg-orange-500/10 text-orange-300 border-orange-500/20'
                                   : 'bg-amber-500/10 text-amber-300 border-amber-500/20'
-                            }`}>
+                              }`}>
                               {reason.severity}
                             </span>
                           </div>
@@ -381,9 +388,9 @@ export default function DashboardPage() {
                 Could not construct software import dependency landscape.
               </div>
             ) : (
-              <GraphExplorer 
-                graphData={graphState.data} 
-                selectedSha={selected?.sha || null} 
+              <GraphExplorer
+                graphData={graphState.data}
+                selectedSha={selected?.sha || null}
                 commits={commits}
                 onSelectCommit={setSelected}
               />
@@ -416,7 +423,7 @@ export default function DashboardPage() {
                 )}
               </div>
             )}
-            
+
             {repoId && <HotspotMap repoId={repoId} sha={selected?.sha || null} startDate={startDate} endDate={endDate} />}
           </div>
         </main>
