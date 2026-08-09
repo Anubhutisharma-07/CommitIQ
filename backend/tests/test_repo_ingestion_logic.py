@@ -15,6 +15,7 @@ from backend.features.repo_ingestion.clone_service import (
     get_clone_path,
     make_repo_slug,
     parse_github_url,
+    sanitize_repo_url,
 )
 from backend.features.repo_ingestion.graph_builder import (
     build_cochange_edges,
@@ -31,10 +32,28 @@ from backend.shared.schemas import IngestRequest
 @pytest.mark.parametrize(
     ("raw", "expected"),
     [
+        ("https://token@github.com/owner/repo", "https://github.com/owner/repo"),
+        ("https://user:token@github.com/owner/repo.git", "https://github.com/owner/repo.git"),
+        ("http://ghp_1234567890@github.com/owner/repo", "http://github.com/owner/repo"),
+        ("token@github.com/owner/repo", "github.com/owner/repo"),
+        ("https://github.com/owner/repo", "https://github.com/owner/repo"),
+        ("owner/repo", "owner/repo"),
+        ("", ""),
+    ],
+)
+def test_sanitize_repo_url_strips_token_credentials(raw, expected):
+    assert sanitize_repo_url(raw) == expected
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
         ("owner/repo", ("owner", "repo")),
         ("https://github.com/owner/repo", ("owner", "repo")),
         ("http://github.com/owner/repo.git/", ("owner", "repo")),
         ("www.github.com/owner/repo", ("owner", "repo")),
+        ("https://ghp_token123@github.com/owner/repo", ("owner", "repo")),
+        ("https://user:secret@github.com/owner/repo.git", ("owner", "repo")),
     ],
 )
 def test_parse_github_url_accepts_supported_forms(raw, expected):

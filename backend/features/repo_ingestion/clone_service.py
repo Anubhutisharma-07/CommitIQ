@@ -21,9 +21,24 @@ def _is_valid_github_name(value: str) -> bool:
     return bool(re.fullmatch(r"[\w.-]+", value))
 
 
+def sanitize_repo_url(url: str) -> str:
+    """
+    Sanitize and strip token credentials and user info from repository URLs.
+    e.g. 'https://token@github.com/owner/repo' -> 'https://github.com/owner/repo'
+         'https://user:token@github.com/owner/repo' -> 'https://github.com/owner/repo'
+         'http://token@github.com/owner/repo' -> 'http://github.com/owner/repo'
+         'token@github.com/owner/repo' -> 'github.com/owner/repo'
+    """
+    if not url:
+        return ""
+    cleaned = re.sub(r"^(https?://)[^/@\s]+@", r"\1", url.strip())
+    cleaned = re.sub(r"^[^/@\s]+@(github\.com[/:]|www\.github\.com[/:])", r"\1", cleaned)
+    return cleaned
+
+
 def parse_github_url(url: str) -> tuple[str, str]:
     """Parse GitHub URL or shorthand to ('owner', 'repo')."""
-    s = url.strip()
+    s = sanitize_repo_url(url).strip()
     
     while s.endswith('/') or s.endswith('.git'):
         if s.endswith('/'):
@@ -46,18 +61,18 @@ def parse_github_url(url: str) -> tuple[str, str]:
     if s.startswith('github.com/'):
         s = s[len('github.com/'):]
     elif explicit_host:
-        raise ValueError(f"Cannot parse GitHub URL: {url}. Expected a github.com repository URL.")
+        raise ValueError(f"Cannot parse GitHub URL: {_redact_secret(url)}. Expected a github.com repository URL.")
         
     parts = s.split('/')
     if len(parts) < 2 or not parts[0] or not parts[1]:
-        raise ValueError(f"Cannot parse GitHub URL: {url}. Expected format 'owner/repo' or 'github.com/owner/repo'.")
+        raise ValueError(f"Cannot parse GitHub URL: {_redact_secret(url)}. Expected format 'owner/repo' or 'github.com/owner/repo'.")
         
     owner = parts[0]
     repo = parts[1]
     
     # Validate owner/repo format to avoid invalid directory names or bad parameters
     if not _is_valid_github_name(owner) or not _is_valid_github_name(repo):
-        raise ValueError(f"Invalid owner or repository name in URL: {url}")
+        raise ValueError(f"Invalid owner or repository name in URL: {_redact_secret(url)}")
         
     return owner, repo
 
