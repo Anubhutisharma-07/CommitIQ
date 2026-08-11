@@ -63,14 +63,17 @@ class IngestionCancelled(RuntimeError):
 
 
 async def _update_job(job_id: int, **kwargs) -> None:
-    from backend.database import AsyncSessionLocal
+    from backend.database import AsyncSessionLocal, commit_with_retry
 
-    async with AsyncSessionLocal() as session:
-        job = await session.get(AnalysisJob, job_id)
-        if job:
-            for key, value in kwargs.items():
-                setattr(job, key, value)
-            await session.commit()
+    try:
+        async with AsyncSessionLocal() as session:
+            job = await session.get(AnalysisJob, job_id)
+            if job:
+                for key, value in kwargs.items():
+                    setattr(job, key, value)
+                await commit_with_retry(session, max_retries=3)
+    except Exception as exc:
+        logger.warning("Failed to update job id=%s after 3 retry attempts: %s", job_id, exc)
 
 
 async def _raise_if_cancelled(job_id: int) -> None:
@@ -369,7 +372,7 @@ async def _latest_active_job(db: AsyncSession, repo_id: int) -> AnalysisJob | No
     return result.scalar_one_or_none()
 
 
-async def run_ingestion(repo_id: int, job_id: int, max_commits: int) -> None:
+async def run_ingestion(repo_id: int, job_id: int, max_commits: int,branch: str | None = None) -> None:
     from backend.database import AsyncSessionLocal
     from backend.features.repo_ingestion.metrics_extractor import (
         checkout_commit,
@@ -403,8 +406,7 @@ async def run_ingestion(repo_id: int, job_id: int, max_commits: int) -> None:
 
     clone_path = None
     try:
-        clone_path = await clone_repo(repo_url, repo_id, max_commits)
-        await _raise_if_cancelled(job_id)
+        clone_path = await clone_repo(repo_url, repo_id, max_commits,branch=branch,)
         available_commits = await count_available_commits(clone_path)
         if available_commits < 1:
             raise RuntimeError(
@@ -595,10 +597,15 @@ async def ingest_repo(
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
 ):
+    normalized_repo_url = request.repo_url.strip().lower()
+
     try:
-        owner, repo_name = parse_github_url(request.repo_url)
+        owner, repo_name = parse_github_url(normalized_repo_url)
     except ValueError as exc:
         raise _http_error(400, str(exc), "invalid_repo_url")
+
+    owner = owner.strip().lower()
+    repo_name = repo_name.strip().lower()
 
     url = f"https://github.com/{owner}/{repo_name}"
     repo_slug = make_repo_slug(owner, repo_name)
@@ -650,7 +657,7 @@ async def ingest_repo(
     await db.refresh(repo)
     await db.refresh(job)
 
-    background_tasks.add_task(run_ingestion, repo.id, job.id, max_c)
+    background_tasks.add_task(run_ingestion, repo.id, job.id, request.max_commits,request.branch,)
     return IngestResponse(
         repo_id=repo.id,
         repo_slug=repo.repo_slug,
@@ -776,13 +783,23 @@ async def get_repo(repo_id: int, db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/{repo_id}/timeline", response_model=TimelineResponse)
-async def get_timeline(repo_id: int, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(
+async def get_timeline(
+    repo_id: int,
+    start_date: datetime | None = Query(default=None),
+    end_date: datetime | None = Query(default=None),
+    db: AsyncSession = Depends(get_db),
+):
+    query = (
         select(Commit, HealthSnapshot)
         .join(HealthSnapshot, HealthSnapshot.commit_id == Commit.id)
         .where(Commit.repo_id == repo_id)
-        .order_by(Commit.committed_at)
     )
+    if isinstance(start_date, datetime):
+        query = query.where(Commit.committed_at >= start_date)
+    if isinstance(end_date, datetime):
+        query = query.where(Commit.committed_at <= end_date)
+    query = query.order_by(Commit.committed_at)
+    result = await db.execute(query)
     return {
         "repo_id": repo_id,
         "commits": [_snapshot_payload(commit, snap) for commit, snap in result.all()],
@@ -918,7 +935,13 @@ async def get_bus_factor(repo_id: int, db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/{repo_id}/hotspots")
-async def get_hotspots(repo_id: int, sha: str | None = None, db: AsyncSession = Depends(get_db)):
+async def get_hotspots(
+    repo_id: int,
+    sha: str | None = None,
+    start_date: datetime | None = Query(None),
+    end_date: datetime | None = Query(None),
+    db: AsyncSession = Depends(get_db),
+):
     commit = await _find_commit(db, repo_id, sha)
     if not commit:
         raise _http_error(404, "Commit not found.", "commit_not_found")
@@ -935,12 +958,18 @@ async def get_hotspots(repo_id: int, sha: str | None = None, db: AsyncSession = 
         return {"repo_id": repo_id, "commit_sha": commit.sha, "hotspots": []}
 
     file_paths = [node.file_path for node in nodes]
-    commits_result = await db.execute(
-        select(Commit)
-        .where(Commit.repo_id == repo_id)
-        .order_by(desc(Commit.committed_at))
-        .limit(20)
-    )
+    commits_query = select(Commit).where(Commit.repo_id == repo_id)
+    if isinstance(start_date, datetime):
+        commits_query = commits_query.where(Commit.committed_at >= start_date)
+    if isinstance(end_date, datetime):
+        commits_query = commits_query.where(Commit.committed_at <= end_date)
+
+    if not isinstance(start_date, datetime) and not isinstance(end_date, datetime):
+        commits_query = commits_query.order_by(desc(Commit.committed_at)).limit(20)
+    else:
+        commits_query = commits_query.order_by(desc(Commit.committed_at))
+
+    commits_result = await db.execute(commits_query)
     recent_commits = commits_result.scalars().all()
     churn_counts = {fpath: 0 for fpath in file_paths}
     for recent in recent_commits:
@@ -967,6 +996,7 @@ async def get_hotspots(repo_id: int, sha: str | None = None, db: AsyncSession = 
                 "complexity": round(node.avg_complexity, 2),
                 "churn_count": churn_count,
                 "risk_score": round(risk_score, 1),
+                "loc": node.loc,
             }
         )
 
@@ -982,3 +1012,4 @@ async def get_llm_usage(repo_id: int, db: AsyncSession = Depends(get_db)):
     from backend.features.llm_analysis.cost_guard import get_usage_summary
 
     return await get_usage_summary(repo_id, db)
+
