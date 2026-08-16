@@ -385,3 +385,39 @@ def test_is_code_file_excludes_documentation_files():
     assert not is_code_file("README.md")
     assert not is_code_file("CHANGELOG.md")
 
+
+def test_stream_commit_diff_stats_parses_numstat_lines(monkeypatch, tmp_path):
+    from backend.features.repo_ingestion.commit_walker import stream_commit_diff_stats
+
+    mock_diff_lines = [
+        "10\t2\tbackend/main.py",
+        "50\t0\tsrc/utils.ts",
+        "-\t-\tassets/logo.png",
+        "",
+    ]
+
+    monkeypatch.setattr(
+        "backend.features.repo_ingestion.commit_walker.stream_git_diff_lines",
+        lambda repo_path, cmd: iter(mock_diff_lines),
+    )
+
+    files, insertions, deletions = stream_commit_diff_stats(tmp_path, "abc123456789")
+    assert files == ["backend/main.py", "src/utils.ts", "assets/logo.png"]
+    assert insertions == 60
+    assert deletions == 2
+
+
+def test_stream_commit_diff_stats_handles_empty_stream(monkeypatch, tmp_path):
+    from backend.features.repo_ingestion.commit_walker import stream_commit_diff_stats
+
+    monkeypatch.setattr(
+        "backend.features.repo_ingestion.commit_walker.stream_git_diff_lines",
+        lambda repo_path, cmd: iter([]),
+    )
+
+    files, insertions, deletions = stream_commit_diff_stats(tmp_path, "abc123456789")
+    assert files == []
+    assert insertions == 0
+    assert deletions == 0
+
+
