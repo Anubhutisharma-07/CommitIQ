@@ -1,6 +1,5 @@
 import axios, { AxiosError } from 'axios'
 import type {
-  ApiError,
   BusFactorWrapper,
   CommitDetailResponse,
   GraphResponse,
@@ -26,13 +25,28 @@ const client = axios.create({
   timeout: 30000,
 })
 
+interface ErrorDetailItem {
+  msg?: string
+  detail?: string
+}
+
 function normalizeError(error: unknown): Error {
   if (axios.isAxiosError(error)) {
-    const axiosError = error as AxiosError<ApiError | string>
+    const axiosError = error as AxiosError<Record<string, unknown>>
     const data = axiosError.response?.data
     if (typeof data === 'string') return new Error(data)
-    if (data?.detail) return new Error(data.detail)
-    if (data?.message) return new Error(data.message)
+    if (data && typeof data === 'object') {
+      if ('detail' in data) {
+        if (typeof data.detail === 'string') return new Error(data.detail)
+        if (Array.isArray(data.detail)) {
+          const msgs = (data.detail as ErrorDetailItem[])
+            .map((d: ErrorDetailItem) => d.msg?.replace(/^Value error,\s*/, '') || d.detail)
+            .filter((val): val is string => Boolean(val))
+          if (msgs.length > 0) return new Error(msgs.join('; '))
+        }
+      }
+      if ('message' in data && typeof data.message === 'string') return new Error(data.message)
+    }
     return new Error(axiosError.message)
   }
   return error instanceof Error ? error : new Error('Unexpected API error')
@@ -51,6 +65,10 @@ export async function ingestRepo(url: string, maxCommits?: number,branch?: strin
   return request<IngestResponse>(
     client.post('/repos/ingest', { repo_url: url,branch, max_commits: maxCommits || 500 })
   )
+}
+
+export async function rescanRepo(repoId: string | number): Promise<IngestResponse> {
+  return request<IngestResponse>(client.post(`/repos/${repoId}/rescan`))
 }
 
 export async function getRepoBySlug(slug: string): Promise<Repo> {

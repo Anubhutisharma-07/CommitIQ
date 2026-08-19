@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ingestRepo, getRepoBySlug } from '../lib/api'
+import type { Repo } from '../types'
 import DemoPage from './DemoPage'
 
 vi.mock('../lib/api', () => ({
@@ -13,14 +14,39 @@ vi.mock('../lib/api', () => ({
 const ingestRepoMock = vi.mocked(ingestRepo)
 const getRepoBySlugMock = vi.mocked(getRepoBySlug)
 
-const mockNavigate = vi.fn()
-vi.mock('react-router-dom', async () => {
-  const actual = await vi.importActual('react-router-dom')
+const { mockNavigate } = vi.hoisted(() => ({
+  mockNavigate: vi.fn(),
+}))
+
+vi.mock('react-router-dom', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('react-router-dom')>()
   return {
     ...actual,
     useNavigate: () => mockNavigate,
   }
 })
+
+function makeRepo(overrides: Partial<Repo> = {}): Repo {
+  return {
+    id: 31,
+    url: 'https://github.com/facebook/react',
+    name: 'facebook/react',
+    owner: 'facebook',
+    repo_slug: 'facebook-react',
+    default_branch: 'main',
+    ingested_at: null,
+    last_updated_at: null,
+    total_commits: 100,
+    analyzed_commits: 100,
+    status: 'ready',
+    error_message: null,
+    max_commits_setting: 100,
+    github_stars: 200000,
+    github_language: 'JavaScript',
+    github_description: 'The library for web and native user interfaces',
+    ...overrides,
+  }
+}
 
 function renderDemoPage() {
   return render(
@@ -54,18 +80,23 @@ describe('DemoPage', () => {
     await waitFor(() => {
       expect(ingestRepoMock).toHaveBeenCalledWith('https://github.com/facebook/react', 100)
     })
-    expect(mockNavigate).toHaveBeenCalledWith('/analyze?repo_id=31&name=https%3A%2F%2Fgithub.com%2Ffacebook%2Freact', { replace: true })
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith(
+        '/analyze?repo_id=31&name=https%3A%2F%2Fgithub.com%2Ffacebook%2Freact',
+        { replace: true },
+      )
+    })
   })
 
   it('navigates directly to the dashboard when the demo repo is already completed', async () => {
     const user = userEvent.setup()
-    getRepoBySlugMock.mockResolvedValue({
+    getRepoBySlugMock.mockResolvedValue(makeRepo({
       id: 31,
       name: 'facebook/react',
       owner: 'facebook',
       repo_slug: 'facebook-react',
       status: 'ready',
-    } as any)
+    }))
     renderDemoPage()
 
     await user.click(screen.getByRole('button', { name: /start demo analysis/i }))

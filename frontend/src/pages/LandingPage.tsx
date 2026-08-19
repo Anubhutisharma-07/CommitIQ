@@ -79,16 +79,20 @@ export default function LandingPage() {
   }
 
   const handleSubmit = async () => {
-    if (status !== 'valid' || loading) return
+    if (loading) return
+    const parsed = parseGitHubUrl(url)
+    if (!parsed) {
+      setStatus('invalid')
+      setError(
+        url.trim()
+          ? 'Please enter a complete GitHub repository URL or owner/repo path (e.g. Myparadox-creator/CommitIQ---).'
+          : 'Please enter a GitHub repository URL to analyze.'
+      )
+      return
+    }
     setLoading(true)
     setError(null)
     try {
-      const parsed = parseGitHubUrl(url)
-      if (!parsed) {
-        setStatus('invalid')
-        setLoading(false)
-        return
-      }
       const normalizedUrl = `https://github.com/${parsed.owner}/${parsed.repo}`
       const commitsNum = maxCommits ? parseInt(maxCommits, 10) : 500
       const response = await ingestRepo(normalizedUrl, isNaN(commitsNum) ? 500 : commitsNum,branch.trim() || undefined)
@@ -127,7 +131,7 @@ export default function LandingPage() {
               Interactive Demo
             </button>
             <a 
-              href="https://github.com/eshaanag/CommitIQ---" 
+              href="https://github.com/Myparadox-creator/CommitIQ---" 
               target="_blank" 
               rel="noreferrer" 
               className="text-slate-300 hover:text-white text-sm font-medium tracking-wide transition-colors"
@@ -183,7 +187,7 @@ export default function LandingPage() {
               </div>
               <button
                 onClick={handleSubmit}
-                disabled={status !== 'valid' || loading}
+                disabled={loading}
                 className="px-6 py-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white font-semibold text-sm transition-all duration-300 disabled:opacity-40 disabled:hover:bg-white/10 disabled:cursor-not-allowed flex items-center gap-2 border border-white/5 active:scale-95"
               >
                 {loading ? (

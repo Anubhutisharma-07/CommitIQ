@@ -13,7 +13,7 @@ _IS_SQLITE = DATABASE_URL.startswith("sqlite")
 
 engine = create_async_engine(
     DATABASE_URL,
-    connect_args={"check_same_thread": False, "timeout": 30} if _IS_SQLITE else {},
+    connect_args={"check_same_thread": False, "timeout": 60} if _IS_SQLITE else {},
     echo=False,
 )
 
@@ -22,7 +22,7 @@ if _IS_SQLITE:
     def set_sqlite_pragma(dbapi_connection, connection_record):
         cursor = dbapi_connection.cursor()
         cursor.execute("PRAGMA journal_mode=WAL")
-        cursor.execute("PRAGMA busy_timeout=30000")
+        cursor.execute("PRAGMA busy_timeout=60000")
         cursor.execute("PRAGMA synchronous=NORMAL")
         cursor.close()
 

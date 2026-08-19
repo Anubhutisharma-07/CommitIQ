@@ -148,9 +148,7 @@ def compute_bus_factor_from_history(
 
     entries = []
     for module_path in sorted(touched_files):
-        author_counts = _blame_authors(repo_path, module_path, resolver=resolver)
-        if not author_counts:
-            author_counts = fallback_counts[module_path]
+        author_counts = fallback_counts[module_path]
 
         total = sum(author_counts.values())
         if total == 0:

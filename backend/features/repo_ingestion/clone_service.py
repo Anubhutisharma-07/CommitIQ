@@ -21,9 +21,24 @@ def _is_valid_github_name(value: str) -> bool:
     return bool(re.fullmatch(r"[\w.-]+", value))
 
 
+def sanitize_repo_url(url: str) -> str:
+    """
+    Sanitize and strip token credentials and user info from repository URLs.
+    e.g. 'https://token@github.com/owner/repo' -> 'https://github.com/owner/repo'
+         'https://user:token@github.com/owner/repo' -> 'https://github.com/owner/repo'
+         'http://token@github.com/owner/repo' -> 'http://github.com/owner/repo'
+         'token@github.com/owner/repo' -> 'github.com/owner/repo'
+    """
+    if not url:
+        return ""
+    cleaned = re.sub(r"^(https?://)[^/@\s]+@", r"\1", url.strip())
+    cleaned = re.sub(r"^[^/@\s]+@(github\.com[/:]|www\.github\.com[/:])", r"\1", cleaned)
+    return cleaned
+
+
 def parse_github_url(url: str) -> tuple[str, str]:
     """Parse GitHub URL or shorthand to ('owner', 'repo')."""
-    s = url.strip()
+    s = sanitize_repo_url(url).strip()
     
     while s.endswith('/') or s.endswith('.git'):
         if s.endswith('/'):
@@ -46,18 +61,18 @@ def parse_github_url(url: str) -> tuple[str, str]:
     if s.startswith('github.com/'):
         s = s[len('github.com/'):]
     elif explicit_host:
-        raise ValueError(f"Cannot parse GitHub URL: {url}. Expected a github.com repository URL.")
+        raise ValueError(f"Cannot parse GitHub URL: {_redact_secret(url)}. Expected a github.com repository URL.")
         
     parts = s.split('/')
     if len(parts) < 2 or not parts[0] or not parts[1]:
-        raise ValueError(f"Cannot parse GitHub URL: {url}. Expected format 'owner/repo' or 'github.com/owner/repo'.")
+        raise ValueError(f"Cannot parse GitHub URL: {_redact_secret(url)}. Expected format 'owner/repo' or 'github.com/owner/repo'.")
         
     owner = parts[0]
     repo = parts[1]
     
     # Validate owner/repo format to avoid invalid directory names or bad parameters
     if not _is_valid_github_name(owner) or not _is_valid_github_name(repo):
-        raise ValueError(f"Invalid owner or repository name in URL: {url}")
+        raise ValueError(f"Invalid owner or repository name in URL: {_redact_secret(url)}")
         
     return owner, repo
 
@@ -115,11 +130,12 @@ async def clone_repo(
     else:
         auth_url = repo_url
 
+    import os
+    env = {**os.environ, "GIT_TERMINAL_PROMPT": "0", "GIT_ASKPASS": ""}
+
     clone_cmd = [
-        "git",
-        "clone",
-        "--depth",
-        str(max_commits),
+        "git", "clone",
+        "--depth", str(max_commits),
         "--single-branch",
     ]
 
@@ -135,6 +151,7 @@ async def clone_repo(
         *clone_cmd,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
+        env=env,
     )
 
     try:
@@ -150,6 +167,8 @@ async def clone_repo(
     if process.returncode != 0:
         cleanup_repo(repo_id)
         stderr_text = stderr.decode('utf-8', errors='replace')
+        if "not found" in stderr_text.lower() or "could not read" in stderr_text.lower() or "authentication failed" in stderr_text.lower():
+            raise RuntimeError(f"Repository not found on GitHub or is private: {repo_url}")
         raise RuntimeError(f"git clone failed: {_redact_secret(stderr_text)[:500]}")
 
     return target
@@ -177,6 +196,16 @@ async def count_available_commits(repo_path: Path) -> int:
         return 0
 
 
+def _remove_readonly(func, path, _excinfo):
+    try:
+        import os
+        import stat
+        os.chmod(path, stat.S_IWRITE)
+        func(path)
+    except Exception:
+        pass
+
+
 def cleanup_repo(repo_id: int) -> bool:
     """Delete cloned repo after ingestion to reclaim disk space."""
     target = get_clone_path(repo_id)
@@ -193,7 +222,10 @@ def cleanup_repo(repo_id: int) -> bool:
             pass
 
     try:
-        shutil.rmtree(target, onerror=remove_readonly)
+        try:
+            shutil.rmtree(target, onerror=_remove_readonly)
+        except TypeError:
+            shutil.rmtree(target)
         return True
     except OSError as exc:
         logger.warning(

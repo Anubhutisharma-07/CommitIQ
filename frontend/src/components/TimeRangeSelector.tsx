@@ -1,4 +1,4 @@
-import { Calendar, Clock, Filter } from 'lucide-react'
+import { Calendar, Clock, Filter, RotateCcw } from 'lucide-react'
 
 export type TimeRangePreset = 'all' | '7d' | '30d' | '1y' | 'custom'
 
@@ -8,6 +8,7 @@ export interface TimeRangeSelectorProps {
   customStartDate: string
   customEndDate: string
   onCustomDateChange: (startDate: string, endDate: string) => void
+  onReset: () => void
 }
 
 const PRESETS: { id: TimeRangePreset; label: string }[] = [
@@ -24,6 +25,7 @@ export function TimeRangeSelector({
   customStartDate,
   customEndDate,
   onCustomDateChange,
+  onReset,
 }: TimeRangeSelectorProps) {
   return (
     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white/[0.02] border border-white/5 p-2.5 rounded-[20px] backdrop-blur-xl">
@@ -41,11 +43,10 @@ export function TimeRangeSelector({
             <button
               key={preset.id}
               onClick={() => onSelectPreset(preset.id)}
-              className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 border flex items-center gap-1.5 cursor-pointer ${
-                isActive
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 border flex items-center gap-1.5 cursor-pointer ${isActive
                   ? 'bg-purple-500/20 text-purple-200 border-purple-500/40 shadow-[0_0_12px_rgba(168,85,247,0.2)]'
                   : 'bg-white/5 text-slate-400 border-white/5 hover:bg-white/10 hover:text-slate-200 hover:border-white/10'
-              }`}
+                }`}
             >
               {preset.id === 'custom' ? (
                 <Calendar className="w-3.5 h-3.5 text-purple-400" />
@@ -56,6 +57,15 @@ export function TimeRangeSelector({
             </button>
           )
         })}
+        <button
+          type="button"
+          onClick={onReset}
+          aria-label="Reset time range"
+          title="Reset time range"
+          className="p-2 rounded-full text-slate-400 bg-white/5 border border-white/5 hover:bg-white/10 hover:text-slate-200 hover:border-white/10 transition-all cursor-pointer"
+        >
+          <RotateCcw className="w-3.5 h-3.5" />
+        </button>
       </div>
 
       {selectedPreset === 'custom' && (
