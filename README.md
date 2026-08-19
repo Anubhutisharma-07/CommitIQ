@@ -1,6 +1,6 @@
 # CommitIQ
 
-[![CI](https://github.com/eshaanag/CommitIQ---/actions/workflows/ci.yml/badge.svg)](https://github.com/eshaanag/CommitIQ---/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![CI](https://github.com/Myparadox-creator/CommitIQ---/actions/workflows/ci.yml/badge.svg)](https://github.com/Myparadox-creator/CommitIQ---/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 Repository health intelligence for GitHub projects.
 
@@ -66,7 +66,7 @@ docs/         Product and engineering design notes
 Clone the repository:
 
 ```bash
-git clone https://github.com/eshaanag/CommitIQ---.git
+git clone https://github.com/Myparadox-creator/CommitIQ---.git
 cd CommitIQ---
 ```
 

@@ -28,6 +28,8 @@ export interface Repo {
   github_stars: number | null
   github_language: string | null
   github_description: string | null
+  total_file_count: number
+  total_repo_loc: number
 }
 
 export interface Commit {
@@ -186,6 +188,7 @@ export interface HotspotEntry {
   complexity: number
   churn_count: number
   risk_score: number
+  loc?: number
 }
 
 export interface HotspotResponse {
