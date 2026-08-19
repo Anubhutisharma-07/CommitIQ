@@ -3,13 +3,13 @@ from unittest.mock import AsyncMock
 
 from backend.database import commit_with_retry
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_commit_with_retry_success_first_try():
     session = AsyncMock()
     await commit_with_retry(session)
     assert session.commit.call_count == 1
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_commit_with_retry_succeeds_after_transient_lock(monkeypatch):
     import asyncio
     monkeypatch.setattr(asyncio, "sleep", AsyncMock())
@@ -30,7 +30,7 @@ async def test_commit_with_retry_succeeds_after_transient_lock(monkeypatch):
     assert asyncio.sleep.call_args_list[0][0][0] == 0.1
     assert asyncio.sleep.call_args_list[1][0][0] == 0.2
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_commit_with_retry_raises_after_max_retries(monkeypatch):
     import asyncio
     monkeypatch.setattr(asyncio, "sleep", AsyncMock())
@@ -44,7 +44,7 @@ async def test_commit_with_retry_raises_after_max_retries(monkeypatch):
     assert session.commit.call_count == 3
     assert asyncio.sleep.call_count == 2
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_commit_with_retry_raises_on_non_lock_error(monkeypatch):
     import asyncio
     monkeypatch.setattr(asyncio, "sleep", AsyncMock())
