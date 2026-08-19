@@ -124,12 +124,71 @@ def sanitize_commit_message(message: str | None) -> str:
     return msg.strip()[:500]
 
 
+def stream_git_diff_lines(
+    repo_path: Path,
+    cmd: list[str],
+) -> Iterator[str]:
+    """
+    Generator streaming lines from a git diff process to prevent memory spikes
+    on giant commits (Issue #300).
+    """
+    try:
+        process = subprocess.Popen(
+            cmd,
+            cwd=repo_path,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            errors="replace",
+            bufsize=1,  # Line-buffered
+        )
+        if process.stdout:
+            for line in process.stdout:
+                yield line.rstrip("\r\n")
+        process.wait(timeout=30)
+    except Exception as exc:
+        logger.debug("commit_walker: stream_git_diff_lines error: %s", exc)
+        return
+
+
+def stream_commit_diff_stats(
+    repo_path: Path,
+    commit_sha: str,
+) -> tuple[list[str], int, int]:
+    """
+    Stream and parse git diff stats line-by-line using a generator stream
+    instead of pulling the entire raw diff output string into memory (Issue #300).
+    Returns (files_changed, total_insertions, total_deletions).
+    """
+    cmd = ["git", "diff-tree", "--no-commit-id", "--numstat", "-r", commit_sha]
+    files_changed: list[str] = []
+    total_insertions = 0
+    total_deletions = 0
+
+    for line in stream_git_diff_lines(repo_path, cmd):
+        line = line.strip()
+        if not line:
+            continue
+        parts = line.split("\t", 2)
+        if len(parts) == 3:
+            ins_str, del_str, file_path = parts
+            ins = int(ins_str) if ins_str.isdigit() else 0
+            dels = int(del_str) if del_str.isdigit() else 0
+            total_insertions += ins
+            total_deletions += dels
+            files_changed.append(file_path)
+        elif len(parts) == 1:
+            files_changed.append(parts[0])
+
+    return files_changed, total_insertions, total_deletions
+
+
 def _walk_commits_uncached(repo_path: Path, limit: int) -> Iterator[dict]:
     """
     Walk last `limit` commits from shallow clone.
     Yields commit metadata dicts. Does NOT checkout each commit
     (shallow clones don't support full checkout).
-    Metrics are computed from git stats, not file inspection.
+    Metrics are computed from streamed git stats, not file inspection.
     """
     repo = git.Repo(repo_path)
     commits = list(repo.iter_commits('HEAD', max_count=limit))
@@ -139,26 +198,20 @@ def _walk_commits_uncached(repo_path: Path, limit: int) -> Iterator[dict]:
     for idx, commit in enumerate(commits):
         parent_sha = commit.parents[0].hexsha if commit.parents else None
 
-        try:
-            stats = commit.stats
-            files_changed = list(stats.files.keys())
-            insertions = stats.total.get('insertions', 0)
-            deletions = stats.total.get('deletions', 0)
-        except Exception:
-            # Fallback for shallow clone boundary commits where parent object is missing
-            files_changed = []
-            insertions = 0
-            deletions = 0
+        # Issue #300: Stream git diff stats line-by-line to avoid memory spikes on giant commits
+        files_changed, insertions, deletions = stream_commit_diff_stats(repo_path, commit.hexsha)
+
+        # Fallback to commit.stats if git diff-tree was empty
+        if not files_changed:
             try:
-                cmd = ["git", "diff-tree", "--no-commit-id", "--name-only", "-r", commit.hexsha]
-                res = subprocess.run(cmd, cwd=repo_path, capture_output=True, text=True, errors="replace")
-                if res.returncode == 0:
-                    files_changed = [line.strip() for line in res.stdout.splitlines() if line.strip()]
-                # Set dummy insertions/deletions as proxy to avoid zero metrics division issues
-                insertions = len(files_changed) * 15
-                deletions = 5
+                stats = commit.stats
+                files_changed = list(stats.files.keys())
+                insertions = stats.total.get('insertions', 0)
+                deletions = stats.total.get('deletions', 0)
             except Exception:
-                pass
+                files_changed = []
+                insertions = 0
+                deletions = 0
 
         # ── Issue #266: resolve author identity with graceful fallbacks ──
         # ``commit.author.name`` / ``commit.author.email`` can be None or

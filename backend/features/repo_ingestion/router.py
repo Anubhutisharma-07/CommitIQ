@@ -22,6 +22,7 @@ from backend.features.repo_ingestion.clone_service import (
     fetch_github_metadata,
     make_repo_slug,
     parse_github_url,
+    sanitize_repo_url,
 )
 from backend.features.repo_ingestion.commit_walker import walk_commits
 from backend.features.repo_ingestion.graph_builder import build_cochange_edges, build_import_edges
@@ -864,7 +865,8 @@ async def ingest_repo(
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
 ):
-    normalized_repo_url = request.repo_url.strip().lower()
+    cleaned_repo_url = sanitize_repo_url(request.repo_url)
+    normalized_repo_url = cleaned_repo_url.strip().lower()
 
     try:
         owner, repo_name = parse_github_url(normalized_repo_url)
