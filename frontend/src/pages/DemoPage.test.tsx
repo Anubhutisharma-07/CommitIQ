@@ -2,7 +2,8 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { getRepoBySlug, ingestRepo } from '../lib/api'
+import { ingestRepo, getRepoBySlug } from '../lib/api'
+import type { Repo } from '../types'
 import DemoPage from './DemoPage'
 
 vi.mock('../lib/api', () => ({
@@ -24,6 +25,28 @@ vi.mock('react-router-dom', async (importOriginal) => {
     useNavigate: () => mockNavigate,
   }
 })
+
+function makeRepo(overrides: Partial<Repo> = {}): Repo {
+  return {
+    id: 31,
+    url: 'https://github.com/facebook/react',
+    name: 'facebook/react',
+    owner: 'facebook',
+    repo_slug: 'facebook-react',
+    default_branch: 'main',
+    ingested_at: null,
+    last_updated_at: null,
+    total_commits: 100,
+    analyzed_commits: 100,
+    status: 'ready',
+    error_message: null,
+    max_commits_setting: 100,
+    github_stars: 200000,
+    github_language: 'JavaScript',
+    github_description: 'The library for web and native user interfaces',
+    ...overrides,
+  }
+}
 
 function renderDemoPage() {
   return render(
@@ -67,13 +90,13 @@ describe('DemoPage', () => {
 
   it('navigates directly to the dashboard when the demo repo is already completed', async () => {
     const user = userEvent.setup()
-    getRepoBySlugMock.mockResolvedValue({
+    getRepoBySlugMock.mockResolvedValue(makeRepo({
       id: 31,
       name: 'facebook/react',
       owner: 'facebook',
       repo_slug: 'facebook-react',
       status: 'ready',
-    } as unknown as Awaited<ReturnType<typeof getRepoBySlug>>)
+    }))
     renderDemoPage()
 
     await user.click(screen.getByRole('button', { name: /start demo analysis/i }))

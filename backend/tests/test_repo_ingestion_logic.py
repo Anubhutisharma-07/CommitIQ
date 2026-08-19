@@ -15,6 +15,7 @@ from backend.features.repo_ingestion.clone_service import (
     get_clone_path,
     make_repo_slug,
     parse_github_url,
+    sanitize_repo_url,
 )
 from backend.features.repo_ingestion.graph_builder import (
     build_cochange_edges,
@@ -31,10 +32,28 @@ from backend.shared.schemas import IngestRequest
 @pytest.mark.parametrize(
     ("raw", "expected"),
     [
+        ("https://token@github.com/owner/repo", "https://github.com/owner/repo"),
+        ("https://user:token@github.com/owner/repo.git", "https://github.com/owner/repo.git"),
+        ("http://ghp_1234567890@github.com/owner/repo", "http://github.com/owner/repo"),
+        ("token@github.com/owner/repo", "github.com/owner/repo"),
+        ("https://github.com/owner/repo", "https://github.com/owner/repo"),
+        ("owner/repo", "owner/repo"),
+        ("", ""),
+    ],
+)
+def test_sanitize_repo_url_strips_token_credentials(raw, expected):
+    assert sanitize_repo_url(raw) == expected
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
         ("owner/repo", ("owner", "repo")),
         ("https://github.com/owner/repo", ("owner", "repo")),
         ("http://github.com/owner/repo.git/", ("owner", "repo")),
         ("www.github.com/owner/repo", ("owner", "repo")),
+        ("https://ghp_token123@github.com/owner/repo", ("owner", "repo")),
+        ("https://user:secret@github.com/owner/repo.git", ("owner", "repo")),
     ],
 )
 def test_parse_github_url_accepts_supported_forms(raw, expected):
@@ -384,4 +403,40 @@ def test_is_code_file_excludes_documentation_files():
     assert not is_code_file("LICENSE")
     assert not is_code_file("README.md")
     assert not is_code_file("CHANGELOG.md")
+
+
+def test_stream_commit_diff_stats_parses_numstat_lines(monkeypatch, tmp_path):
+    from backend.features.repo_ingestion.commit_walker import stream_commit_diff_stats
+
+    mock_diff_lines = [
+        "10\t2\tbackend/main.py",
+        "50\t0\tsrc/utils.ts",
+        "-\t-\tassets/logo.png",
+        "",
+    ]
+
+    monkeypatch.setattr(
+        "backend.features.repo_ingestion.commit_walker.stream_git_diff_lines",
+        lambda repo_path, cmd: iter(mock_diff_lines),
+    )
+
+    files, insertions, deletions = stream_commit_diff_stats(tmp_path, "abc123456789")
+    assert files == ["backend/main.py", "src/utils.ts", "assets/logo.png"]
+    assert insertions == 60
+    assert deletions == 2
+
+
+def test_stream_commit_diff_stats_handles_empty_stream(monkeypatch, tmp_path):
+    from backend.features.repo_ingestion.commit_walker import stream_commit_diff_stats
+
+    monkeypatch.setattr(
+        "backend.features.repo_ingestion.commit_walker.stream_git_diff_lines",
+        lambda repo_path, cmd: iter([]),
+    )
+
+    files, insertions, deletions = stream_commit_diff_stats(tmp_path, "abc123456789")
+    assert files == []
+    assert insertions == 0
+    assert deletions == 0
+
 
