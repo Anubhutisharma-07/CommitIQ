@@ -384,7 +384,19 @@ async def test_streaming_narrative_falls_back_to_demo_mode(db_session: AsyncSess
         raise RuntimeError("provider keys missing")
         yield prompt, None
 
+    class MockAsyncSessionContext:
+        def __init__(self, session):
+            self.session = session
+        async def __aenter__(self):
+            return self.session
+        async def __aexit__(self, exc_type, exc_val, exc_tb):
+            pass
+
     monkeypatch.setattr("backend.features.llm_analysis.router.stream_narrative", failing_stream)
+    monkeypatch.setattr(
+        "backend.database.AsyncSessionLocal",
+        lambda: MockAsyncSessionContext(db_session)
+    )
 
     response = await explain_commit_stream(
         NarrativeRequest(repo_id=1, commit_sha="abc123def456", prompt_type="explain_drop"),
