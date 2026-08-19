@@ -15,6 +15,7 @@ from backend.features.repo_ingestion.router import (
     get_bus_factor,
     get_commit_detail,
     get_graph,
+    get_hotspots,
     ingest_progress,
     get_llm_usage,
     get_repo_by_slug,
@@ -383,7 +384,19 @@ async def test_streaming_narrative_falls_back_to_demo_mode(db_session: AsyncSess
         raise RuntimeError("provider keys missing")
         yield prompt, None
 
+    class MockAsyncSessionContext:
+        def __init__(self, session):
+            self.session = session
+        async def __aenter__(self):
+            return self.session
+        async def __aexit__(self, exc_type, exc_val, exc_tb):
+            pass
+
     monkeypatch.setattr("backend.features.llm_analysis.router.stream_narrative", failing_stream)
+    monkeypatch.setattr(
+        "backend.database.AsyncSessionLocal",
+        lambda: MockAsyncSessionContext(db_session)
+    )
 
     response = await explain_commit_stream(
         NarrativeRequest(repo_id=1, commit_sha="abc123def456", prompt_type="explain_drop"),
@@ -459,9 +472,41 @@ async def test_ingest_repo_schedules_created_job_by_id(db_session: AsyncSessionA
     job = db_session.session.get(AnalysisJob, response.job_id)
 
     assert scheduled_func is run_ingestion
-    assert args == (response.repo_id, response.job_id, 25)
+    assert args == (response.repo_id, response.job_id, 25, None)
     assert kwargs == {}
     assert job.status == "queued"
+
+
+async def test_ingest_repo_normalizes_repo_url_owner_and_name_to_lowercase(db_session: AsyncSessionAdapter, monkeypatch):
+    metadata_calls = []
+
+    async def fake_fetch_github_metadata(owner: str, repo: str):
+        metadata_calls.append((owner, repo))
+        return {
+            "github_stars": 0,
+            "github_language": None,
+            "github_description": None,
+        }
+
+    monkeypatch.setattr(
+        "backend.features.repo_ingestion.router.fetch_github_metadata",
+        fake_fetch_github_metadata,
+    )
+    background_tasks = BackgroundTaskRecorder()
+
+    response = await ingest_repo(
+        IngestRequest(repo_url="https://github.com/Example/ProjectNormalizationCase", max_commits=25),
+        background_tasks=background_tasks,
+        db=db_session,
+    )
+
+    repo = db_session.session.get(Repo, response.repo_id)
+
+    assert repo.url == "https://github.com/example/projectnormalizationcase"
+    assert repo.name == "example/projectnormalizationcase"
+    assert repo.owner == "example"
+    assert repo.repo_slug == "example-projectnormalizationcase"
+    assert metadata_calls == [("example", "projectnormalizationcase")]
 
 
 async def test_cancel_ingestion_marks_active_job_cancelled(db_session: AsyncSessionAdapter):
@@ -905,4 +950,37 @@ async def test_mark_stale_jobs_as_error(tmp_path, monkeypatch):
     assert repo3_dir.exists()
 
     await test_engine.dispose()
+
+
+async def test_get_timeline_with_date_range_filtering(db_session: AsyncSessionAdapter):
+    res_all = await get_timeline(repo_id=1, db=db_session)
+    assert len(res_all["commits"]) == 2
+
+    res_after = await get_timeline(
+        repo_id=1,
+        start_date=datetime(2026, 1, 1, 12, 0, tzinfo=timezone.utc),
+        db=db_session,
+    )
+    assert len(res_after["commits"]) == 1
+    assert res_after["commits"][0]["sha"] == "def456abc123"
+
+    res_before = await get_timeline(
+        repo_id=1,
+        end_date=datetime(2026, 1, 1, 12, 0, tzinfo=timezone.utc),
+        db=db_session,
+    )
+    assert len(res_before["commits"]) == 1
+    assert res_before["commits"][0]["sha"] == "abc123def456"
+
+
+async def test_get_hotspots_with_date_range_filtering(db_session: AsyncSessionAdapter):
+    res = await get_hotspots(
+        repo_id=1,
+        start_date=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        end_date=datetime(2026, 1, 3, tzinfo=timezone.utc),
+        db=db_session,
+    )
+    assert res["repo_id"] == 1
+    assert "hotspots" in res
+
 
