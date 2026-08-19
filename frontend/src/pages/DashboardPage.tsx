@@ -13,7 +13,9 @@ import { NarrativeCard } from '../components/NarrativeCard'
 import { TimeRangeSelector, type TimeRangePreset } from '../components/TimeRangeSelector'
 import { HealthBadge } from '../components/ui/HealthBadge'
 import { ThemeToggle } from '../components/ui/ThemeToggle'
-import { Layers, Compass, BarChart2, Activity, GitBranch, RefreshCw } from 'lucide-react'
+import { ScrollToTop } from '../components/ui/ScrollToTop'
+import { Layers, Compass, BarChart2, Activity, GitBranch, RefreshCw, AlertTriangle } from 'lucide-react'
+import { sanitizeCommitMessage } from '../lib/utils'
 
 
 export default function DashboardPage() {
@@ -22,6 +24,37 @@ export default function DashboardPage() {
   const mainRef = useRef<HTMLElement>(null)
   const [selected, setSelected] = useState<HealthSnapshot | null>(null)
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  const [timeRangePreset, setTimeRangePreset] = useState<TimeRangePreset>('all')
+  const [customStartDate, setCustomStartDate] = useState<string>('')
+  const [customEndDate, setCustomEndDate] = useState<string>('')
+
+  const { startDate, endDate } = useMemo(() => {
+    if (timeRangePreset === 'all') {
+      return { startDate: undefined, endDate: undefined }
+    }
+    if (timeRangePreset === 'custom') {
+      return {
+        startDate: customStartDate ? new Date(customStartDate).toISOString() : undefined,
+        endDate: customEndDate ? new Date(`${customEndDate}T23:59:59.999Z`).toISOString() : undefined,
+      }
+    }
+    const now = new Date()
+    let start: Date
+    if (timeRangePreset === '7d') {
+      start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+    } else if (timeRangePreset === '30d') {
+      start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+    } else if (timeRangePreset === '1y') {
+      start = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000)
+    } else {
+      return { startDate: undefined, endDate: undefined }
+    }
+    return {
+      startDate: start.toISOString(),
+      endDate: now.toISOString(),
+    }
+  }, [timeRangePreset, customStartDate, customEndDate])
+
   const [isRescanning, setIsRescanning] = useState(false)
   const [rescanStage, setRescanStage] = useState<string | null>(null)
   const [rescanError, setRescanError] = useState<string | null>(null)

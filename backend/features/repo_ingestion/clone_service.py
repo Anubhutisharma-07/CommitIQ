@@ -133,7 +133,7 @@ async def clone_repo(
     import os
     env = {**os.environ, "GIT_TERMINAL_PROMPT": "0", "GIT_ASKPASS": ""}
 
-    process = await asyncio.create_subprocess_exec(
+    clone_cmd = [
         "git", "clone",
         "--depth", str(max_commits),
         "--single-branch",
