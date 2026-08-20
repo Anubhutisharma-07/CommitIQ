@@ -3,7 +3,8 @@ import subprocess
 from collections import defaultdict
 from pathlib import Path
 
-from backend.features.repo_ingestion.identity_normalizer import ContributorIdentityResolver
+from backend.features.repo_ingestion.identity_normalizer import \
+    ContributorIdentityResolver
 
 logger = logging.getLogger(__name__)
 

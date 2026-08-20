@@ -5,15 +5,8 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.shared.models import (
-    BusFactor,
-    Commit,
-    GraphEdge,
-    GraphNode,
-    HealthSnapshot,
-    LLMNarrative,
-    Repo,
-)
+from backend.shared.models import (BusFactor, Commit, GraphEdge, GraphNode,
+                                   HealthSnapshot, LLMNarrative, Repo)
 
 logger = logging.getLogger(__name__)
 
