@@ -1,5 +1,4 @@
-from backend.features.repo_ingestion.identity_normalizer import \
-    ContributorIdentityResolver
+from backend.features.repo_ingestion.identity_normalizer import ContributorIdentityResolver
 
 
 class TestContributorIdentityResolver:
