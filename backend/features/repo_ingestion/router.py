@@ -1098,7 +1098,8 @@ async def list_repos(
     query = select(Repo)
     if slug:
         query = query.where(Repo.repo_slug == slug)
-    result = await db.execute(query.order_by(desc(Repo.ingested_at)))
+    query = query.order_by(desc(Repo.ingested_at)).limit(limit).offset(offset)
+    result = await db.execute(query)
     repos = result.scalars().all()
     repo_ids = [repo.id for repo in repos]
     contrib_map = await _active_contributors_map(db, repo_ids)
