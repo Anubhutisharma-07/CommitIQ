@@ -7,14 +7,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.config import ANTHROPIC_API_KEY
 from backend.features.llm_analysis.cache import make_cache_key
-from backend.features.llm_analysis.cost_guard import (check_budget,
-                                                      estimate_cost_usd)
-from backend.features.llm_analysis.llm_router import (
-    get_narrative_non_streaming, model_for_provider)
-from backend.features.llm_analysis.prompt_builder import (EXPLAIN_DROP_SYSTEM,
-                                                          PREDICT_MERGE_SYSTEM,
-                                                          build_explain_prompt,
-                                                          build_predict_prompt)
+from backend.features.llm_analysis.cost_guard import check_budget, estimate_cost_usd
+from backend.features.llm_analysis.llm_router import get_narrative_non_streaming, model_for_provider
+from backend.features.llm_analysis.prompt_builder import (
+    EXPLAIN_DROP_SYSTEM,
+    PREDICT_MERGE_SYSTEM,
+    build_explain_prompt,
+    build_predict_prompt,
+)
 from backend.shared.models import Commit, HealthSnapshot, LLMNarrative
 
 # Sonnet pricing (as of 2025):

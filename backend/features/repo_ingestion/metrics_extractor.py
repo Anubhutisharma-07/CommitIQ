@@ -8,7 +8,9 @@ from radon.raw import analyze as radon_raw_analyze
 
 from backend.config import ENABLE_SEMANTIC_ANALYSIS
 from backend.features.repo_ingestion.semantic_analyzer import (
-    compute_repo_semantic_health, compute_semantic_drift)
+    compute_repo_semantic_health,
+    compute_semantic_drift,
+)
 
 SUPPORTED_EXTENSIONS = {".py", ".js", ".ts", ".jsx", ".tsx", ".java", ".go", ".cpp", ".c"}
 SEMANTIC_EXTENSIONS = {".py", ".js", ".ts", ".jsx", ".tsx"}

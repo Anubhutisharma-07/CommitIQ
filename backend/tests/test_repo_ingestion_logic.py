@@ -12,16 +12,21 @@ from pydantic import ValidationError
 
 from backend.config import MAX_COMMITS
 from backend.features.repo_ingestion import semantic_analyzer
-from backend.features.repo_ingestion.bus_factor import (_blame_authors,
-                                                        is_code_file)
-from backend.features.repo_ingestion.clone_service import (cleanup_repo,
-                                                           get_clone_path,
-                                                           make_repo_slug,
-                                                           parse_github_url,
-                                                           sanitize_repo_url)
+from backend.features.repo_ingestion.bus_factor import _blame_authors, is_code_file
+from backend.features.repo_ingestion.clone_service import (
+    cleanup_repo,
+    get_clone_path,
+    make_repo_slug,
+    parse_github_url,
+    sanitize_repo_url,
+)
 from backend.features.repo_ingestion.graph_builder import (
-    build_cochange_edges, extract_js_imports, extract_python_imports,
-    get_top_files_by_frequency, resolve_import_to_file)
+    build_cochange_edges,
+    extract_js_imports,
+    extract_python_imports,
+    get_top_files_by_frequency,
+    resolve_import_to_file,
+)
 from backend.features.repo_ingestion.health_scorer import compute_full_snapshot
 from backend.shared.schemas import IngestRequest
 
@@ -311,8 +316,7 @@ def test_compute_full_snapshot_aggregates_metric_and_semantic_inputs():
 @pytest.mark.anyio
 async def test_clone_repo_rejects_when_storage_quota_exceeded(monkeypatch, tmp_path):
     """Ingestion must be rejected when REPO_STORAGE_PATH usage exceeds MAX_REPO_STORAGE_MB."""
-    from backend.features.repo_ingestion.clone_service import (
-        clone_repo, get_storage_usage_mb)
+    from backend.features.repo_ingestion.clone_service import clone_repo, get_storage_usage_mb
 
     monkeypatch.setattr("backend.features.repo_ingestion.clone_service.REPO_STORAGE_PATH", tmp_path)
     monkeypatch.setattr("backend.config.MAX_REPO_STORAGE_MB", 1)
@@ -344,8 +348,7 @@ async def test_clone_repo_allows_when_under_quota(monkeypatch, tmp_path):
 
 
 def test_calculate_average_metrics_zero_code_files():
-    from backend.features.repo_ingestion.health_scorer import \
-        calculate_average_metrics
+    from backend.features.repo_ingestion.health_scorer import calculate_average_metrics
 
     assert calculate_average_metrics(0.0, 0) == 0.0
     assert calculate_average_metrics(10.0, 0) == 0.0
@@ -384,8 +387,7 @@ def test_compute_full_snapshot_with_zero_code_files():
 
 
 def test_sanitize_commit_message():
-    from backend.features.repo_ingestion.commit_walker import \
-        sanitize_commit_message
+    from backend.features.repo_ingestion.commit_walker import sanitize_commit_message
 
     assert sanitize_commit_message(None) == ""
     assert sanitize_commit_message("") == ""
@@ -412,8 +414,7 @@ def test_is_code_file_excludes_documentation_files():
 
 
 def test_stream_commit_diff_stats_parses_numstat_lines(monkeypatch, tmp_path):
-    from backend.features.repo_ingestion.commit_walker import \
-        stream_commit_diff_stats
+    from backend.features.repo_ingestion.commit_walker import stream_commit_diff_stats
 
     mock_diff_lines = [
         "10\t2\tbackend/main.py",
@@ -434,8 +435,7 @@ def test_stream_commit_diff_stats_parses_numstat_lines(monkeypatch, tmp_path):
 
 
 def test_stream_commit_diff_stats_handles_empty_stream(monkeypatch, tmp_path):
-    from backend.features.repo_ingestion.commit_walker import \
-        stream_commit_diff_stats
+    from backend.features.repo_ingestion.commit_walker import stream_commit_diff_stats
 
     monkeypatch.setattr(
         "backend.features.repo_ingestion.commit_walker.stream_git_diff_lines",
