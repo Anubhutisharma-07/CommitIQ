@@ -24,9 +24,6 @@ interface TreemapNode {
   height?: number
 }
 
-type SortKey = 'file' | 'complexity' | 'churn_count' | 'risk_score' | 'loc'
-type SortDir = 'asc' | 'desc'
-
 const RISK_COLORS = {
   critical: '#dc2626',
   high: '#f97316',
