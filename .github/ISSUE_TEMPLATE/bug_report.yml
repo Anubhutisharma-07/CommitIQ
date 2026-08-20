@@ -1,7 +1,7 @@
 name: Bug Report
 description: Create a report to help us improve CommitIQ
-title: "[BUG] "
-labels: ["bug", "triage"]
+title: '[BUG] '
+labels: ['bug', 'triage']
 body:
   - type: markdown
     attributes:
@@ -12,7 +12,7 @@ body:
     attributes:
       label: CommitIQ Version
       description: Which version of CommitIQ are you using? (e.g. latest main branch, v1.0.0, or SaaS)
-      placeholder: "e.g. main branch"
+      placeholder: 'e.g. main branch'
     validations:
       required: true
   - type: textarea
