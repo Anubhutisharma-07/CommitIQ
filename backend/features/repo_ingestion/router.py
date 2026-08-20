@@ -1283,6 +1283,8 @@ async def get_bus_factor(repo_id: int, db: AsyncSession = Depends(get_db)):
 async def get_hotspots(
     repo_id: int,
     sha: str | None = None,
+    start_date: datetime | None = Query(None),
+    end_date: datetime | None = Query(None),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     db: AsyncSession = Depends(get_db),
