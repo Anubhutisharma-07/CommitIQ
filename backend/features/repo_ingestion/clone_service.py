@@ -1,10 +1,14 @@
-import logging
 import asyncio
-from pathlib import Path
-import shutil
-from backend.config import REPO_STORAGE_PATH, GITHUB_TOKEN
-import httpx
+import logging
+import os
 import re
+import shutil
+import stat
+from pathlib import Path
+
+import httpx
+
+from backend.config import GITHUB_TOKEN, REPO_STORAGE_PATH
 
 logger = logging.getLogger(__name__)
 
@@ -39,47 +43,51 @@ def sanitize_repo_url(url: str) -> str:
 def parse_github_url(url: str) -> tuple[str, str]:
     """Parse GitHub URL or shorthand to ('owner', 'repo')."""
     s = sanitize_repo_url(url).strip()
-    
-    while s.endswith('/') or s.endswith('.git'):
-        if s.endswith('/'):
+
+    while s.endswith("/") or s.endswith(".git"):
+        if s.endswith("/"):
             s = s[:-1]
-        elif s.endswith('.git'):
+        elif s.endswith(".git"):
             s = s[:-4]
-            
+
     explicit_host = False
 
-    if s.startswith('https://'):
-        s = s[len('https://'):]
+    if s.startswith("https://"):
+        s = s[len("https://") :]
         explicit_host = True
-    elif s.startswith('http://'):
-        s = s[len('http://'):]
+    elif s.startswith("http://"):
+        s = s[len("http://") :]
         explicit_host = True
-        
-    if s.startswith('www.'):
+
+    if s.startswith("www."):
         s = s[4:]
-        
-    if s.startswith('github.com/'):
-        s = s[len('github.com/'):]
+
+    if s.startswith("github.com/"):
+        s = s[len("github.com/") :]
     elif explicit_host:
-        raise ValueError(f"Cannot parse GitHub URL: {_redact_secret(url)}. Expected a github.com repository URL.")
-        
-    parts = s.split('/')
+        raise ValueError(
+            f"Cannot parse GitHub URL: {_redact_secret(url)}. Expected a github.com repository URL."
+        )
+
+    parts = s.split("/")
     if len(parts) < 2 or not parts[0] or not parts[1]:
-        raise ValueError(f"Cannot parse GitHub URL: {_redact_secret(url)}. Expected format 'owner/repo' or 'github.com/owner/repo'.")
-        
+        raise ValueError(
+            f"Cannot parse GitHub URL: {_redact_secret(url)}. Expected format 'owner/repo' or 'github.com/owner/repo'."
+        )
+
     owner = parts[0]
     repo = parts[1]
-    
+
     # Validate owner/repo format to avoid invalid directory names or bad parameters
     if not _is_valid_github_name(owner) or not _is_valid_github_name(repo):
         raise ValueError(f"Invalid owner or repository name in URL: {_redact_secret(url)}")
-        
+
     return owner, repo
 
 
 def make_repo_slug(owner: str, repo: str) -> str:
     slug = f"{owner}-{repo}".lower()
-    slug = re.sub(r'[^a-z0-9\-]', '-', slug)
+    slug = re.sub(r"[^a-z0-9\-]", "-", slug)
     return slug
 
 
@@ -87,7 +95,7 @@ def get_storage_usage_mb(path: Path) -> float:
     if not path.exists():
         return 0.0
     total = 0
-    for p in path.rglob('*'):
+    for p in path.rglob("*"):
         try:
             if p.is_file() and not p.is_symlink():
                 total += p.stat().st_size
@@ -113,6 +121,7 @@ async def clone_repo(
             raise RuntimeError(f"Could not clean existing clone directory for repo_id={repo_id}")
 
     from backend.config import MAX_REPO_STORAGE_MB
+
     current_usage = get_storage_usage_mb(REPO_STORAGE_PATH)
     if current_usage >= MAX_REPO_STORAGE_MB:
         raise ValueError(
@@ -123,29 +132,29 @@ async def clone_repo(
 
     # Use git clone via HTTPS — never uses GitHub REST API, no rate limits
     if GITHUB_TOKEN:
-         auth_url = repo_url.replace(
-            "https://github.com/",
-            f"https://{GITHUB_TOKEN}@github.com/"
-        )
+        auth_url = repo_url.replace("https://github.com/", f"https://{GITHUB_TOKEN}@github.com/")
     else:
         auth_url = repo_url
 
-    import os
     env = {**os.environ, "GIT_TERMINAL_PROMPT": "0", "GIT_ASKPASS": ""}
 
     clone_cmd = [
-        "git", "clone",
-        "--depth", str(max_commits),
+        "git",
+        "clone",
+        "--depth",
+        str(max_commits),
         "--single-branch",
     ]
 
     if branch:
         clone_cmd.extend(["--branch", branch])
 
-    clone_cmd.extend([
-        auth_url,
-        str(target),
-    ])
+    clone_cmd.extend(
+        [
+            auth_url,
+            str(target),
+        ]
+    )
 
     process = await asyncio.create_subprocess_exec(
         *clone_cmd,
@@ -166,8 +175,12 @@ async def clone_repo(
 
     if process.returncode != 0:
         cleanup_repo(repo_id)
-        stderr_text = stderr.decode('utf-8', errors='replace')
-        if "not found" in stderr_text.lower() or "could not read" in stderr_text.lower() or "authentication failed" in stderr_text.lower():
+        stderr_text = stderr.decode("utf-8", errors="replace")
+        if (
+            "not found" in stderr_text.lower()
+            or "could not read" in stderr_text.lower()
+            or "authentication failed" in stderr_text.lower()
+        ):
             raise RuntimeError(f"Repository not found on GitHub or is private: {repo_url}")
         raise RuntimeError(f"git clone failed: {_redact_secret(stderr_text)[:500]}")
 
@@ -176,12 +189,15 @@ async def clone_repo(
 
 async def count_available_commits(repo_path: Path) -> int:
     process = await asyncio.create_subprocess_exec(
-        "git", "rev-list", "--count", "HEAD",
+        "git",
+        "rev-list",
+        "--count",
+        "HEAD",
         cwd=str(repo_path),
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
-    
+
     try:
         stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=30)
     except asyncio.TimeoutError:
@@ -191,15 +207,13 @@ async def count_available_commits(repo_path: Path) -> int:
     if process.returncode != 0:
         return 0
     try:
-        return int(stdout.decode('utf-8', errors='replace').strip())
+        return int(stdout.decode("utf-8", errors="replace").strip())
     except ValueError:
         return 0
 
 
 def _remove_readonly(func, path, _excinfo):
     try:
-        import os
-        import stat
         os.chmod(path, stat.S_IWRITE)
         func(path)
     except Exception:
@@ -211,21 +225,9 @@ def cleanup_repo(repo_id: int) -> bool:
     target = get_clone_path(repo_id)
     if not target.exists():
         return True
-        
-    def remove_readonly(func, path, _):
-        import os
-        import stat
-        try:
-            os.chmod(path, stat.S_IWRITE)
-            func(path)
-        except Exception:
-            pass
 
     try:
-        try:
-            shutil.rmtree(target, onerror=_remove_readonly)
-        except TypeError:
-            shutil.rmtree(target)
+        shutil.rmtree(target, onerror=_remove_readonly)
         return True
     except OSError as exc:
         logger.warning(
@@ -243,10 +245,7 @@ async def fetch_github_metadata(owner: str, repo: str) -> dict:
 
     try:
         async with httpx.AsyncClient(timeout=5) as client:
-            r = await client.get(
-                f"https://api.github.com/repos/{owner}/{repo}",
-                headers=headers
-            )
+            r = await client.get(f"https://api.github.com/repos/{owner}/{repo}", headers=headers)
             if r.status_code == 200:
                 data = r.json()
                 return {
@@ -262,6 +261,7 @@ async def fetch_github_metadata(owner: str, repo: str) -> dict:
 async def fetch_github_pull_requests(owner: str, repo: str, limit: int = 500) -> list[dict]:
     """Fetch pull requests for the repository."""
     from dateutil.parser import parse as parse_date
+
     headers = {"Accept": "application/vnd.github+json"}
     if GITHUB_TOKEN:
         headers["Authorization"] = f"token {GITHUB_TOKEN}"
@@ -273,7 +273,7 @@ async def fetch_github_pull_requests(owner: str, repo: str, limit: int = 500) ->
             while True:
                 r = await client.get(
                     f"https://api.github.com/repos/{owner}/{repo}/pulls?state=all&per_page=100&page={page}",
-                    headers=headers
+                    headers=headers,
                 )
                 if r.status_code != 200:
                     break
@@ -284,17 +284,23 @@ async def fetch_github_pull_requests(owner: str, repo: str, limit: int = 500) ->
                     created_at = item.get("created_at")
                     merged_at = item.get("merged_at")
                     closed_at = item.get("closed_at")
-                    
-                    prs.append({
-                        "pr_number": item.get("number"),
-                        "title": item.get("title", "")[:255],
-                        "state": item.get("state", "unknown"),
-                        "author": item.get("user", {}).get("login", "unknown") if item.get("user") else "unknown",
-                        "created_at": parse_date(created_at) if created_at else None,
-                        "merged_at": parse_date(merged_at) if merged_at else None,
-                        "closed_at": parse_date(closed_at) if closed_at else None,
-                    })
-                
+
+                    prs.append(
+                        {
+                            "pr_number": item.get("number"),
+                            "title": item.get("title", "")[:255],
+                            "state": item.get("state", "unknown"),
+                            "author": (
+                                item.get("user", {}).get("login", "unknown")
+                                if item.get("user")
+                                else "unknown"
+                            ),
+                            "created_at": parse_date(created_at) if created_at else None,
+                            "merged_at": parse_date(merged_at) if merged_at else None,
+                            "closed_at": parse_date(closed_at) if closed_at else None,
+                        }
+                    )
+
                 if len(prs) >= limit:
                     prs = prs[:limit]
                     break

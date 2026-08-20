@@ -1,12 +1,13 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from contextlib import asynccontextmanager
 
 from backend.config import CORS_ORIGINS, ENVIRONMENT
 from backend.database import engine, init_db
-from backend.features.repo_ingestion.router import router as ingestion_router
 from backend.features.llm_analysis.router import router as llm_router
 from backend.features.metrics.router import router as metrics_router
+from backend.features.repo_ingestion.router import router as ingestion_router
 
 
 @asynccontextmanager

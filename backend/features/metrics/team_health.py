@@ -1,7 +1,10 @@
 from collections import defaultdict
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from backend.shared.models import Commit
+
 
 async def compute_team_health(db: AsyncSession, repo_id: int) -> dict:
     stmt = select(Commit).where(Commit.repo_id == repo_id)
@@ -20,30 +23,30 @@ async def compute_team_health(db: AsyncSession, repo_id: int) -> dict:
     total_commits = len(commits)
     weekend_commits = 0
     after_hours_commits = 0
-    
+
     author_days = defaultdict(int)
     author_files = defaultdict(int)
 
     for c in commits:
         if not c.committed_at:
             continue
-            
+
         if c.committed_at.weekday() >= 5:
             weekend_commits += 1
-            
+
         hour = c.committed_at.hour
         if hour >= 20 or hour < 8:
             after_hours_commits += 1
-            
+
         date_str = c.committed_at.strftime("%Y-%m-%d")
         author = c.author_email or c.author_name or "unknown"
         key = f"{author}_{date_str}"
         author_days[key] += 1
-        author_files[key] += (c.files_changed or 0)
+        author_files[key] += c.files_changed or 0
 
     weekend_percent = (weekend_commits / total_commits) * 100
     after_hours_percent = (after_hours_commits / total_commits) * 100
-    
+
     burnout_score = "Low"
     if weekend_percent > 15 or after_hours_percent > 20:
         burnout_score = "High"
@@ -53,7 +56,7 @@ async def compute_team_health(db: AsyncSession, repo_id: int) -> dict:
     avg_files = 0.0
     if author_days:
         avg_files = sum(author_files.values()) / len(author_files)
-        
+
     context_switch_score = "Low"
     if avg_files > 50:
         context_switch_score = "High"

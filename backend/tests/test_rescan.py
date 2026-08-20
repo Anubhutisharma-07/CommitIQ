@@ -1,19 +1,10 @@
-from datetime import datetime, timezone
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from backend.database import Base
 from backend.features.repo_ingestion.router import rescan_repo, run_rescan
-from backend.shared.models import (
-    AnalysisJob,
-    BusFactor,
-    Commit,
-    GraphEdge,
-    GraphNode,
-    HealthSnapshot,
-    Repo,
-)
+from backend.shared.models import AnalysisJob, Repo
 
 pytestmark = pytest.mark.anyio
 
@@ -63,6 +54,7 @@ def db_session():
 
 async def test_rescan_repo_not_found(db_session):
     from fastapi import HTTPException
+
     class DummyBackgroundTasks:
         def add_task(self, func, *args, **kwargs):
             pass
@@ -85,6 +77,7 @@ async def test_rescan_repo_creates_job(db_session):
     await db_session.commit()
 
     tasks_added = []
+
     class DummyBackgroundTasks:
         def add_task(self, func, *args, **kwargs):
             tasks_added.append((func, args, kwargs))
@@ -112,6 +105,7 @@ async def test_rescan_repo_returns_existing_active_job(db_session):
     await db_session.commit()
 
     tasks_added = []
+
     class DummyBackgroundTasks:
         def add_task(self, func, *args, **kwargs):
             tasks_added.append((func, args, kwargs))
