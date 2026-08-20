@@ -99,7 +99,11 @@ export default function LandingPage() {
     try {
       const normalizedUrl = `https://github.com/${parsed.owner}/${parsed.repo}`
       const commitsNum = maxCommits ? parseInt(maxCommits, 10) : 500
-      const response = await ingestRepo(normalizedUrl, isNaN(commitsNum) ? 500 : commitsNum)
+      const response = await ingestRepo(
+        normalizedUrl,
+        isNaN(commitsNum) ? 500 : commitsNum,
+        branch || undefined
+      )
       navigate(`/analyze?repo_id=${response.repo_id}&name=${encodeURIComponent(normalizedUrl)}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not start repository ingestion.')

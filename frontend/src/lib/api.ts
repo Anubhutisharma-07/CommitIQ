@@ -69,9 +69,9 @@ export async function listRepos(slug?: string): Promise<Repo[]> {
   return request<Repo[]>(client.get('/repos', { params: slug ? { slug } : undefined }))
 }
 
-export async function ingestRepo(url: string, maxCommits?: number): Promise<IngestResponse> {
+export async function ingestRepo(url: string, maxCommits?: number, branch?: string): Promise<IngestResponse> {
   return request<IngestResponse>(
-    client.post('/repos/ingest', { repo_url: url, max_commits: maxCommits || 500 })
+    client.post('/repos/ingest', { repo_url: url, max_commits: maxCommits || 500, branch })
   )
 }
 
