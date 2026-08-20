@@ -213,12 +213,74 @@ async def init_db(env: str = ENVIRONMENT):
 
     async with engine.begin() as conn:
         if _IS_SQLITE:
-            await conn.execute(text("PRAGMA journal_mode=WAL"))
-            await conn.execute(text("PRAGMA synchronous=NORMAL"))
             await conn.execute(text("PRAGMA foreign_keys=ON"))
 
         await conn.run_sync(Base.metadata.create_all)
         migration_res = await check_database_migrations(conn, env=env)
 
     logger.info("Database initialized", extra={"migration_status": migration_res})
+    await mark_stale_jobs_as_error()
+
+    # Auto-seed the facebook-react demo data if database is empty
+    from backend.demo_seeder import seed_demo_data_if_empty
+    async with AsyncSessionLocal() as session:
+        try:
+            await seed_demo_data_if_empty(session)
+        except Exception as exc:
+            logger.error(f"Failed to auto-seed demo data: {exc}", exc_info=True)
+
     return migration_res
+
+
+async def mark_stale_jobs_as_error() -> None:
+    """Queries for any AnalysisJob in active statuses and marks them as error on startup.
+    Also cleans up leftover temporary repository folders under REPO_STORAGE_PATH.
+    """
+    from backend.shared.models import AnalysisJob
+    from backend.features.repo_ingestion.router import ACTIVE_JOB_STATUSES
+    from backend.features.repo_ingestion.clone_service import cleanup_repo, REPO_STORAGE_PATH
+    import shutil
+    from sqlalchemy import select
+
+    logger.info("Checking for stale/orphaned analysis jobs on startup...")
+    async with AsyncSessionLocal() as session:
+        try:
+            stmt = select(AnalysisJob).where(AnalysisJob.status.in_(ACTIVE_JOB_STATUSES))
+            result = await session.execute(stmt)
+            stale_jobs = result.scalars().all()
+
+            if not stale_jobs:
+                logger.info("No stale/orphaned analysis jobs found.")
+                return
+
+            logger.warning(
+                f"Found {len(stale_jobs)} stale/orphaned analysis jobs. Marking as error and cleaning up storage..."
+            )
+            for job in stale_jobs:
+                logger.info(f"Aborting stale job id={job.id} (status={job.status}, repo_id={job.repo_id})")
+                job.status = "error"
+                job.error_message = "System restart aborted the analysis job"
+
+                # Clean up repository folders matching the stale job repo_id
+                try:
+                    cleanup_repo(job.repo_id)
+                except Exception as exc:
+                    logger.warning(
+                        f"Failed to clean up repo directory for repo_id={job.repo_id} during startup: {exc}"
+                    )
+
+                # Also clean up folder matching job.id if it exists under REPO_STORAGE_PATH
+                try:
+                    job_dir = REPO_STORAGE_PATH / str(job.id)
+                    if job_dir.exists():
+                        shutil.rmtree(job_dir)
+                except Exception as exc:
+                    logger.warning(
+                        f"Failed to clean up job directory for job_id={job.id} during startup: {exc}"
+                    )
+
+            await session.commit()
+            logger.info("Stale/orphaned analysis jobs cleanup completed successfully.")
+        except Exception as exc:
+            await session.rollback()
+            logger.error(f"Failed to mark stale jobs as error during startup: {exc}", exc_info=True)
