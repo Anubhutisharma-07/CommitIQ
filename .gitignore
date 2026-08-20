@@ -19,3 +19,5 @@ test-results/
 # Agent Rules
 AGENTS.md
 .agents/
+backend/.coverage
+backend/coverage.xml
