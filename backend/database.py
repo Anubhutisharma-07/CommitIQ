@@ -5,7 +5,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
-from backend.config import DATABASE_URL
+from backend.config import DATABASE_URL, ENVIRONMENT
 
 logger = logging.getLogger(__name__)
 _IS_SQLITE = DATABASE_URL.startswith("sqlite")
@@ -124,7 +124,58 @@ async def apply_sql_migrations(
     return applied_now
 
 
-async def init_db():
+async def get_unapplied_migrations(
+    conn,
+    migrations_dir: Path | None = None,
+) -> list[str]:
+    """Return a list of unapplied migration version names."""
+    migration_root = migrations_dir or _migrations_dir()
+    if not migration_root.exists():
+        return []
+    await _ensure_migration_table(conn)
+    applied = await _applied_migrations(conn)
+    unapplied: list[str] = []
+    for migration_path in sorted(migration_root.glob("*.sql")):
+        version = migration_path.stem
+        if version not in applied:
+            unapplied.append(version)
+    return unapplied
+
+
+async def check_database_migrations(
+    conn,
+    env: str = ENVIRONMENT,
+    migrations_dir: Path | None = None,
+) -> dict:
+    """
+    Check for unapplied migrations on startup.
+    In production environment, automatically apply unapplied migrations.
+    In non-production environments, log a warning about unapplied migrations.
+    """
+    unapplied = await get_unapplied_migrations(conn, migrations_dir=migrations_dir)
+    is_prod = env.lower() == "production"
+
+    if not unapplied:
+        logger.info("Database migrations are up to date.")
+        return {"status": "up_to_date", "unapplied": [], "applied": [], "auto_applied": False}
+
+    if is_prod:
+        logger.warning(
+            f"Unapplied database migrations detected in production: {unapplied}. Automatically applying migrations..."
+        )
+        applied_now = await apply_sql_migrations(conn, migrations_dir=migrations_dir)
+        logger.info(f"Successfully applied database migrations: {applied_now}", extra={"applied": applied_now})
+        return {"status": "applied", "unapplied": [], "applied": applied_now, "auto_applied": True}
+    else:
+        logger.warning(
+            f"Unapplied database migrations detected on startup: {unapplied}. "
+            "Running in non-production mode; migrations were not automatically applied.",
+            extra={"unapplied": unapplied},
+        )
+        return {"status": "unapplied_detected", "unapplied": unapplied, "applied": [], "auto_applied": False}
+
+
+async def init_db(env: str = ENVIRONMENT):
     """Initialize database schema for local SQLite and hosted Postgres."""
     from backend.shared import models  # noqa: F401
 
@@ -135,6 +186,7 @@ async def init_db():
             await conn.execute(text("PRAGMA foreign_keys=ON"))
 
         await conn.run_sync(Base.metadata.create_all)
-        applied = await apply_sql_migrations(conn)
+        migration_res = await check_database_migrations(conn, env=env)
 
-    logger.info("Database initialized", extra={"migrations_applied": len(applied)})
+    logger.info("Database initialized", extra={"migration_status": migration_res})
+    return migration_res
