@@ -21,7 +21,6 @@ import { NarrativeCard } from '../components/NarrativeCard'
 import { CycleTimeDashboard } from '../components/CycleTimeDashboard'
 import { DoraMetricsDashboard } from '../components/DoraMetricsDashboard'
 import { TeamHealthDashboard } from '../components/TeamHealthDashboard'
-import { CodeQualityDashboard } from '../components/CodeQualityDashboard'
 import { TimeRangeSelector, type TimeRangePreset } from '../components/TimeRangeSelector'
 import { HealthBadge } from '../components/ui/HealthBadge'
 import { ThemeToggle } from '../components/ui/ThemeToggle'
@@ -645,7 +644,6 @@ export default function DashboardPage() {
               <div className="w-full">
                 <TeamHealthDashboard repoId={repoId} />
               </div>
-            ) : (
               <div>
                 <BusFactorTable modules={busState.data?.modules || []} />
                 {(selected?.bus_factor_min === 1 ||
@@ -673,15 +671,14 @@ export default function DashboardPage() {
             </div>
           )}
 
-            {repoId && (
-              <HotspotMap
-                repoId={repoId}
-                sha={selected?.sha || null}
-                startDate={startDate}
-                endDate={endDate}
-              />
-            )}
-          </div>
+          {repoId && (
+            <HotspotMap
+              repoId={repoId}
+              sha={selected?.sha || null}
+              startDate={startDate}
+              endDate={endDate}
+            />
+          )}
         </main>
       </div>
       <ScrollToTop containerRef={mainRef} />
