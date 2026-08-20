@@ -14,25 +14,44 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.config import MAX_COMMITS
 from backend.database import get_db
 from backend.features.llm_analysis.cache import make_cache_key
-from backend.features.repo_ingestion.bus_factor import \
-    compute_bus_factor_from_history
+from backend.features.repo_ingestion.bus_factor import compute_bus_factor_from_history
 from backend.features.repo_ingestion.clone_service import (
-    cleanup_repo, clone_repo, count_available_commits, fetch_github_metadata,
-    fetch_github_pull_requests, make_repo_slug, parse_github_url,
-    sanitize_repo_url)
+    cleanup_repo,
+    clone_repo,
+    count_available_commits,
+    fetch_github_metadata,
+    fetch_github_pull_requests,
+    make_repo_slug,
+    parse_github_url,
+    sanitize_repo_url,
+)
 from backend.features.repo_ingestion.commit_walker import walk_commits
-from backend.features.repo_ingestion.graph_builder import (
-    build_cochange_edges, build_import_edges)
-from backend.features.repo_ingestion.health_scorer import (
-    assign_health_color, compute_full_snapshot)
-from backend.shared.models import (AnalysisJob, BusFactor, Commit, GraphEdge,
-                                   GraphNode, HealthSnapshot, LLMNarrative,
-                                   PullRequest, Repo)
-from backend.shared.schemas import (BusFactorWrapper, CommitDetailResponse,
-                                    GraphResponse, HotspotResponse,
-                                    IngestRequest, IngestResponse,
-                                    JobProgressOut, LLMUsageOut, RepoOut,
-                                    RescanResponse, TimelineResponse)
+from backend.features.repo_ingestion.graph_builder import build_cochange_edges, build_import_edges
+from backend.features.repo_ingestion.health_scorer import assign_health_color, compute_full_snapshot
+from backend.shared.models import (
+    AnalysisJob,
+    BusFactor,
+    Commit,
+    GraphEdge,
+    GraphNode,
+    HealthSnapshot,
+    LLMNarrative,
+    PullRequest,
+    Repo,
+)
+from backend.shared.schemas import (
+    BusFactorWrapper,
+    CommitDetailResponse,
+    GraphResponse,
+    HotspotResponse,
+    IngestRequest,
+    IngestResponse,
+    JobProgressOut,
+    LLMUsageOut,
+    RepoOut,
+    RescanResponse,
+    TimelineResponse,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/repos", tags=["repos"])
@@ -385,7 +404,9 @@ async def run_ingestion(
 ) -> None:
     from backend.database import AsyncSessionLocal
     from backend.features.repo_ingestion.metrics_extractor import (
-        checkout_commit, extract_commit_metrics)
+        checkout_commit,
+        extract_commit_metrics,
+    )
 
     # --- early validation (own session, committed immediately) ---
     async with AsyncSessionLocal() as db:
@@ -630,7 +651,9 @@ async def run_ingestion(
 async def run_rescan(repo_id: int, job_id: int, max_commits: int) -> None:
     from backend.database import AsyncSessionLocal
     from backend.features.repo_ingestion.metrics_extractor import (
-        checkout_commit, extract_commit_metrics)
+        checkout_commit,
+        extract_commit_metrics,
+    )
 
     async with AsyncSessionLocal() as db:
         repo = await db.get(Repo, repo_id)

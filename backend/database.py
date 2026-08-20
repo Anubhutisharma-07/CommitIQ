@@ -3,8 +3,7 @@ import logging
 from pathlib import Path
 
 from sqlalchemy import event, text
-from sqlalchemy.ext.asyncio import (AsyncSession, async_sessionmaker,
-                                    create_async_engine)
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
 from backend.config import DATABASE_URL, ENVIRONMENT
@@ -249,8 +248,7 @@ async def mark_stale_jobs_as_error() -> None:
 
     from sqlalchemy import select
 
-    from backend.features.repo_ingestion.clone_service import (
-        REPO_STORAGE_PATH, cleanup_repo)
+    from backend.features.repo_ingestion.clone_service import REPO_STORAGE_PATH, cleanup_repo
     from backend.features.repo_ingestion.router import ACTIVE_JOB_STATUSES
     from backend.shared.models import AnalysisJob
 

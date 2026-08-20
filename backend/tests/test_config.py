@@ -1,7 +1,12 @@
-from backend.config import (DEFAULT_LOCAL_CORS_ORIGINS,
-                            DEVELOPMENT_ENVIRONMENTS, _cors_origins,
-                            _is_development_environment,
-                            _normalize_database_url, _parse_bool, _parse_csv)
+from backend.config import (
+    DEFAULT_LOCAL_CORS_ORIGINS,
+    DEVELOPMENT_ENVIRONMENTS,
+    _cors_origins,
+    _is_development_environment,
+    _normalize_database_url,
+    _parse_bool,
+    _parse_csv,
+)
 
 
 def test_normalize_database_url_uses_asyncpg_for_postgres_urls():

@@ -10,16 +10,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.database import get_db
 from backend.features.llm_analysis.cache import make_cache_key
 from backend.features.llm_analysis.claude_client import get_or_create_narrative
-from backend.features.llm_analysis.cost_guard import (check_budget,
-                                                      estimate_cost_usd)
-from backend.features.llm_analysis.llm_router import (LLMProvider,
-                                                      model_for_provider,
-                                                      stream_narrative)
-from backend.features.llm_analysis.prompt_builder import (EXPLAIN_DROP_SYSTEM,
-                                                          build_explain_prompt)
+from backend.features.llm_analysis.cost_guard import check_budget, estimate_cost_usd
+from backend.features.llm_analysis.llm_router import (
+    LLMProvider,
+    model_for_provider,
+    stream_narrative,
+)
+from backend.features.llm_analysis.prompt_builder import EXPLAIN_DROP_SYSTEM, build_explain_prompt
 from backend.shared.models import Commit, HealthSnapshot, LLMNarrative
-from backend.shared.schemas import (NarrativeRequest, NarrativeResponse,
-                                    PredictRequest)
+from backend.shared.schemas import NarrativeRequest, NarrativeResponse, PredictRequest
 
 router = APIRouter(prefix="", tags=["llm"])
 logger = logging.getLogger(__name__)
