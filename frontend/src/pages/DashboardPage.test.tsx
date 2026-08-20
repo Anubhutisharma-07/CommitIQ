@@ -18,6 +18,7 @@ vi.mock('../lib/api', () => ({
   getCycleTime: vi.fn(() => Promise.resolve({ avg_cycle_time_hours: 0, bottlenecks: [] })),
   getDoraMetrics: vi.fn(() => Promise.resolve({ dora_score: "Elite" })),
   getTeamHealthMetrics: vi.fn(() => Promise.resolve({ burnout_risk_score: "Low", context_switching_score: "Low" })),
+  getCodeQualityMetrics: vi.fn(() => Promise.resolve({ churn_category: "Low", ai_impact_score: "Low" })),
   getGraph: vi.fn(),
   getHealthTimeline: vi.fn(),
   getIngestProgress: vi.fn(),
@@ -46,6 +47,12 @@ vi.mock('../components/DoraMetricsDashboard', () => ({
 vi.mock('../components/TeamHealthDashboard', () => ({
   TeamHealthDashboard: ({ repoId }: { repoId: string | number }) => (
     <div data-testid="team-health-dashboard">team health: {repoId}</div>
+  ),
+}))
+
+vi.mock('../components/CodeQualityDashboard', () => ({
+  CodeQualityDashboard: ({ repoId }: { repoId: string | number }) => (
+    <div data-testid="code-quality-dashboard">code quality: {repoId}</div>
   ),
 }))
 

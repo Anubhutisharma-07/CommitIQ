@@ -429,3 +429,10 @@ export interface TeamHealthMetrics {
   context_switching_score: string
   avg_files_per_day: number
 }
+
+export interface CodeQualityMetrics {
+  churn_rate_percent: number
+  churn_category: string
+  ai_assisted_commits: number
+  ai_impact_score: string
+}

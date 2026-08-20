@@ -13,6 +13,7 @@ import { NarrativeCard } from '../components/NarrativeCard'
 import { CycleTimeDashboard } from '../components/CycleTimeDashboard'
 import { DoraMetricsDashboard } from '../components/DoraMetricsDashboard'
 import { TeamHealthDashboard } from '../components/TeamHealthDashboard'
+import { CodeQualityDashboard } from '../components/CodeQualityDashboard'
 import { TimeRangeSelector, type TimeRangePreset } from '../components/TimeRangeSelector'
 import { HealthBadge } from '../components/ui/HealthBadge'
 import { ThemeToggle } from '../components/ui/ThemeToggle'
@@ -474,8 +475,13 @@ export default function DashboardPage() {
           </div>
 
           {repoId && (
-            <div className="w-full">
-              <TeamHealthDashboard repoId={repoId} />
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+              <div className="w-full">
+                <TeamHealthDashboard repoId={repoId} />
+              </div>
+              <div className="w-full">
+                <CodeQualityDashboard repoId={repoId} />
+              </div>
             </div>
           )}
 
