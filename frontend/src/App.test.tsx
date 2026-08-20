@@ -18,6 +18,8 @@ import type { HealthSnapshot, Repo } from './types'
 vi.mock('./lib/api', () => ({
   cancelIngest: vi.fn(),
   getBusFactor: vi.fn(),
+  getCycleTime: vi.fn(() => Promise.resolve({ avg_cycle_time_hours: 0, bottlenecks: [] })),
+  getDoraMetrics: vi.fn(() => Promise.resolve({ dora_score: "Elite" })),
   getGraph: vi.fn(),
   getHealthTimeline: vi.fn(),
   getIngestProgress: vi.fn(),
@@ -30,6 +32,18 @@ vi.mock('./lib/api', () => ({
 vi.mock('./components/BusFactorTable', () => ({
   BusFactorTable: ({ modules }: { modules: Array<{ module_path: string }> }) => (
     <div data-testid="bus-factor">ownership modules: {modules.length}</div>
+  ),
+}))
+
+vi.mock('./components/CycleTimeDashboard', () => ({
+  CycleTimeDashboard: ({ repoId }: { repoId: string | number }) => (
+    <div data-testid="cycle-time-dashboard">cycle time: {repoId}</div>
+  ),
+}))
+
+vi.mock('./components/DoraMetricsDashboard', () => ({
+  DoraMetricsDashboard: ({ repoId }: { repoId: string | number }) => (
+    <div data-testid="dora-metrics-dashboard">dora metrics: {repoId}</div>
   ),
 }))
 
@@ -205,7 +219,7 @@ describe('App route flow', () => {
     await user.click(screen.getByRole('button', { name: 'Analyze' }))
 
     await waitFor(() => {
-      expect(ingestRepoMock).toHaveBeenCalledWith('https://github.com/example/project', 25,undefined)
+      expect(ingestRepoMock).toHaveBeenCalledWith('https://github.com/example/project', 25)
       expect(getIngestProgressMock).toHaveBeenCalledWith('17')
     })
     expect(await screen.findByText('Analyzing Repository')).toBeInTheDocument()

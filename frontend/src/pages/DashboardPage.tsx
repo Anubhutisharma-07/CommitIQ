@@ -10,6 +10,8 @@ import { GraphExplorer } from '../components/GraphExplorer'
 import { HealthTimeline } from '../components/HealthTimeline'
 import { HotspotMap } from '../components/HotspotMap'
 import { NarrativeCard } from '../components/NarrativeCard'
+import { CycleTimeDashboard } from '../components/CycleTimeDashboard'
+import { DoraMetricsDashboard } from '../components/DoraMetricsDashboard'
 import { TimeRangeSelector, type TimeRangePreset } from '../components/TimeRangeSelector'
 import { HealthBadge } from '../components/ui/HealthBadge'
 import { ThemeToggle } from '../components/ui/ThemeToggle'
@@ -466,32 +468,39 @@ export default function DashboardPage() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-            {busState.error ? (
-              <div className="glass-panel rounded-[28px] p-6 text-rose-300 border border-rose-500/20 bg-rose-500/10">
-                Could not retrieve module ownership datasets.
-              </div>
-            ) : (
-              <div>
-                <BusFactorTable modules={busState.data?.modules || []} />
-                {(selected?.bus_factor_min === 1 || (busState.data?.modules && busState.data.modules.some(m => m.contributor_count === 1))) && (
-                  <div
-                    data-testid="bus-factor-warning"
-                    className="mt-4 p-4 rounded-[20px] bg-amber-500/10 border border-amber-500/30 text-amber-200 flex items-start gap-3 text-xs shadow-lg backdrop-blur-xl"
-                  >
-                    <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <span className="font-head font-semibold text-amber-300 block text-xs mb-0.5 uppercase tracking-wider">
-                        Single Point of Failure Warning
-                      </span>
-                      <p className="text-slate-300 leading-relaxed text-[11px]">
-                        The computed minimum bus factor for this repository is <strong>1</strong>. Key modules depend entirely on a single principal contributor, leaving the repository vulnerable to a single-point-of-failure if that contributor becomes unavailable.
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
+            {repoId && <CycleTimeDashboard repoId={repoId} />}
+            {repoId && <DoraMetricsDashboard repoId={repoId} />}
+          </div>
 
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+            <div className="w-full">
+              {busState.error ? (
+                <div className="glass-panel rounded-[28px] p-6 text-rose-300 border border-rose-500/20 bg-rose-500/10">
+                  Could not retrieve module ownership datasets.
+                </div>
+              ) : (
+                <div>
+                  <BusFactorTable modules={busState.data?.modules || []} />
+                  {(selected?.bus_factor_min === 1 || (busState.data?.modules && busState.data.modules.some(m => m.contributor_count === 1))) && (
+                    <div
+                      data-testid="bus-factor-warning"
+                      className="mt-4 p-4 rounded-[20px] bg-amber-500/10 border border-amber-500/30 text-amber-200 flex items-start gap-3 text-xs shadow-lg backdrop-blur-xl"
+                    >
+                      <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <span className="font-head font-semibold text-amber-300 block text-xs mb-0.5 uppercase tracking-wider">
+                          Single Point of Failure Warning
+                        </span>
+                        <p className="text-slate-300 leading-relaxed text-[11px]">
+                          The computed minimum bus factor for this repository is <strong>1</strong>. Key modules depend entirely on a single principal contributor, leaving the repository vulnerable to a single-point-of-failure if that contributor becomes unavailable.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            
             {repoId && <HotspotMap repoId={repoId} sha={selected?.sha || null} startDate={startDate} endDate={endDate} />}
           </div>
         </main>

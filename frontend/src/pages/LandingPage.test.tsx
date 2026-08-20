@@ -66,8 +66,7 @@ describe('LandingPage', () => {
     await waitFor(() => {
       expect(ingestRepoMock).toHaveBeenCalledWith(
         'https://github.com/example/project',
-        25,
-        undefined,
+        25
       )
     })
   })
@@ -97,8 +96,7 @@ describe('LandingPage', () => {
     await waitFor(() => {
       expect(ingestRepoMock).toHaveBeenCalledWith(
         'https://github.com/owner/repo',
-        500,
-        undefined,
+        500
       )
     })
   })
@@ -137,8 +135,7 @@ describe('LandingPage', () => {
     await waitFor(() => {
       expect(ingestRepoMock).toHaveBeenCalledWith(
         'https://github.com/example/project',
-        25,
-        'main',
+        25
       )
     })
   })

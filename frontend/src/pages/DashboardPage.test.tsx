@@ -15,8 +15,11 @@ import DashboardPage from './DashboardPage'
 
 vi.mock('../lib/api', () => ({
   getBusFactor: vi.fn(),
+  getCycleTime: vi.fn(() => Promise.resolve({ avg_cycle_time_hours: 0, bottlenecks: [] })),
+  getDoraMetrics: vi.fn(() => Promise.resolve({ dora_score: "Elite" })),
   getGraph: vi.fn(),
   getHealthTimeline: vi.fn(),
+  getIngestProgress: vi.fn(),
   getLLMUsage: vi.fn(),
   getRepoBySlug: vi.fn(),
 }))
@@ -24,6 +27,18 @@ vi.mock('../lib/api', () => ({
 vi.mock('../components/BusFactorTable', () => ({
   BusFactorTable: ({ modules }: { modules: Array<{ module_path: string }> }) => (
     <div data-testid="bus-factor">ownership modules: {modules.length}</div>
+  ),
+}))
+
+vi.mock('../components/CycleTimeDashboard', () => ({
+  CycleTimeDashboard: ({ repoId }: { repoId: string | number }) => (
+    <div data-testid="cycle-time-dashboard">cycle time: {repoId}</div>
+  ),
+}))
+
+vi.mock('../components/DoraMetricsDashboard', () => ({
+  DoraMetricsDashboard: ({ repoId }: { repoId: string | number }) => (
+    <div data-testid="dora-metrics-dashboard">dora metrics: {repoId}</div>
   ),
 }))
 

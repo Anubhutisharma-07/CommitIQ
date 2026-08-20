@@ -6,6 +6,7 @@ from backend.config import CORS_ORIGINS, ENVIRONMENT
 from backend.database import engine, init_db
 from backend.features.repo_ingestion.router import router as ingestion_router
 from backend.features.llm_analysis.router import router as llm_router
+from backend.features.metrics.router import router as metrics_router
 
 
 @asynccontextmanager
@@ -31,6 +32,7 @@ app.add_middleware(
 
 app.include_router(ingestion_router, prefix="/api")
 app.include_router(llm_router, prefix="/api")
+app.include_router(metrics_router, prefix="/api")
 
 
 @app.get("/health")

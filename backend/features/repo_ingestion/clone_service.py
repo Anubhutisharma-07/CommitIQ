@@ -257,3 +257,48 @@ async def fetch_github_metadata(owner: str, repo: str) -> dict:
     except Exception:
         pass  # Metadata is cosmetic — never fail ingestion for this
     return {"github_stars": None, "github_language": None, "github_description": None}
+
+
+async def fetch_github_pull_requests(owner: str, repo: str, limit: int = 500) -> list[dict]:
+    """Fetch pull requests for the repository."""
+    from dateutil.parser import parse as parse_date
+    headers = {"Accept": "application/vnd.github+json"}
+    if GITHUB_TOKEN:
+        headers["Authorization"] = f"token {GITHUB_TOKEN}"
+
+    prs = []
+    page = 1
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            while True:
+                r = await client.get(
+                    f"https://api.github.com/repos/{owner}/{repo}/pulls?state=all&per_page=100&page={page}",
+                    headers=headers
+                )
+                if r.status_code != 200:
+                    break
+                data = r.json()
+                if not data:
+                    break
+                for item in data:
+                    created_at = item.get("created_at")
+                    merged_at = item.get("merged_at")
+                    closed_at = item.get("closed_at")
+                    
+                    prs.append({
+                        "pr_number": item.get("number"),
+                        "title": item.get("title", "")[:255],
+                        "state": item.get("state", "unknown"),
+                        "author": item.get("user", {}).get("login", "unknown") if item.get("user") else "unknown",
+                        "created_at": parse_date(created_at) if created_at else None,
+                        "merged_at": parse_date(merged_at) if merged_at else None,
+                        "closed_at": parse_date(closed_at) if closed_at else None,
+                    })
+                
+                if len(prs) >= limit:
+                    prs = prs[:limit]
+                    break
+                page += 1
+    except Exception as e:
+        logger.warning(f"Error fetching PRs for {owner}/{repo}: {e}")
+    return prs

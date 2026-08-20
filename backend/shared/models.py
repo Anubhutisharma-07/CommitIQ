@@ -32,6 +32,7 @@ class Repo(Base):
     commits       = relationship("Commit", back_populates="repo", cascade="all, delete-orphan")
     analysis_jobs = relationship("AnalysisJob", back_populates="repo", cascade="all, delete-orphan")
     bus_factor    = relationship("BusFactor", back_populates="repo", cascade="all, delete-orphan")
+    pull_requests = relationship("PullRequest", back_populates="repo", cascade="all, delete-orphan")
 
 
 class Commit(Base):
@@ -228,3 +229,31 @@ class AnalysisJob(Base):
     __table_args__ = (
         Index("idx_jobs_repo_created", "repo_id", "created_at"),
     )
+
+
+class PullRequest(Base):
+    __tablename__ = "pull_requests"
+
+    id              = Column(Integer, primary_key=True, autoincrement=True)
+    repo_id         = Column(Integer, ForeignKey("repos.id", ondelete="CASCADE"), nullable=False)
+    pr_number       = Column(Integer, nullable=False)
+    title           = Column(String, nullable=False)
+    state           = Column(String, nullable=False) # 'open', 'closed', 'merged'
+    author          = Column(String, nullable=False)
+    created_at      = Column(DateTime(timezone=True), nullable=False)
+    first_review_at = Column(DateTime(timezone=True), nullable=True)
+    merged_at       = Column(DateTime(timezone=True), nullable=True)
+    closed_at       = Column(DateTime(timezone=True), nullable=True)
+    
+    # Optional metrics
+    coding_time_sec = Column(Integer, nullable=True)
+    pickup_time_sec = Column(Integer, nullable=True)
+    review_time_sec = Column(Integer, nullable=True)
+
+    repo = relationship("Repo", back_populates="pull_requests")
+
+    __table_args__ = (
+        UniqueConstraint("repo_id", "pr_number", name="uq_pr_repo_number"),
+        Index("idx_prs_repo_created", "repo_id", "created_at"),
+    )
+
