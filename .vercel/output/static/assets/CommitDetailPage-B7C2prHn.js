@@ -77,30 +77,28 @@ function w({ repoId: e, commitSha: t, previousSha: n }) {
               }),
               (0, S.jsx)(`div`, {
                 className: `space-y-2`,
-                children: a.nodes_changed
-                  .slice(0, 5)
-                  .map((e) =>
-                    (0, S.jsxs)(
-                      `div`,
-                      {
-                        className: `flex items-center justify-between gap-4 text-small border-b border-border/60 pb-2 last:border-b-0`,
-                        children: [
-                          (0, S.jsx)(`span`, {
-                            className: `text-secondary truncate font-mono`,
-                            children: e.file,
-                          }),
-                          (0, S.jsxs)(`span`, {
-                            className:
-                              e.delta_pct > 0
-                                ? `text-health-critical font-mono`
-                                : `text-health-good font-mono`,
-                            children: [e.delta_pct > 0 ? `+` : ``, e.delta_pct, `%`],
-                          }),
-                        ],
-                      },
-                      e.file
-                    )
-                  ),
+                children: a.nodes_changed.slice(0, 5).map((e) =>
+                  (0, S.jsxs)(
+                    `div`,
+                    {
+                      className: `flex items-center justify-between gap-4 text-small border-b border-border/60 pb-2 last:border-b-0`,
+                      children: [
+                        (0, S.jsx)(`span`, {
+                          className: `text-secondary truncate font-mono`,
+                          children: e.file,
+                        }),
+                        (0, S.jsxs)(`span`, {
+                          className:
+                            e.delta_pct > 0
+                              ? `text-health-critical font-mono`
+                              : `text-health-good font-mono`,
+                          children: [e.delta_pct > 0 ? `+` : ``, e.delta_pct, `%`],
+                        }),
+                      ],
+                    },
+                    e.file
+                  )
+                ),
               }),
             ],
           })

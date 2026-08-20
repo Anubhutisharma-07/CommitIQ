@@ -1,8 +1,7 @@
+backend/
+.venv/
 node_modules/
 dist/
-build/
-.next/
 coverage/
-*.min.js
-.venv/
-__pycache__/
+test-results/
+
