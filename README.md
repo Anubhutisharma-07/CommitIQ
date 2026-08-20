@@ -35,14 +35,14 @@ Live app: https://commit-iq-iota.vercel.app
 
 ## Tech Stack
 
-| Area | Stack |
-| --- | --- |
-| Backend | FastAPI, SQLAlchemy async ORM, SQLite by default, optional Postgres |
-| Analysis | GitPython, git subprocesses, radon, lizard, custom graph and ownership analysis |
-| Semantic drift | difflib fallback, optional GraphCodeBERT |
-| LLM layer | Anthropic Claude, Google Gemini fallback |
-| Frontend | React, TypeScript, Vite, SWR, Recharts, react-force-graph-2d |
-| Quality | pytest, Vitest, ESLint, CI, secret/conflict/debug-output guards |
+| Area           | Stack                                                                           |
+| -------------- | ------------------------------------------------------------------------------- |
+| Backend        | FastAPI, SQLAlchemy async ORM, SQLite by default, optional Postgres             |
+| Analysis       | GitPython, git subprocesses, radon, lizard, custom graph and ownership analysis |
+| Semantic drift | difflib fallback, optional GraphCodeBERT                                        |
+| LLM layer      | Anthropic Claude, Google Gemini fallback                                        |
+| Frontend       | React, TypeScript, Vite, SWR, Recharts, react-force-graph-2d                    |
+| Quality        | pytest, Vitest, ESLint, CI, secret/conflict/debug-output guards                 |
 
 ## Repository Structure
 

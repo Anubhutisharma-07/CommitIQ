@@ -19,9 +19,13 @@ vi.mock('./lib/api', () => ({
   cancelIngest: vi.fn(),
   getBusFactor: vi.fn(),
   getCycleTime: vi.fn(() => Promise.resolve({ avg_cycle_time_hours: 0, bottlenecks: [] })),
-  getDoraMetrics: vi.fn(() => Promise.resolve({ dora_score: "Elite" })),
-  getTeamHealthMetrics: vi.fn(() => Promise.resolve({ burnout_risk_score: "Low", context_switching_score: "Low" })),
-  getCodeQualityMetrics: vi.fn(() => Promise.resolve({ churn_category: "Low", ai_impact_score: "Low" })),
+  getDoraMetrics: vi.fn(() => Promise.resolve({ dora_score: 'Elite' })),
+  getTeamHealthMetrics: vi.fn(() =>
+    Promise.resolve({ burnout_risk_score: 'Low', context_switching_score: 'Low' })
+  ),
+  getCodeQualityMetrics: vi.fn(() =>
+    Promise.resolve({ churn_category: 'Low', ai_impact_score: 'Low' })
+  ),
   getGraph: vi.fn(),
   getHealthTimeline: vi.fn(),
   getIngestProgress: vi.fn(),
@@ -87,13 +91,17 @@ vi.mock('./components/HealthTimeline', () => ({
 
 vi.mock('./components/HotspotMap', () => ({
   HotspotMap: ({ repoId, sha }: { repoId: number; sha: string | null }) => (
-    <div data-testid="hotspots">hotspots {repoId}:{sha ?? 'none'}</div>
+    <div data-testid="hotspots">
+      hotspots {repoId}:{sha ?? 'none'}
+    </div>
   ),
 }))
 
 vi.mock('./components/NarrativeCard', () => ({
   NarrativeCard: ({ repoId, commitSha }: { repoId: number; commitSha: string }) => (
-    <div data-testid="narrative-card">narrative {repoId}:{commitSha}</div>
+    <div data-testid="narrative-card">
+      narrative {repoId}:{commitSha}
+    </div>
   ),
 }))
 
@@ -169,7 +177,7 @@ function renderApp() {
   return render(
     <SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0, revalidateOnFocus: false }}>
       <App />
-    </SWRConfig>,
+    </SWRConfig>
   )
 }
 
@@ -233,7 +241,11 @@ describe('App route flow', () => {
     await user.click(screen.getByRole('button', { name: 'Analyze' }))
 
     await waitFor(() => {
-      expect(ingestRepoMock).toHaveBeenCalledWith('https://github.com/example/project', 25)
+      expect(ingestRepoMock).toHaveBeenCalledWith(
+        'https://github.com/example/project',
+        25,
+        undefined
+      )
       expect(getIngestProgressMock).toHaveBeenCalledWith('17')
     })
     expect(await screen.findByText('Analyzing Repository')).toBeInTheDocument()
