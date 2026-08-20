@@ -1,6 +1,6 @@
+import json
 from collections.abc import AsyncIterator
 from datetime import datetime, timezone
-import json
 
 import pytest
 from fastapi import HTTPException
@@ -16,10 +16,10 @@ from backend.features.repo_ingestion.router import (
     get_commit_detail,
     get_graph,
     get_hotspots,
-    ingest_progress,
     get_llm_usage,
     get_repo_by_slug,
     get_timeline,
+    ingest_progress,
     ingest_repo,
     list_repos,
     run_ingestion,
@@ -180,120 +180,124 @@ def _seed_repo(session: Session) -> None:
     session.add_all([first_commit, second_commit])
     session.flush()
 
-    session.add_all([
-        HealthSnapshot(
-            repo_id=repo.id,
-            commit_id=first_commit.id,
-            full_sha=first_commit.full_sha,
-            health_score=82.0,
-            avg_complexity=2.0,
-            max_complexity=3.0,
-            total_loc=120,
-            churn_rate=0.2,
-            num_files_changed=1,
-            bus_factor_min=2,
-            health_delta=None,
-            cc_score=90,
-            churn_score=80,
-            bus_score=40,
-            loc_score=85,
-            complexity_drift_score=90,
-            churn_risk_score=80,
-            bus_factor_risk_score=40,
-            dependency_health_score=85,
-            top_files_json='[{"path":"src/app.py","complexity":2.0,"loc":120}]',
-        ),
-        HealthSnapshot(
-            repo_id=repo.id,
-            commit_id=second_commit.id,
-            full_sha=second_commit.full_sha,
-            health_score=68.5,
-            avg_complexity=7.25,
-            max_complexity=12.0,
-            total_loc=240,
-            churn_rate=0.35,
-            num_files_changed=2,
-            bus_factor_min=1,
-            health_delta=-13.5,
-            cc_score=63.8,
-            churn_score=65,
-            bus_score=20,
-            loc_score=80,
-            complexity_drift_score=63.8,
-            churn_risk_score=65,
-            bus_factor_risk_score=20,
-            dependency_health_score=80,
-            dependency_density=0.5,
-            avg_semantic_drift=0.12,
-            semantic_health_score=88,
-            high_drift_files=0,
-            semantic_drift_method="fallback_levenshtein",
-            risk_reasons_json='[{"code":"single_owner","severity":"critical","label":"Single-owner risk","detail":"At least one critical module has only one active contributor.","impact":30.0}]',
-            hotspot_persistence_score=37.5,
-            persistent_hotspots_json='[{"path":"src/service.py","recent_commit_count":3,"complexity":7.25,"loc":160}]',
-            top_files_json='[{"path":"src/service.py","complexity":7.25,"loc":160}]',
-        ),
-    ])
+    session.add_all(
+        [
+            HealthSnapshot(
+                repo_id=repo.id,
+                commit_id=first_commit.id,
+                full_sha=first_commit.full_sha,
+                health_score=82.0,
+                avg_complexity=2.0,
+                max_complexity=3.0,
+                total_loc=120,
+                churn_rate=0.2,
+                num_files_changed=1,
+                bus_factor_min=2,
+                health_delta=None,
+                cc_score=90,
+                churn_score=80,
+                bus_score=40,
+                loc_score=85,
+                complexity_drift_score=90,
+                churn_risk_score=80,
+                bus_factor_risk_score=40,
+                dependency_health_score=85,
+                top_files_json='[{"path":"src/app.py","complexity":2.0,"loc":120}]',
+            ),
+            HealthSnapshot(
+                repo_id=repo.id,
+                commit_id=second_commit.id,
+                full_sha=second_commit.full_sha,
+                health_score=68.5,
+                avg_complexity=7.25,
+                max_complexity=12.0,
+                total_loc=240,
+                churn_rate=0.35,
+                num_files_changed=2,
+                bus_factor_min=1,
+                health_delta=-13.5,
+                cc_score=63.8,
+                churn_score=65,
+                bus_score=20,
+                loc_score=80,
+                complexity_drift_score=63.8,
+                churn_risk_score=65,
+                bus_factor_risk_score=20,
+                dependency_health_score=80,
+                dependency_density=0.5,
+                avg_semantic_drift=0.12,
+                semantic_health_score=88,
+                high_drift_files=0,
+                semantic_drift_method="fallback_levenshtein",
+                risk_reasons_json='[{"code":"single_owner","severity":"critical","label":"Single-owner risk","detail":"At least one critical module has only one active contributor.","impact":30.0}]',
+                hotspot_persistence_score=37.5,
+                persistent_hotspots_json='[{"path":"src/service.py","recent_commit_count":3,"complexity":7.25,"loc":160}]',
+                top_files_json='[{"path":"src/service.py","complexity":7.25,"loc":160}]',
+            ),
+        ]
+    )
 
-    session.add_all([
-        GraphNode(
-            repo_id=repo.id,
-            commit_id=second_commit.id,
-            full_sha=second_commit.full_sha,
-            file_path="src/service.py",
-            module_name="service.py",
-            loc=160,
-            avg_complexity=7.25,
-            health_color="yellow",
-            is_entry_point=False,
-            semantic_drift_score=0.12,
-            drift_method="fallback_levenshtein",
-        ),
-        GraphNode(
-            repo_id=repo.id,
-            commit_id=second_commit.id,
-            full_sha=second_commit.full_sha,
-            file_path="src/app.py",
-            module_name="app.py",
-            loc=80,
-            avg_complexity=2.0,
-            health_color="green",
-            is_entry_point=True,
-        ),
-        GraphEdge(
-            repo_id=repo.id,
-            commit_id=second_commit.id,
-            full_sha=second_commit.full_sha,
-            source_file="src/app.py",
-            target_file="src/service.py",
-            edge_type="import",
-            weight=1,
-        ),
-        BusFactor(
-            repo_id=repo.id,
-            module_path="src/service.py",
-            contributor_count=1,
-            top_contributor="Noor",
-            top_contributor_email="noor@example.com",
-            top_contributor_pct=1.0,
-            total_commits_to_module=2,
-            risk_level="critical",
-            last_commit_sha=second_commit.sha,
-        ),
-        LLMNarrative(
-            repo_id=repo.id,
-            commit_id=second_commit.id,
-            full_sha=second_commit.full_sha,
-            prompt_type="explain_drop",
-            cache_key=make_cache_key(repo.id, second_commit.full_sha, "explain_drop"),
-            prompt_input="{}",
-            response_text="Complexity increased in the service layer.",
-            tokens_input=10,
-            tokens_output=8,
-            cost_usd=0.00015,
-            model_used="claude-3-5-sonnet-20241022",
-        ),
-    ])
+    session.add_all(
+        [
+            GraphNode(
+                repo_id=repo.id,
+                commit_id=second_commit.id,
+                full_sha=second_commit.full_sha,
+                file_path="src/service.py",
+                module_name="service.py",
+                loc=160,
+                avg_complexity=7.25,
+                health_color="yellow",
+                is_entry_point=False,
+                semantic_drift_score=0.12,
+                drift_method="fallback_levenshtein",
+            ),
+            GraphNode(
+                repo_id=repo.id,
+                commit_id=second_commit.id,
+                full_sha=second_commit.full_sha,
+                file_path="src/app.py",
+                module_name="app.py",
+                loc=80,
+                avg_complexity=2.0,
+                health_color="green",
+                is_entry_point=True,
+            ),
+            GraphEdge(
+                repo_id=repo.id,
+                commit_id=second_commit.id,
+                full_sha=second_commit.full_sha,
+                source_file="src/app.py",
+                target_file="src/service.py",
+                edge_type="import",
+                weight=1,
+            ),
+            BusFactor(
+                repo_id=repo.id,
+                module_path="src/service.py",
+                contributor_count=1,
+                top_contributor="Noor",
+                top_contributor_email="noor@example.com",
+                top_contributor_pct=1.0,
+                total_commits_to_module=2,
+                risk_level="critical",
+                last_commit_sha=second_commit.sha,
+            ),
+            LLMNarrative(
+                repo_id=repo.id,
+                commit_id=second_commit.id,
+                full_sha=second_commit.full_sha,
+                prompt_type="explain_drop",
+                cache_key=make_cache_key(repo.id, second_commit.full_sha, "explain_drop"),
+                prompt_input="{}",
+                response_text="Complexity increased in the service layer.",
+                tokens_input=10,
+                tokens_output=8,
+                cost_usd=0.00015,
+                model_used="claude-3-5-sonnet-20241022",
+            ),
+        ]
+    )
     session.commit()
 
 
@@ -345,7 +349,9 @@ async def test_timeline_returns_snapshot_payloads(db_session: AsyncSessionAdapte
     assert payload["commits"][1]["persistent_hotspots"][0]["path"] == "src/service.py"
 
 
-async def test_graph_bus_factor_and_usage_endpoints_return_seeded_data(db_session: AsyncSessionAdapter):
+async def test_graph_bus_factor_and_usage_endpoints_return_seeded_data(
+    db_session: AsyncSessionAdapter,
+):
     graph = await get_graph(repo_id=1, sha="def456", db=db_session)
     assert graph["commit_sha"] == "def456abc123"
     assert {node["file"] for node in graph["nodes"]} == {"src/app.py", "src/service.py"}
@@ -386,30 +392,32 @@ async def test_get_hotspots_pagination(db_session: AsyncSessionAdapter):
     db_session.session.add(c3)
     db_session.session.flush()
 
-    db_session.session.add_all([
-        GraphNode(
-            repo_id=repo.id,
-            commit_id=c1.id,
-            full_sha=c1.full_sha,
-            file_path="src/service.py",
-            module_name="service.py",
-            loc=160,
-            avg_complexity=7.25,
-            health_color="yellow",
-            is_entry_point=False,
-        ),
-        GraphNode(
-            repo_id=repo.id,
-            commit_id=c3.id,
-            full_sha=c3.full_sha,
-            file_path="src/service.py",
-            module_name="service.py",
-            loc=160,
-            avg_complexity=7.25,
-            health_color="yellow",
-            is_entry_point=False,
-        ),
-    ])
+    db_session.session.add_all(
+        [
+            GraphNode(
+                repo_id=repo.id,
+                commit_id=c1.id,
+                full_sha=c1.full_sha,
+                file_path="src/service.py",
+                module_name="service.py",
+                loc=160,
+                avg_complexity=7.25,
+                health_color="yellow",
+                is_entry_point=False,
+            ),
+            GraphNode(
+                repo_id=repo.id,
+                commit_id=c3.id,
+                full_sha=c3.full_sha,
+                file_path="src/service.py",
+                module_name="service.py",
+                loc=160,
+                avg_complexity=7.25,
+                health_color="yellow",
+                is_entry_point=False,
+            ),
+        ]
+    )
     db_session.session.commit()
 
     # Default pagination
@@ -441,7 +449,9 @@ async def test_get_hotspots_pagination(db_session: AsyncSessionAdapter):
     assert usage["total_tokens"] == 18
 
 
-async def test_commit_detail_includes_nested_snapshot_graph_and_cached_narrative(db_session: AsyncSessionAdapter):
+async def test_commit_detail_includes_nested_snapshot_graph_and_cached_narrative(
+    db_session: AsyncSessionAdapter,
+):
     detail = await get_commit_detail(repo_id=1, sha="def456", db=db_session)
 
     assert detail["repo"].repo_slug == "example-project"
@@ -454,7 +464,9 @@ async def test_commit_detail_includes_nested_snapshot_graph_and_cached_narrative
     assert detail["narrative"]["explanation"] == "Complexity increased in the service layer."
 
 
-async def test_streaming_narrative_falls_back_to_demo_mode(db_session: AsyncSessionAdapter, monkeypatch):
+async def test_streaming_narrative_falls_back_to_demo_mode(
+    db_session: AsyncSessionAdapter, monkeypatch
+):
     async def failing_stream(prompt: str):
         raise RuntimeError("provider keys missing")
         yield prompt, None
@@ -462,15 +474,16 @@ async def test_streaming_narrative_falls_back_to_demo_mode(db_session: AsyncSess
     class MockAsyncSessionContext:
         def __init__(self, session):
             self.session = session
+
         async def __aenter__(self):
             return self.session
+
         async def __aexit__(self, exc_type, exc_val, exc_tb):
             pass
 
     monkeypatch.setattr("backend.features.llm_analysis.router.stream_narrative", failing_stream)
     monkeypatch.setattr(
-        "backend.database.AsyncSessionLocal",
-        lambda: MockAsyncSessionContext(db_session)
+        "backend.database.AsyncSessionLocal", lambda: MockAsyncSessionContext(db_session)
     )
 
     response = await explain_commit_stream(
@@ -487,15 +500,21 @@ async def test_streaming_narrative_falls_back_to_demo_mode(db_session: AsyncSess
     assert "DEMO MODE" in final_payload["explanation"]
     assert "error" not in final_payload
 
-    cached = db_session.session.query(LLMNarrative).filter(
-        LLMNarrative.cache_key
-        == make_cache_key(1, "abc123def4567890abc123def4567890abc123de", "explain_drop")
-    ).one()
+    cached = (
+        db_session.session.query(LLMNarrative)
+        .filter(
+            LLMNarrative.cache_key
+            == make_cache_key(1, "abc123def4567890abc123def4567890abc123de", "explain_drop")
+        )
+        .one()
+    )
     assert cached.model_used == "demo-mode"
     assert cached.cost_usd == 0.0
 
 
-async def test_ingest_repo_reuses_active_job_without_scheduling_duplicate(db_session: AsyncSessionAdapter):
+async def test_ingest_repo_reuses_active_job_without_scheduling_duplicate(
+    db_session: AsyncSessionAdapter,
+):
     active_job = AnalysisJob(
         repo_id=1,
         status="analyzing",
@@ -523,7 +542,9 @@ async def test_ingest_repo_reuses_active_job_without_scheduling_duplicate(db_ses
     assert background_tasks.tasks == []
 
 
-async def test_ingest_repo_schedules_created_job_by_id(db_session: AsyncSessionAdapter, monkeypatch):
+async def test_ingest_repo_schedules_created_job_by_id(
+    db_session: AsyncSessionAdapter, monkeypatch
+):
     async def fake_fetch_github_metadata(owner: str, repo: str):
         return {
             "github_stars": 0,
@@ -552,7 +573,9 @@ async def test_ingest_repo_schedules_created_job_by_id(db_session: AsyncSessionA
     assert job.status == "queued"
 
 
-async def test_ingest_repo_normalizes_repo_url_owner_and_name_to_lowercase(db_session: AsyncSessionAdapter, monkeypatch):
+async def test_ingest_repo_normalizes_repo_url_owner_and_name_to_lowercase(
+    db_session: AsyncSessionAdapter, monkeypatch
+):
     metadata_calls = []
 
     async def fake_fetch_github_metadata(owner: str, repo: str):
@@ -570,7 +593,9 @@ async def test_ingest_repo_normalizes_repo_url_owner_and_name_to_lowercase(db_se
     background_tasks = BackgroundTaskRecorder()
 
     response = await ingest_repo(
-        IngestRequest(repo_url="https://github.com/Example/ProjectNormalizationCase", max_commits=25),
+        IngestRequest(
+            repo_url="https://github.com/Example/ProjectNormalizationCase", max_commits=25
+        ),
         background_tasks=background_tasks,
         db=db_session,
     )
@@ -690,27 +715,30 @@ async def test_ingest_progress_stream_picks_up_cancelled_job_updates(monkeypatch
     async def skip_sleep(seconds: float):
         return None
 
-    db = _mock_progress_db(monkeypatch, [
-        AnalysisJob(
-            repo_id=1,
-            status="queued",
-            total_commits=5,
-            processed_commits=0,
-            current_stage="Queued",
-            progress_pct=0.0,
-            triggered_by="user",
-        ),
-        AnalysisJob(
-            repo_id=1,
-            status="cancelled",
-            total_commits=5,
-            processed_commits=0,
-            current_stage="Cancelled",
-            progress_pct=0.0,
-            error_message="Ingestion cancelled by user.",
-            triggered_by="user",
-        ),
-    ])
+    db = _mock_progress_db(
+        monkeypatch,
+        [
+            AnalysisJob(
+                repo_id=1,
+                status="queued",
+                total_commits=5,
+                processed_commits=0,
+                current_stage="Queued",
+                progress_pct=0.0,
+                triggered_by="user",
+            ),
+            AnalysisJob(
+                repo_id=1,
+                status="cancelled",
+                total_commits=5,
+                processed_commits=0,
+                current_stage="Cancelled",
+                progress_pct=0.0,
+                error_message="Ingestion cancelled by user.",
+                triggered_by="user",
+            ),
+        ],
+    )
     monkeypatch.setattr("backend.features.repo_ingestion.router.asyncio.sleep", skip_sleep)
 
     response = await ingest_progress(repo_id=1)
@@ -734,7 +762,13 @@ async def test_ingestion_rollback_preserves_old_data_on_mid_ingestion_failure(
     import sys
     import types
 
-    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine as _create
+    from sqlalchemy.ext.asyncio import (
+        AsyncSession,
+        async_sessionmaker,
+    )
+    from sqlalchemy.ext.asyncio import (
+        create_async_engine as _create,
+    )
 
     from backend.database import Base
     from backend.shared.models import AnalysisJob, Commit, Repo
@@ -746,6 +780,7 @@ async def test_ingestion_rollback_preserves_old_data_on_mid_ingestion_failure(
 
     async with test_engine.begin() as conn:
         from sqlalchemy import text as sa_text
+
         await conn.execute(sa_text("PRAGMA journal_mode=WAL"))
         await conn.execute(sa_text("PRAGMA synchronous=NORMAL"))
         await conn.run_sync(Base.metadata.create_all)
@@ -808,15 +843,17 @@ async def test_ingestion_rollback_preserves_old_data_on_mid_ingestion_failure(
         pass
 
     monkeypatch.setattr("backend.features.repo_ingestion.router._update_job", _noop_update)
-    monkeypatch.setattr("backend.features.repo_ingestion.router._raise_if_cancelled", _noop_cancel_check)
+    monkeypatch.setattr(
+        "backend.features.repo_ingestion.router._raise_if_cancelled", _noop_cancel_check
+    )
 
     # --- patch clone_repo to return a fake path ---
     fake_clone = tmp_path / "fake_repo"
     fake_clone.mkdir()
-    
+
     async def mock_clone(*args, **kwargs):
         return fake_clone
-        
+
     monkeypatch.setattr(
         "backend.features.repo_ingestion.router.clone_repo",
         mock_clone,
@@ -825,7 +862,7 @@ async def test_ingestion_rollback_preserves_old_data_on_mid_ingestion_failure(
     # --- patch count_available_commits ---
     async def mock_count(*args, **kwargs):
         return 2
-        
+
     monkeypatch.setattr(
         "backend.features.repo_ingestion.router.count_available_commits",
         mock_count,
@@ -888,12 +925,16 @@ async def test_ingestion_rollback_preserves_old_data_on_mid_ingestion_failure(
     fake_metrics_mod = types.ModuleType("backend.features.repo_ingestion.metrics_extractor")
     fake_metrics_mod.checkout_commit = lambda path, sha: None
     fake_metrics_mod.extract_commit_metrics = failing_extract
-    monkeypatch.setitem(sys.modules, "backend.features.repo_ingestion.metrics_extractor", fake_metrics_mod)
+    monkeypatch.setitem(
+        sys.modules, "backend.features.repo_ingestion.metrics_extractor", fake_metrics_mod
+    )
 
     # --- patch bus factor ---
     monkeypatch.setattr(
         "backend.features.repo_ingestion.router.compute_bus_factor_from_history",
-        lambda history, path: [{"file_path": "src/app.py", "contributor_count": 1, "contributors_json": "[]"}],
+        lambda history, path: [
+            {"file_path": "src/app.py", "contributor_count": 1, "contributors_json": "[]"}
+        ],
     )
 
     # --- patch graph builders (return empty) ---
@@ -924,9 +965,9 @@ async def test_ingestion_rollback_preserves_old_data_on_mid_ingestion_failure(
 
         # Old commit should still be there because the transaction rolled back
         old_shas = [c.sha for c in commits]
-        assert "oldsha12" in old_shas, (
-            f"Old commit was deleted but should have been preserved. Found: {old_shas}"
-        )
+        assert (
+            "oldsha12" in old_shas
+        ), f"Old commit was deleted but should have been preserved. Found: {old_shas}"
         # New commits should NOT be present (they were rolled back)
         assert "newsha01" not in old_shas, "Partial new data should have been rolled back"
 
@@ -940,7 +981,14 @@ async def test_ingestion_rollback_preserves_old_data_on_mid_ingestion_failure(
 
 @pytest.mark.anyio
 async def test_mark_stale_jobs_as_error(tmp_path, monkeypatch):
-    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine as _create
+    from sqlalchemy.ext.asyncio import (
+        AsyncSession,
+        async_sessionmaker,
+    )
+    from sqlalchemy.ext.asyncio import (
+        create_async_engine as _create,
+    )
+
     from backend.database import Base, mark_stale_jobs_as_error
     from backend.shared.models import AnalysisJob, Repo
 
@@ -955,12 +1003,33 @@ async def test_mark_stale_jobs_as_error(tmp_path, monkeypatch):
     # --- seed repos and jobs ---
     async with TestSession() as db:
         # Repo 1: has stale job (e.g. status='queued')
-        repo1 = Repo(id=1, url="https://github.com/test/proj1", name="test/proj1", owner="test", repo_slug="test-proj1", status="ready")
+        repo1 = Repo(
+            id=1,
+            url="https://github.com/test/proj1",
+            name="test/proj1",
+            owner="test",
+            repo_slug="test-proj1",
+            status="ready",
+        )
         # Repo 2: has stale job (e.g. status='analyzing')
-        repo2 = Repo(id=2, url="https://github.com/test/proj2", name="test/proj2", owner="test", repo_slug="test-proj2", status="ready")
+        repo2 = Repo(
+            id=2,
+            url="https://github.com/test/proj2",
+            name="test/proj2",
+            owner="test",
+            repo_slug="test-proj2",
+            status="ready",
+        )
         # Repo 3: has completed job (status='ready')
-        repo3 = Repo(id=3, url="https://github.com/test/proj3", name="test/proj3", owner="test", repo_slug="test-proj3", status="ready")
-        
+        repo3 = Repo(
+            id=3,
+            url="https://github.com/test/proj3",
+            name="test/proj3",
+            owner="test",
+            repo_slug="test-proj3",
+            status="ready",
+        )
+
         db.add_all([repo1, repo2, repo3])
         await db.flush()
 
@@ -971,7 +1040,9 @@ async def test_mark_stale_jobs_as_error(tmp_path, monkeypatch):
         # Job 3: not stale (status='ready')
         job3 = AnalysisJob(id=3, repo_id=3, status="ready", triggered_by="user")
         # Job 4: not stale (status='error')
-        job4 = AnalysisJob(id=4, repo_id=1, status="error", triggered_by="user", error_message="Previous failure")
+        job4 = AnalysisJob(
+            id=4, repo_id=1, status="error", triggered_by="user", error_message="Previous failure"
+        )
 
         db.add_all([job1, job2, job3, job4])
         await db.commit()
@@ -984,6 +1055,7 @@ async def test_mark_stale_jobs_as_error(tmp_path, monkeypatch):
 
     # Set up some fake directories to check cleanup
     from backend.features.repo_ingestion.clone_service import get_clone_path
+
     repo1_dir = get_clone_path(1)
     repo2_dir = get_clone_path(2)
     repo3_dir = get_clone_path(3)
@@ -1057,5 +1129,3 @@ async def test_get_hotspots_with_date_range_filtering(db_session: AsyncSessionAd
     )
     assert res["repo_id"] == 1
     assert "hotspots" in res
-
-

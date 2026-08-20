@@ -10,9 +10,18 @@ from backend.config import (
 
 
 def test_normalize_database_url_uses_asyncpg_for_postgres_urls():
-    assert _normalize_database_url("postgres://user:pass@host/db") == "postgresql+asyncpg://user:pass@host/db"
-    assert _normalize_database_url("postgresql://user:pass@host/db") == "postgresql+asyncpg://user:pass@host/db"
-    assert _normalize_database_url("sqlite+aiosqlite:///./commitiq.db") == "sqlite+aiosqlite:///./commitiq.db"
+    assert (
+        _normalize_database_url("postgres://user:pass@host/db")
+        == "postgresql+asyncpg://user:pass@host/db"
+    )
+    assert (
+        _normalize_database_url("postgresql://user:pass@host/db")
+        == "postgresql+asyncpg://user:pass@host/db"
+    )
+    assert (
+        _normalize_database_url("sqlite+aiosqlite:///./commitiq.db")
+        == "sqlite+aiosqlite:///./commitiq.db"
+    )
 
 
 def test_parse_csv_trims_empty_values():
@@ -105,7 +114,7 @@ def test_cors_origins_dev_defaults_first_then_explicit():
 
     defaults = _parse_csv(DEFAULT_LOCAL_CORS_ORIGINS)
     assert origins[: len(defaults)] == defaults
-    assert origins[len(defaults):] == ["https://custom.example.com"]
+    assert origins[len(defaults) :] == ["https://custom.example.com"]
 
 
 def test_cors_origins_production_does_not_merge_defaults():
@@ -126,9 +135,9 @@ def test_cors_origins_recognizes_dev_environment_aliases():
     """Common dev environment identifiers all get localhost defaults."""
     for env in ("development", "dev", "local", "staging", "test", "testing"):
         origins = _cors_origins(env, None)
-        assert "http://localhost:5173" in origins, (
-            f"Environment {env!r} should auto-allow localhost origins"
-        )
+        assert (
+            "http://localhost:5173" in origins
+        ), f"Environment {env!r} should auto-allow localhost origins"
 
 
 def test_cors_origins_case_insensitive_environment():

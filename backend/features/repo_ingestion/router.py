@@ -36,8 +36,8 @@ from backend.shared.models import (
     GraphNode,
     HealthSnapshot,
     LLMNarrative,
-    Repo,
     PullRequest,
+    Repo,
 )
 from backend.shared.schemas import (
     BusFactorWrapper,
@@ -92,7 +92,7 @@ async def _update_job(job_id: int, db: AsyncSession | None = None, **kwargs) -> 
         except Exception as exc:
             if attempt == 4:
                 logger.warning("Failed to update job id=%s after 5 attempts: %s", job_id, exc)
-            await asyncio.sleep(0.1 * (2 ** attempt))
+            await asyncio.sleep(0.1 * (2**attempt))
 
 
 async def _raise_if_cancelled(job_id: int) -> None:
@@ -377,7 +377,15 @@ async def _commit_graph_rows(
 
 
 async def _clear_repo_data(db: AsyncSession, repo_id: int) -> None:
-    for model in (LLMNarrative, GraphEdge, GraphNode, HealthSnapshot, Commit, BusFactor, PullRequest):
+    for model in (
+        LLMNarrative,
+        GraphEdge,
+        GraphNode,
+        HealthSnapshot,
+        Commit,
+        BusFactor,
+        PullRequest,
+    ):
         await db.execute(delete(model).where(model.repo_id == repo_id))
 
 
@@ -391,7 +399,9 @@ async def _latest_active_job(db: AsyncSession, repo_id: int) -> AnalysisJob | No
     return result.scalar_one_or_none()
 
 
-async def run_ingestion(repo_id: int, job_id: int, max_commits: int,branch: str | None = None) -> None:
+async def run_ingestion(
+    repo_id: int, job_id: int, max_commits: int, branch: str | None = None
+) -> None:
     from backend.database import AsyncSessionLocal
     from backend.features.repo_ingestion.metrics_extractor import (
         checkout_commit,
@@ -425,7 +435,12 @@ async def run_ingestion(repo_id: int, job_id: int, max_commits: int,branch: str 
 
     clone_path = None
     try:
-        clone_path = await clone_repo(repo_url, repo_id, max_commits,branch=branch,)
+        clone_path = await clone_repo(
+            repo_url,
+            repo_id,
+            max_commits,
+            branch=branch,
+        )
         available_commits = await count_available_commits(clone_path)
         if available_commits < 1:
             raise RuntimeError(
@@ -445,7 +460,9 @@ async def run_ingestion(repo_id: int, job_id: int, max_commits: int,branch: str 
         )
         await _raise_if_cancelled(job_id)
         checkout_commit(clone_path, commit_history[-1]["full_sha"])
-        bus_entries = await asyncio.to_thread(compute_bus_factor_from_history, commit_history, clone_path)
+        bus_entries = await asyncio.to_thread(
+            compute_bus_factor_from_history, commit_history, clone_path
+        )
         min_bus_factor = min((entry["contributor_count"] for entry in bus_entries), default=1)
 
         owner, repo_name = parse_github_url(repo_url)
@@ -484,7 +501,9 @@ async def run_ingestion(repo_id: int, job_id: int, max_commits: int,branch: str 
                     progress_pct=round(idx / len(commit_history) * 60, 1),
                 )
 
-                file_metrics_map = await asyncio.to_thread(extract_commit_metrics, clone_path, commit_data)
+                file_metrics_map = await asyncio.to_thread(
+                    extract_commit_metrics, clone_path, commit_data
+                )
                 top_files = list(file_metrics_map.keys())[:50]
                 import_edges = build_import_edges(clone_path, top_files)
                 cochange_edges = build_cochange_edges(commit_history[: idx + 1])
@@ -543,7 +562,9 @@ async def run_ingestion(repo_id: int, job_id: int, max_commits: int,branch: str 
                             commit_id=commit_obj.id,
                             full_sha=commit_obj.full_sha,
                             file_path=fpath,
-                            module_name=str(Path(fpath).parent) if Path(fpath).parent != Path(".") else None,
+                            module_name=(
+                                str(Path(fpath).parent) if Path(fpath).parent != Path(".") else None
+                            ),
                             loc=metrics.get("loc", 0),
                             avg_complexity=metrics.get("avg_complexity", 0.0),
                             health_color=assign_health_color(metrics.get("avg_complexity", 0.0)),
@@ -718,17 +739,28 @@ async def run_rescan(repo_id: int, job_id: int, max_commits: int) -> None:
 
         # Process new commits incrementally
         checkout_commit(clone_path, commit_history[-1]["full_sha"])
-        bus_entries = await asyncio.to_thread(compute_bus_factor_from_history, commit_history, clone_path)
+        bus_entries = await asyncio.to_thread(
+            compute_bus_factor_from_history, commit_history, clone_path
+        )
         min_bus_factor = min((entry["contributor_count"] for entry in bus_entries), default=1)
 
         for idx, commit_data in enumerate(new_commits):
             await _raise_if_cancelled(job_id)
 
-            file_metrics_map = await asyncio.to_thread(extract_commit_metrics, clone_path, commit_data)
+            file_metrics_map = await asyncio.to_thread(
+                extract_commit_metrics, clone_path, commit_data
+            )
             top_files = list(file_metrics_map.keys())[:50]
             import_edges = build_import_edges(clone_path, top_files)
 
-            c_idx = next((i for i, c in enumerate(commit_history) if c["full_sha"] == commit_data["full_sha"]), idx)
+            c_idx = next(
+                (
+                    i
+                    for i, c in enumerate(commit_history)
+                    if c["full_sha"] == commit_data["full_sha"]
+                ),
+                idx,
+            )
             cochange_edges = build_cochange_edges(commit_history[: c_idx + 1])
             top_set = set(top_files)
             filtered_edges = []
@@ -786,7 +818,9 @@ async def run_rescan(repo_id: int, job_id: int, max_commits: int) -> None:
                             commit_id=commit_obj.id,
                             full_sha=commit_obj.full_sha,
                             file_path=fpath,
-                            module_name=str(Path(fpath).parent) if Path(fpath).parent != Path(".") else None,
+                            module_name=(
+                                str(Path(fpath).parent) if Path(fpath).parent != Path(".") else None
+                            ),
                             loc=metrics.get("loc", 0),
                             avg_complexity=metrics.get("avg_complexity", 0.0),
                             health_color=assign_health_color(metrics.get("avg_complexity", 0.0)),
@@ -829,8 +863,10 @@ async def run_rescan(repo_id: int, job_id: int, max_commits: int) -> None:
             repo = await db.get(Repo, repo_id)
             if repo:
                 total_db_commits = (
-                    await db.execute(select(Commit).where(Commit.repo_id == repo_id))
-                ).scalars().all()
+                    (await db.execute(select(Commit).where(Commit.repo_id == repo_id)))
+                    .scalars()
+                    .all()
+                )
                 repo.status = "ready"
                 repo.analyzed_commits = len(total_db_commits)
                 repo.total_commits = available_commits
@@ -946,7 +982,13 @@ async def ingest_repo(
     await db.refresh(repo)
     await db.refresh(job)
 
-    background_tasks.add_task(run_ingestion, repo.id, job.id, request.max_commits,request.branch,)
+    background_tasks.add_task(
+        run_ingestion,
+        repo.id,
+        job.id,
+        request.max_commits,
+        request.branch,
+    )
     return IngestResponse(
         repo_id=repo.id,
         repo_slug=repo.repo_slug,
@@ -1076,8 +1118,9 @@ async def ingest_progress(repo_id: int):
 
 async def _count_active_contributors(db: AsyncSession, repo_id: int) -> int:
     result = await db.execute(
-        select(func.count(func.distinct(func.coalesce(Commit.author_email, Commit.author_name))))
-        .where(Commit.repo_id == repo_id)
+        select(
+            func.count(func.distinct(func.coalesce(Commit.author_email, Commit.author_name)))
+        ).where(Commit.repo_id == repo_id)
     )
     return result.scalar() or 0
 
@@ -1395,4 +1438,3 @@ async def get_llm_usage(repo_id: int, db: AsyncSession = Depends(get_db)):
     from backend.features.llm_analysis.cost_guard import get_usage_summary
 
     return await get_usage_summary(repo_id, db)
-
