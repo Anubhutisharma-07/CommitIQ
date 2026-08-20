@@ -37,8 +37,9 @@ function parseGitHubUrl(url: string): { owner: string; repo: string } | null {
     return null
   }
 
-  const owner = parts[0]
-  const repo = parts[1]
+  // Convert owner and repo to lowercase to maintain consistent URL formatting
+  const owner = parts[0].toLowerCase()
+  const repo = parts[1].toLowerCase()
 
   const nameRegex = /^[\w.-]+$/
   if (!nameRegex.test(owner) || !nameRegex.test(repo)) {
@@ -55,6 +56,7 @@ export default function LandingPage() {
   const [error, setError] = useState<string | null>(null)
   const [phIdx, setPhIdx] = useState(0)
   const [maxCommits, setMaxCommits] = useState('500')
+  const [branch, setBranch] = useState('')
   const navigate = useNavigate()
 
   const reposState = useSWR('recent-repos', () => listRepos())
@@ -81,19 +83,23 @@ export default function LandingPage() {
   }
 
   const handleSubmit = async () => {
-    if (status !== 'valid' || loading) return
+    if (loading) return
+    const parsed = parseGitHubUrl(url)
+    if (!parsed) {
+      setStatus('invalid')
+      setError(
+        url.trim()
+          ? 'Please enter a complete GitHub repository URL or owner/repo path (e.g. Myparadox-creator/CommitIQ---).'
+          : 'Please enter a GitHub repository URL to analyze.'
+      )
+      return
+    }
     setLoading(true)
     setError(null)
     try {
-      const parsed = parseGitHubUrl(url)
-      if (!parsed) {
-        setStatus('invalid')
-        setLoading(false)
-        return
-      }
       const normalizedUrl = `https://github.com/${parsed.owner}/${parsed.repo}`
       const commitsNum = maxCommits ? parseInt(maxCommits, 10) : 500
-      const response = await ingestRepo(normalizedUrl, isNaN(commitsNum) ? 500 : commitsNum)
+      const response = await ingestRepo(normalizedUrl, isNaN(commitsNum) ? 500 : commitsNum,branch.trim() || undefined)
       navigate(`/analyze?repo_id=${response.repo_id}&name=${encodeURIComponent(normalizedUrl)}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not start repository ingestion.')
@@ -129,7 +135,7 @@ export default function LandingPage() {
               Interactive Demo
             </button>
             <a 
-              href="https://github.com/eshaanag/CommitIQ" 
+              href="https://github.com/Myparadox-creator/CommitIQ---" 
               target="_blank" 
               rel="noreferrer" 
               className="text-slate-300 hover:text-white text-sm font-medium tracking-wide transition-colors"
@@ -185,7 +191,7 @@ export default function LandingPage() {
               </div>
               <button
                 onClick={handleSubmit}
-                disabled={status !== 'valid' || loading}
+                disabled={loading}
                 className="px-6 py-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white font-semibold text-sm transition-all duration-300 disabled:opacity-40 disabled:hover:bg-white/10 disabled:cursor-not-allowed flex items-center gap-2 border border-white/5 active:scale-95"
               >
                 {loading ? (
@@ -200,6 +206,16 @@ export default function LandingPage() {
                   <span>Analyze</span>
                 )}
               </button>
+            </div>
+              <div className="mt-3">
+              <input
+                type="text"
+                value={branch}
+                onChange={(e) => setBranch(e.target.value)}
+                onKeyDown={(event) => event.key === 'Enter' && handleSubmit()}
+                placeholder="Branch (optional)"
+                className="w-full glass-panel rounded-xl px-4 py-3 bg-transparent text-white font-mono text-sm outline-none placeholder-slate-500 border border-white/10 focus:border-purple-500/50"
+              />
             </div>
           </div>
 
@@ -310,3 +326,4 @@ export default function LandingPage() {
     </div>
   )
 }
+ 

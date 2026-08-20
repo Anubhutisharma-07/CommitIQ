@@ -15,6 +15,7 @@ from backend.features.repo_ingestion.router import (
     get_bus_factor,
     get_commit_detail,
     get_graph,
+    get_hotspots,
     ingest_progress,
     get_llm_usage,
     get_repo_by_slug,
@@ -386,7 +387,19 @@ async def test_streaming_narrative_falls_back_to_demo_mode(db_session: AsyncSess
         raise RuntimeError("provider keys missing")
         yield prompt, None
 
+    class MockAsyncSessionContext:
+        def __init__(self, session):
+            self.session = session
+        async def __aenter__(self):
+            return self.session
+        async def __aexit__(self, exc_type, exc_val, exc_tb):
+            pass
+
     monkeypatch.setattr("backend.features.llm_analysis.router.stream_narrative", failing_stream)
+    monkeypatch.setattr(
+        "backend.database.AsyncSessionLocal",
+        lambda: MockAsyncSessionContext(db_session)
+    )
 
     response = await explain_commit_stream(
         NarrativeRequest(repo_id=1, commit_sha="abc123def456", prompt_type="explain_drop"),
@@ -462,9 +475,41 @@ async def test_ingest_repo_schedules_created_job_by_id(db_session: AsyncSessionA
     job = db_session.session.get(AnalysisJob, response.job_id)
 
     assert scheduled_func is run_ingestion
-    assert args == (response.repo_id, response.job_id, 25)
+    assert args == (response.repo_id, response.job_id, 25, None)
     assert kwargs == {}
     assert job.status == "queued"
+
+
+async def test_ingest_repo_normalizes_repo_url_owner_and_name_to_lowercase(db_session: AsyncSessionAdapter, monkeypatch):
+    metadata_calls = []
+
+    async def fake_fetch_github_metadata(owner: str, repo: str):
+        metadata_calls.append((owner, repo))
+        return {
+            "github_stars": 0,
+            "github_language": None,
+            "github_description": None,
+        }
+
+    monkeypatch.setattr(
+        "backend.features.repo_ingestion.router.fetch_github_metadata",
+        fake_fetch_github_metadata,
+    )
+    background_tasks = BackgroundTaskRecorder()
+
+    response = await ingest_repo(
+        IngestRequest(repo_url="https://github.com/Example/ProjectNormalizationCase", max_commits=25),
+        background_tasks=background_tasks,
+        db=db_session,
+    )
+
+    repo = db_session.session.get(Repo, response.repo_id)
+
+    assert repo.url == "https://github.com/example/projectnormalizationcase"
+    assert repo.name == "example/projectnormalizationcase"
+    assert repo.owner == "example"
+    assert repo.repo_slug == "example-projectnormalizationcase"
+    assert metadata_calls == [("example", "projectnormalizationcase")]
 
 
 async def test_cancel_ingestion_marks_active_job_cancelled(db_session: AsyncSessionAdapter):
@@ -819,3 +864,126 @@ async def test_ingestion_rollback_preserves_old_data_on_mid_ingestion_failure(
         assert "Simulated mid-ingestion failure" in (repo.error_message or "")
 
     await test_engine.dispose()
+
+
+@pytest.mark.anyio
+async def test_mark_stale_jobs_as_error(tmp_path, monkeypatch):
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine as _create
+    from backend.database import Base, mark_stale_jobs_as_error
+    from backend.shared.models import AnalysisJob, Repo
+
+    # --- set up an isolated async sqlite database ---
+    db_url = f"sqlite+aiosqlite:///{tmp_path / 'test_stale.db'}"
+    test_engine = _create(db_url, connect_args={"check_same_thread": False, "timeout": 30})
+    TestSession = async_sessionmaker(test_engine, class_=AsyncSession, expire_on_commit=False)
+
+    async with test_engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+    # --- seed repos and jobs ---
+    async with TestSession() as db:
+        # Repo 1: has stale job (e.g. status='queued')
+        repo1 = Repo(id=1, url="https://github.com/test/proj1", name="test/proj1", owner="test", repo_slug="test-proj1", status="ready")
+        # Repo 2: has stale job (e.g. status='analyzing')
+        repo2 = Repo(id=2, url="https://github.com/test/proj2", name="test/proj2", owner="test", repo_slug="test-proj2", status="ready")
+        # Repo 3: has completed job (status='ready')
+        repo3 = Repo(id=3, url="https://github.com/test/proj3", name="test/proj3", owner="test", repo_slug="test-proj3", status="ready")
+        
+        db.add_all([repo1, repo2, repo3])
+        await db.flush()
+
+        # Job 1: stale (status='queued')
+        job1 = AnalysisJob(id=1, repo_id=1, status="queued", triggered_by="user")
+        # Job 2: stale (status='analyzing')
+        job2 = AnalysisJob(id=2, repo_id=2, status="analyzing", triggered_by="user")
+        # Job 3: not stale (status='ready')
+        job3 = AnalysisJob(id=3, repo_id=3, status="ready", triggered_by="user")
+        # Job 4: not stale (status='error')
+        job4 = AnalysisJob(id=4, repo_id=1, status="error", triggered_by="user", error_message="Previous failure")
+
+        db.add_all([job1, job2, job3, job4])
+        await db.commit()
+
+    # Patch AsyncSessionLocal
+    monkeypatch.setattr("backend.database.AsyncSessionLocal", TestSession)
+
+    # Patch REPO_STORAGE_PATH in clone_service to tmp_path
+    monkeypatch.setattr("backend.features.repo_ingestion.clone_service.REPO_STORAGE_PATH", tmp_path)
+
+    # Set up some fake directories to check cleanup
+    from backend.features.repo_ingestion.clone_service import get_clone_path
+    repo1_dir = get_clone_path(1)
+    repo2_dir = get_clone_path(2)
+    repo3_dir = get_clone_path(3)
+    job1_dir = tmp_path / "1"
+
+    # Create directories
+    repo1_dir.mkdir(parents=True, exist_ok=True)
+    repo2_dir.mkdir(parents=True, exist_ok=True)
+    repo3_dir.mkdir(parents=True, exist_ok=True)
+
+    assert repo1_dir.exists()
+    assert repo2_dir.exists()
+    assert repo3_dir.exists()
+
+    # --- Run mark_stale_jobs_as_error ---
+    await mark_stale_jobs_as_error()
+
+    # --- Verify jobs in DB ---
+    async with TestSession() as db:
+        j1 = await db.get(AnalysisJob, 1)
+        j2 = await db.get(AnalysisJob, 2)
+        j3 = await db.get(AnalysisJob, 3)
+        j4 = await db.get(AnalysisJob, 4)
+
+        # Stale jobs should be error
+        assert j1.status == "error"
+        assert j1.error_message == "System restart aborted the analysis job"
+        assert j2.status == "error"
+        assert j2.error_message == "System restart aborted the analysis job"
+
+        # Non-stale jobs should remain unchanged
+        assert j3.status == "ready"
+        assert j4.status == "error"
+        assert j4.error_message == "Previous failure"
+
+    # --- Verify directories are cleaned up ---
+    assert not repo1_dir.exists()
+    assert not repo2_dir.exists()
+    assert repo3_dir.exists()
+
+    await test_engine.dispose()
+
+
+async def test_get_timeline_with_date_range_filtering(db_session: AsyncSessionAdapter):
+    res_all = await get_timeline(repo_id=1, db=db_session)
+    assert len(res_all["commits"]) == 2
+
+    res_after = await get_timeline(
+        repo_id=1,
+        start_date=datetime(2026, 1, 1, 12, 0, tzinfo=timezone.utc),
+        db=db_session,
+    )
+    assert len(res_after["commits"]) == 1
+    assert res_after["commits"][0]["sha"] == "def456abc123"
+
+    res_before = await get_timeline(
+        repo_id=1,
+        end_date=datetime(2026, 1, 1, 12, 0, tzinfo=timezone.utc),
+        db=db_session,
+    )
+    assert len(res_before["commits"]) == 1
+    assert res_before["commits"][0]["sha"] == "abc123def456"
+
+
+async def test_get_hotspots_with_date_range_filtering(db_session: AsyncSessionAdapter):
+    res = await get_hotspots(
+        repo_id=1,
+        start_date=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        end_date=datetime(2026, 1, 3, tzinfo=timezone.utc),
+        db=db_session,
+    )
+    assert res["repo_id"] == 1
+    assert "hotspots" in res
+
+

@@ -26,6 +26,8 @@ class Repo(Base):
     github_stars        = Column(Integer, nullable=True)
     github_language     = Column(String, nullable=True)
     github_description  = Column(Text, nullable=True)
+    total_file_count    = Column(Integer, nullable=False, default=0)
+    total_repo_loc      = Column(Integer, nullable=False, default=0)
 
     commits       = relationship("Commit", back_populates="repo", cascade="all, delete-orphan")
     analysis_jobs = relationship("AnalysisJob", back_populates="repo", cascade="all, delete-orphan")
