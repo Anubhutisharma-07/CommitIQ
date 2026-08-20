@@ -15,6 +15,7 @@ from backend.features.repo_ingestion.clone_service import (
     get_clone_path,
     make_repo_slug,
     parse_github_url,
+    sanitize_repo_url,
 )
 from backend.features.repo_ingestion.graph_builder import (
     build_cochange_edges,
@@ -31,10 +32,28 @@ from backend.shared.schemas import IngestRequest
 @pytest.mark.parametrize(
     ("raw", "expected"),
     [
+        ("https://token@github.com/owner/repo", "https://github.com/owner/repo"),
+        ("https://user:token@github.com/owner/repo.git", "https://github.com/owner/repo.git"),
+        ("http://ghp_1234567890@github.com/owner/repo", "http://github.com/owner/repo"),
+        ("token@github.com/owner/repo", "github.com/owner/repo"),
+        ("https://github.com/owner/repo", "https://github.com/owner/repo"),
+        ("owner/repo", "owner/repo"),
+        ("", ""),
+    ],
+)
+def test_sanitize_repo_url_strips_token_credentials(raw, expected):
+    assert sanitize_repo_url(raw) == expected
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
         ("owner/repo", ("owner", "repo")),
         ("https://github.com/owner/repo", ("owner", "repo")),
         ("http://github.com/owner/repo.git/", ("owner", "repo")),
         ("www.github.com/owner/repo", ("owner", "repo")),
+        ("https://ghp_token123@github.com/owner/repo", ("owner", "repo")),
+        ("https://user:secret@github.com/owner/repo.git", ("owner", "repo")),
     ],
 )
 def test_parse_github_url_accepts_supported_forms(raw, expected):
@@ -75,7 +94,7 @@ def test_cleanup_repo_does_not_mask_cleanup_failures(monkeypatch, tmp_path):
     clone_path = get_clone_path(42)
     clone_path.mkdir()
 
-    def fail_rmtree(path):
+    def fail_rmtree(path, **kwargs):
         raise OSError("permission denied")
 
     monkeypatch.setattr("backend.features.repo_ingestion.clone_service.shutil.rmtree", fail_rmtree)
@@ -113,6 +132,28 @@ def test_import_extractors_and_resolver_cover_common_python_and_ts_patterns():
     )
     assert "os" in python_imports
     assert "package.module" in python_imports
+
+
+def test_extract_python_imports_preserves_relative_import_levels():
+    source = "\n".join([
+        "from .database import get_db",
+        "from ..shared.utils import helper",
+        "from ...config import settings",
+        "from . import models",
+        "from .. import api",
+        "import os",
+        "import pathlib",
+        "from collections import defaultdict",
+    ])
+    python_imports = extract_python_imports(source)
+    assert ".database" in python_imports
+    assert "..shared.utils" in python_imports
+    assert "...config" in python_imports
+    assert "." in python_imports
+    assert ".." in python_imports
+    assert "os" in python_imports
+    assert "pathlib" in python_imports
+    assert "collections" in python_imports
 
     js_imports = extract_js_imports(
         """
@@ -267,7 +308,6 @@ def test_compute_full_snapshot_aggregates_metric_and_semantic_inputs():
     }
     assert json.loads(snapshot["persistent_hotspots_json"]) == persistent_hotspots
 
-
 @pytest.mark.anyio
 async def test_clone_repo_rejects_when_storage_quota_exceeded(monkeypatch, tmp_path):
     """Ingestion must be rejected when REPO_STORAGE_PATH usage exceeds MAX_REPO_STORAGE_MB."""
@@ -298,3 +338,105 @@ async def test_clone_repo_allows_when_under_quota(monkeypatch, tmp_path):
     # Storage is empty, so quota check should pass; it will fail at git clone instead
     with pytest.raises(RuntimeError):
         await clone_repo("https://github.com/test/nonexistent-repo-12345", repo_id=999, max_commits=10)
+
+
+def test_calculate_average_metrics_zero_code_files():
+    from backend.features.repo_ingestion.health_scorer import calculate_average_metrics
+
+    assert calculate_average_metrics(0.0, 0) == 0.0
+    assert calculate_average_metrics(10.0, 0) == 0.0
+    assert calculate_average_metrics(10.0, 2) == 5.0
+
+
+def test_compute_full_snapshot_with_zero_code_files():
+    commit_data = {
+        "full_sha": "def456",
+        "insertions": 15,
+        "deletions": 2,
+        "files_list": ["README.md", ".gitignore"],
+    }
+    file_metrics_map = {
+        "__semantic_health__": {
+            "avg_semantic_drift": 0.0,
+            "semantic_health_score": 100.0,
+            "high_drift_files": 0,
+            "semantic_drift_method": "none",
+        }
+    }
+
+    snapshot = compute_full_snapshot(
+        commit_data=commit_data,
+        file_metrics_map=file_metrics_map,
+        bus_factor_min=1,
+        prev_health=None,
+    )
+
+    assert snapshot["health_score"] == 100.0
+    assert snapshot["avg_complexity"] == 0.0
+    assert snapshot["max_complexity"] == 0.0
+    assert snapshot["total_loc"] == 0
+    assert snapshot["churn_rate"] == 0.0
+    assert json.loads(snapshot["risk_reasons_json"]) == []
+
+def test_sanitize_commit_message():
+    from backend.features.repo_ingestion.commit_walker import sanitize_commit_message
+
+    assert sanitize_commit_message(None) == ""
+    assert sanitize_commit_message("") == ""
+    assert sanitize_commit_message("  ") == ""
+    assert sanitize_commit_message("fix: normal commit") == "fix: normal commit"
+    assert sanitize_commit_message("<script>alert('xss')</script> Fix issue") == "Fix issue"
+    assert sanitize_commit_message("fix: update <Header /> component") == "fix: update  component"
+    assert sanitize_commit_message("feat: value < 100") == "feat: value &lt; 100"
+
+
+def test_is_code_file_allows_license_named_source_files():
+    assert is_code_file("src/hooks/useLicense.ts")
+    assert is_code_file("src/components/LicenseGate.tsx")
+
+
+def test_is_code_file_allows_changelog_named_source_files():
+    assert is_code_file("src/services/changelog.go")
+
+
+def test_is_code_file_excludes_documentation_files():
+    assert not is_code_file("LICENSE")
+    assert not is_code_file("README.md")
+    assert not is_code_file("CHANGELOG.md")
+
+
+def test_stream_commit_diff_stats_parses_numstat_lines(monkeypatch, tmp_path):
+    from backend.features.repo_ingestion.commit_walker import stream_commit_diff_stats
+
+    mock_diff_lines = [
+        "10\t2\tbackend/main.py",
+        "50\t0\tsrc/utils.ts",
+        "-\t-\tassets/logo.png",
+        "",
+    ]
+
+    monkeypatch.setattr(
+        "backend.features.repo_ingestion.commit_walker.stream_git_diff_lines",
+        lambda repo_path, cmd: iter(mock_diff_lines),
+    )
+
+    files, insertions, deletions = stream_commit_diff_stats(tmp_path, "abc123456789")
+    assert files == ["backend/main.py", "src/utils.ts", "assets/logo.png"]
+    assert insertions == 60
+    assert deletions == 2
+
+
+def test_stream_commit_diff_stats_handles_empty_stream(monkeypatch, tmp_path):
+    from backend.features.repo_ingestion.commit_walker import stream_commit_diff_stats
+
+    monkeypatch.setattr(
+        "backend.features.repo_ingestion.commit_walker.stream_git_diff_lines",
+        lambda repo_path, cmd: iter([]),
+    )
+
+    files, insertions, deletions = stream_commit_diff_stats(tmp_path, "abc123456789")
+    assert files == []
+    assert insertions == 0
+    assert deletions == 0
+
+

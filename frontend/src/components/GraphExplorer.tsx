@@ -18,10 +18,23 @@ import {
   Compass, 
   Info,
   ChevronRight,
+  ChevronDown,
   TrendingUp,
-  GitCommit
+  GitCommit,
+  FolderTree,
+  Flame,
+  FileText,
+  Folder
 } from 'lucide-react'
 import type { ForceGraphLink, ForceGraphNode, GraphExplorerProps } from '../types'
+
+interface TreeNode {
+  name: string
+  fullPath?: string
+  nodeId?: string
+  children: TreeNode[]
+  isFolder: boolean
+}
 
 type NodeSizeMetric = 'loc' | 'churn' | 'coupling' | 'instability' | 'equal'
 
@@ -71,6 +84,8 @@ export function GraphExplorer({ graphData, selectedSha, commits = [], onSelectCo
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const [isLeftSidebarOpen, setIsLeftSidebarOpen] = useState(true)
+  const [leftSidebarTab, setLeftSidebarTab] = useState<'filters' | 'tree'>('filters')
+  const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(new Set())
   const [nodeSizeMetric, setNodeSizeMetric] = useState<NodeSizeMetric>('loc')
 
   const [showImports, setShowImports] = useState(true)
@@ -254,6 +269,189 @@ export function GraphExplorer({ graphData, selectedSha, commits = [], onSelectCo
     return Array.from(mods)
   }, [nodes])
 
+  // Hotspot score map per file (0..100 normalized score calculated from complexity * churn & incoming coupling)
+  const hotspotMetricsMap = useMemo(() => {
+    const map = new Map<string, { score: number; colorClass: string; iconType: 'critical' | 'high' | 'medium' | 'low' }>()
+    let maxMetric = 1
+    const rawMetrics = new Map<string, number>()
+
+    nodes.forEach(node => {
+      const locVal = node.loc || 10
+      const healthRisk = node.health_color === 'red' ? 3 : node.health_color === 'orange' ? 2 : node.health_color === 'yellow' ? 1 : 0.5
+      const raw = locVal * healthRisk
+      rawMetrics.set(node.id, raw)
+      if (raw > maxMetric) maxMetric = raw
+    })
+
+    nodes.forEach(node => {
+      const raw = rawMetrics.get(node.id) || 0
+      const score = Math.min(100, Math.round((raw / maxMetric) * 100))
+      
+      let colorClass = 'text-emerald-400 font-normal'
+      let iconType: 'critical' | 'high' | 'medium' | 'low' = 'low'
+
+      if (score > 75) {
+        colorClass = 'text-rose-400 font-semibold'
+        iconType = 'critical'
+      } else if (score > 50) {
+        colorClass = 'text-orange-400 font-semibold'
+        iconType = 'high'
+      } else if (score > 25) {
+        colorClass = 'text-amber-300 font-medium'
+        iconType = 'medium'
+      }
+
+      map.set(node.file, { score, colorClass, iconType })
+      map.set(node.id, { score, colorClass, iconType })
+    })
+
+    return map
+  }, [nodes])
+
+  // Build hierarchical file tree structure from flat node paths
+  const fileTree = useMemo<TreeNode[]>(() => {
+    const root: TreeNode[] = []
+
+    nodes.forEach(node => {
+      const pathParts = node.file.split('/').filter(Boolean)
+      let currentLevel = root
+
+      pathParts.forEach((part, index) => {
+        const isLast = index === pathParts.length - 1
+        let existing = currentLevel.find(item => item.name === part && item.isFolder === !isLast)
+
+        if (!existing) {
+          existing = {
+            name: part,
+            fullPath: isLast ? node.file : undefined,
+            nodeId: isLast ? node.id : undefined,
+            children: [],
+            isFolder: !isLast,
+          }
+          currentLevel.push(existing)
+        }
+        currentLevel = existing.children
+      })
+    })
+
+    const sortNodes = (items: TreeNode[]) => {
+      items.sort((a, b) => {
+        if (a.isFolder && !b.isFolder) return -1
+        if (!a.isFolder && b.isFolder) return 1
+        return a.name.localeCompare(b.name)
+      })
+      items.forEach(item => {
+        if (item.children.length > 0) sortNodes(item.children)
+      })
+    }
+
+    sortNodes(root)
+    return root
+  }, [nodes])
+
+  const toggleFolder = useCallback((folderPath: string) => {
+    setCollapsedFolders(prev => {
+      const next = new Set(prev)
+      if (next.has(folderPath)) {
+        next.delete(folderPath)
+      } else {
+        next.add(folderPath)
+      }
+      return next
+    })
+  }, [])
+
+  const handleFocusNode = useCallback((nodeId: string) => {
+    const canvasNode = nodes.find(n => n.id === nodeId)
+    if (canvasNode && graphRef.current) {
+      graphRef.current.centerAt(canvasNode.x, canvasNode.y, 800)
+      graphRef.current.zoom(1.8, 800)
+      setSelectedNodeId(nodeId)
+      setIsSidebarOpen(true)
+    }
+  }, [nodes])
+
+  const renderTreeNodes = useCallback((items: TreeNode[], currentPath = ''): React.ReactNode => {
+    return items.map(item => {
+      const pathKey = currentPath ? `${currentPath}/${item.name}` : item.name
+      const isCollapsed = collapsedFolders.has(pathKey)
+
+      if (item.isFolder) {
+        return (
+          <div key={pathKey} className="select-none my-0.5">
+            <button
+              type="button"
+              onClick={() => toggleFolder(pathKey)}
+              className="w-full flex items-center gap-1.5 py-1 px-1.5 rounded-lg hover:bg-white/5 text-slate-300 text-xs font-medium text-left transition-colors"
+            >
+              {isCollapsed ? (
+                <ChevronRight className="w-3 h-3 text-slate-500 flex-shrink-0" />
+              ) : (
+                <ChevronDown className="w-3 h-3 text-slate-400 flex-shrink-0" />
+              )}
+              <Folder className="w-3.5 h-3.5 text-purple-400 flex-shrink-0" />
+              <span className="truncate font-mono text-[11px]">{item.name}</span>
+            </button>
+            {!isCollapsed && (
+              <div className="pl-3.5 border-l border-white/5 ml-2">
+                {renderTreeNodes(item.children, pathKey)}
+              </div>
+            )}
+          </div>
+        )
+      }
+
+      const hotspotInfo = (item.fullPath || item.nodeId)
+        ? hotspotMetricsMap.get(item.fullPath!) || hotspotMetricsMap.get(item.nodeId!)
+        : undefined
+
+      const isSelected = item.nodeId === selectedNodeId
+
+      return (
+        <div key={pathKey} className="my-0.5">
+          <button
+            type="button"
+            onClick={() => {
+              if (item.nodeId) {
+                handleFocusNode(item.nodeId)
+              }
+            }}
+            className={`w-full flex items-center justify-between gap-1.5 py-1 px-2 rounded-lg text-left transition-all ${
+              isSelected
+                ? 'bg-purple-500/20 text-white border border-purple-500/40'
+                : 'hover:bg-white/5 text-slate-300'
+            }`}
+          >
+            <div className="flex items-center gap-1.5 min-w-0">
+              <FileText className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+              <span className={`truncate font-mono text-[11px] ${hotspotInfo?.colorClass || 'text-slate-300'}`}>
+                {item.name}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-1 flex-shrink-0 ml-1">
+              {hotspotInfo?.iconType === 'critical' && (
+                <span title={`Critical Hotspot (${hotspotInfo.score}/100)`}>
+                  <AlertTriangle className="w-3 h-3 text-rose-400 animate-pulse" />
+                </span>
+              )}
+              {hotspotInfo?.iconType === 'high' && (
+                <span title={`High Risk Hotspot (${hotspotInfo.score}/100)`}>
+                  <Flame className="w-3 h-3 text-orange-400" />
+                </span>
+              )}
+              {hotspotInfo && (
+                <span className={`text-[9px] font-mono font-bold ${hotspotInfo.colorClass}`}>
+                  {hotspotInfo.score}
+                </span>
+              )}
+            </div>
+          </button>
+        </div>
+      )
+    })
+  }, [collapsedFolders, hotspotMetricsMap, selectedNodeId, toggleFolder, handleFocusNode])
+
   // Dynamic Affinity/Efferent software coupling and Instability Metrics calculations
   const couplingMetrics = useMemo(() => {
     const afferent = new Map<string, number>()
@@ -403,16 +601,6 @@ export function GraphExplorer({ graphData, selectedSha, commits = [], onSelectCo
       refitPendingRef.current = false
     }
   }, [filteredGraphData])
-
-  const handleFocusNode = useCallback((nodeId: string) => {
-    const canvasNode = nodes.find(n => n.id === nodeId)
-    if (canvasNode && graphRef.current) {
-      graphRef.current.centerAt(canvasNode.x, canvasNode.y, 800)
-      graphRef.current.zoom(1.8, 800)
-      setSelectedNodeId(nodeId)
-      setIsSidebarOpen(true)
-    }
-  }, [nodes])
 
   useEffect(() => {
     if (isPlaying && commits.length > 0 && onSelectCommit) {
@@ -712,6 +900,26 @@ export function GraphExplorer({ graphData, selectedSha, commits = [], onSelectCo
     return currentScore - startScore
   }, [commits, activeCommitIndex])
 
+  if (!graphData) {
+    return (
+      <div className="glass-panel rounded-[32px] w-full min-h-[580px] flex items-center justify-center relative overflow-hidden">
+        <div className="absolute inset-0 bg-white/[0.02] animate-pulse" />
+        <div className="flex flex-col items-center gap-5 z-10">
+          <div className="relative">
+            <div className="absolute inset-0 bg-purple-500/20 rounded-full blur-xl animate-pulse" />
+            <div className="w-16 h-16 rounded-full bg-white/5 border border-purple-500/30 flex items-center justify-center relative shadow-[0_0_30px_rgba(167,139,250,0.15)]">
+              <Layers className="w-8 h-8 text-purple-400/80 animate-pulse" />
+            </div>
+          </div>
+          <div className="flex flex-col items-center gap-1.5">
+            <h3 className="text-white font-head text-lg tracking-tight">Constructing Knowledge Graph</h3>
+            <p className="text-slate-400 font-mono text-[11px] animate-pulse">Rendering dependency structures and mapping connections...</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div 
       ref={wrapperRef}
@@ -801,147 +1009,218 @@ export function GraphExplorer({ graphData, selectedSha, commits = [], onSelectCo
 
       <div className="min-h-[580px] h-[calc(100%-80px)] relative overflow-hidden">
         {isLeftSidebarOpen && (
-          <div className="absolute left-4 top-4 bottom-4 w-72 md:w-64 glass-panel rounded-[24px] p-5 space-y-6 flex-shrink-0 z-[45] flex flex-col justify-between overflow-y-auto max-h-[calc(100%-32px)] border border-white/10 shadow-2xl">
-            <div className="space-y-5">
-              <div className="flex items-center gap-2 text-slate-300 text-[11px] uppercase tracking-wider font-semibold">
-                <Filter className="w-3.5 h-3.5 text-purple-400" />
-                <span>Filters & Toggles</span>
-              </div>
-
-              <div className="space-y-2.5">
-                <label className="text-xs text-slate-400 font-medium">Edges Display</label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button 
-                    onClick={() => setShowImports(!showImports)} 
-                    className={`py-1.5 rounded-full text-[11px] border font-medium flex items-center justify-center gap-1.5 transition-all ${
-                      showImports ? 'border-blue-500/40 text-blue-300 bg-blue-500/15' : 'border-white/10 text-slate-500 bg-white/5 hover:bg-white/8'
+          <div className="absolute left-4 top-4 bottom-4 w-72 md:w-64 glass-panel rounded-[24px] p-5 flex-shrink-0 z-[45] flex flex-col justify-between overflow-y-auto max-h-[calc(100%-32px)] border border-white/10 shadow-2xl">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                <div className="flex items-center gap-1.5 p-1 bg-white/5 rounded-xl w-full border border-white/5">
+                  <button
+                    type="button"
+                    onClick={() => setLeftSidebarTab('filters')}
+                    className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+                      leftSidebarTab === 'filters'
+                        ? 'bg-purple-600 text-white shadow-md'
+                        : 'text-slate-400 hover:text-slate-200'
                     }`}
                   >
-                    <span className="w-2 h-2 rounded-full bg-blue-400"></span>
-                    Imports
+                    <Filter className="w-3.5 h-3.5" />
+                    <span>Filters</span>
                   </button>
-                  <button 
-                    onClick={() => setShowCoChange(!showCoChange)} 
-                    className={`py-1.5 rounded-full text-[11px] border font-medium flex items-center justify-center gap-1.5 transition-all ${
-                      showCoChange ? 'border-orange-500/40 text-orange-300 bg-orange-500/15' : 'border-white/10 text-slate-500 bg-white/5 hover:bg-white/8'
+                  <button
+                    type="button"
+                    onClick={() => setLeftSidebarTab('tree')}
+                    className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+                      leftSidebarTab === 'tree'
+                        ? 'bg-purple-600 text-white shadow-md'
+                        : 'text-slate-400 hover:text-slate-200'
                     }`}
                   >
-                    <span className="w-2 h-2 rounded-full bg-orange-400"></span>
-                    Co-change
+                    <FolderTree className="w-3.5 h-3.5" />
+                    <span>File Tree</span>
                   </button>
                 </div>
               </div>
 
-              <div className="space-y-3">
-                <div className="space-y-1.5">
-                  <label className="text-xs text-slate-400 font-medium">Module Namespace</label>
-                  <select
-                    value={selectedModule}
-                    onChange={(e) => setSelectedModule(e.target.value)}
-                    className="w-full px-3 py-2 text-xs bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-purple-500/45 cursor-pointer font-mono"
-                  >
-                    <option value="all">All Modules ({nodes.length})</option>
-                    {uniqueModules.map(mod => (
-                      <option key={mod} value={mod} className="bg-[#181a24] text-white">{mod}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs text-slate-400 font-medium">Complexity Hotspots</label>
-                  <select
-                    value={selectedRisk}
-                    onChange={(e) => setSelectedRisk(e.target.value)}
-                    className="w-full px-3 py-2 text-xs bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-purple-500/45 cursor-pointer"
-                  >
-                    <option value="all">All Risks</option>
-                    <option value="green" className="bg-[#181a24] text-emerald-400">Low Risk (Green)</option>
-                    <option value="yellow" className="bg-[#181a24] text-amber-300">Moderate (Yellow)</option>
-                    <option value="orange" className="bg-[#181a24] text-orange-400">High Risk (Orange)</option>
-                    <option value="red" className="bg-[#181a24] text-rose-400">Critical (Red)</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs text-slate-400 font-medium">Scale Nodes By</label>
-                  <select
-                    value={nodeSizeMetric}
-                    onChange={(e) => {
-                      const value = e.target.value
-                      if (isNodeSizeMetric(value)) setNodeSizeMetric(value)
-                    }}
-                    className="w-full px-3 py-2 text-xs bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-purple-500/45 cursor-pointer"
-                  >
-                    <option value="loc" className="bg-[#181a24]">Complexity (LOC)</option>
-                    <option value="churn" className="bg-[#181a24]">Commit Churn</option>
-                    <option value="coupling" className="bg-[#181a24]">Coupling Degree</option>
-                    <option value="instability" className="bg-[#181a24]">Instability Index</option>
-                    <option value="equal" className="bg-[#181a24]">Uniform Size</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="border-t border-white/5 pt-4 space-y-2">
-                <div className="flex items-center gap-2 text-slate-400 text-[11px] uppercase tracking-wider font-semibold">
-                  <Compass className="w-3.5 h-3.5 text-purple-400" />
-                  <span>Observability Layer</span>
-                </div>
-
-                <button 
-                  onClick={() => setHighlightCyclic(!highlightCyclic)}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl border text-left transition-all duration-300 ${
-                    highlightCyclic ? 'border-amber-500/40 bg-amber-500/15 text-amber-300' : 'border-white/5 bg-white/5 text-slate-300 hover:bg-white/10'
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <AlertTriangle className="w-4 h-4 text-amber-400" />
-                    <span className="text-xs font-medium">Cyclic Loops</span>
+              {leftSidebarTab === 'filters' ? (
+                <div className="space-y-5">
+                  <div className="space-y-2.5">
+                    <label className="text-xs text-slate-400 font-medium">Edges Display</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button 
+                        onClick={() => setShowImports(!showImports)} 
+                        className={`py-1.5 rounded-full text-[11px] border font-medium flex items-center justify-center gap-1.5 transition-all ${
+                          showImports ? 'border-blue-500/40 text-blue-300 bg-blue-500/15' : 'border-white/10 text-slate-500 bg-white/5 hover:bg-white/8'
+                        }`}
+                      >
+                        <span className="w-2 h-2 rounded-full bg-blue-400"></span>
+                        Imports
+                      </button>
+                      <button 
+                        onClick={() => setShowCoChange(!showCoChange)} 
+                        className={`py-1.5 rounded-full text-[11px] border font-medium flex items-center justify-center gap-1.5 transition-all ${
+                          showCoChange ? 'border-orange-500/40 text-orange-300 bg-orange-500/15' : 'border-white/10 text-slate-500 bg-white/5 hover:bg-white/8'
+                        }`}
+                      >
+                        <span className="w-2 h-2 rounded-full bg-orange-400"></span>
+                        Co-change
+                      </button>
+                    </div>
                   </div>
-                  {highlightCyclic && <span className="text-[10px] bg-amber-500 text-slate-950 font-mono px-2 py-0.5 rounded-full font-bold">{cyclicNodesAndEdges.nodes.size}</span>}
-                </button>
 
-                <button 
-                  onClick={() => setHighlightHotspots(!highlightHotspots)}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl border text-left transition-all duration-300 ${
-                    highlightHotspots ? 'border-red-500/40 bg-red-500/15 text-red-300' : 'border-white/5 bg-white/5 text-slate-300 hover:bg-white/10'
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <Activity className="w-4 h-4 text-red-400" />
-                    <span className="text-xs font-medium">Highlight Hotspots</span>
-                  </div>
-                </button>
+                  <div className="space-y-3">
+                    <div className="space-y-1.5">
+                      <label className="text-xs text-slate-400 font-medium">Module Namespace</label>
+                      <select
+                        value={selectedModule}
+                        onChange={(e) => setSelectedModule(e.target.value)}
+                        className="w-full px-3 py-2 text-xs bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-purple-500/45 cursor-pointer font-mono"
+                      >
+                        <option value="all">All Modules ({nodes.length})</option>
+                        {uniqueModules.map(mod => (
+                          <option key={mod} value={mod} className="bg-[#181a24] text-white">{mod}</option>
+                        ))}
+                      </select>
+                    </div>
 
-                <button 
-                  onClick={() => setHighlightStability(!highlightStability)}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl border text-left transition-all duration-300 ${
-                    highlightStability ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-300' : 'border-white/5 bg-white/5 text-slate-300 hover:bg-white/10'
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                    <span className="text-xs font-medium">Stability Mapping</span>
+                    <div className="space-y-1.5">
+                      <label className="text-xs text-slate-400 font-medium">Complexity Hotspots</label>
+                      <select
+                        value={selectedRisk}
+                        onChange={(e) => setSelectedRisk(e.target.value)}
+                        className="w-full px-3 py-2 text-xs bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-purple-500/45 cursor-pointer"
+                      >
+                        <option value="all">All Risks</option>
+                        <option value="green" className="bg-[#181a24] text-emerald-400">Low Risk (Green)</option>
+                        <option value="yellow" className="bg-[#181a24] text-amber-300">Moderate (Yellow)</option>
+                        <option value="orange" className="bg-[#181a24] text-orange-400">High Risk (Orange)</option>
+                        <option value="red" className="bg-[#181a24] text-rose-400">Critical (Red)</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs text-slate-400 font-medium">Scale Nodes By</label>
+                      <select
+                        value={nodeSizeMetric}
+                        onChange={(e) => {
+                          const value = e.target.value
+                          if (isNodeSizeMetric(value)) setNodeSizeMetric(value)
+                        }}
+                        className="w-full px-3 py-2 text-xs bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-purple-500/45 cursor-pointer"
+                      >
+                        <option value="loc" className="bg-[#181a24]">Complexity (LOC)</option>
+                        <option value="churn" className="bg-[#181a24]">Commit Churn</option>
+                        <option value="coupling" className="bg-[#181a24]">Coupling Degree</option>
+                        <option value="instability" className="bg-[#181a24]">Instability Index</option>
+                        <option value="equal" className="bg-[#181a24]">Uniform Size</option>
+                      </select>
+                    </div>
                   </div>
-                </button>
-              </div>
+
+                  <div className="border-t border-white/5 pt-4 space-y-2">
+                    <div className="flex items-center gap-2 text-slate-400 text-[11px] uppercase tracking-wider font-semibold">
+                      <Compass className="w-3.5 h-3.5 text-purple-400" />
+                      <span>Observability Layer</span>
+                    </div>
+
+                    <button 
+                      onClick={() => setHighlightCyclic(!highlightCyclic)}
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-xl border text-left transition-all duration-300 ${
+                        highlightCyclic ? 'border-amber-500/40 bg-amber-500/15 text-amber-300' : 'border-white/5 bg-white/5 text-slate-300 hover:bg-white/10'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className="w-4 h-4 text-amber-400" />
+                        <span className="text-xs font-medium">Cyclic Loops</span>
+                      </div>
+                      {highlightCyclic && <span className="text-[10px] bg-amber-500 text-slate-950 font-mono px-2 py-0.5 rounded-full font-bold">{cyclicNodesAndEdges.nodes.size}</span>}
+                    </button>
+
+                    <button 
+                      onClick={() => setHighlightHotspots(!highlightHotspots)}
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-xl border text-left transition-all duration-300 ${
+                        highlightHotspots ? 'border-red-500/40 bg-red-500/15 text-red-300' : 'border-white/5 bg-white/5 text-slate-300 hover:bg-white/10'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Activity className="w-4 h-4 text-red-400" />
+                        <span className="text-xs font-medium">Highlight Hotspots</span>
+                      </div>
+                    </button>
+
+                    <button 
+                      onClick={() => setHighlightStability(!highlightStability)}
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-xl border text-left transition-all duration-300 ${
+                        highlightStability ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-300' : 'border-white/5 bg-white/5 text-slate-300 hover:bg-white/10'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                        <span className="text-xs font-medium">Stability Mapping</span>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between text-slate-400 text-[11px] uppercase tracking-wider font-semibold">
+                    <div className="flex items-center gap-1.5">
+                      <FolderTree className="w-3.5 h-3.5 text-purple-400" />
+                      <span>Codebase File Tree</span>
+                    </div>
+                    {hotspotMetricsMap.size > 0 && (
+                      <span className="text-[10px] text-rose-400 font-mono font-bold bg-rose-500/10 px-2 py-0.5 rounded-full border border-rose-500/20">
+                        {hotspotMetricsMap.size} Hotspots
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-slate-500 leading-relaxed">
+                    Color-coded by hotspot risk score. Warning icons mark high-risk files. Click to focus in graph.
+                  </p>
+                  <div className="space-y-0.5 max-h-[320px] overflow-y-auto pr-1 border border-white/5 rounded-xl p-2 bg-white/[0.01]">
+                    {renderTreeNodes(fileTree)}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="border-t border-white/5 pt-4 space-y-2">
-              <div className="text-slate-500 text-[10px] uppercase tracking-wider font-semibold">Hierarchy Legend</div>
-              <div className="grid grid-cols-2 gap-x-2 gap-y-2 text-[10px] text-slate-400 font-medium">
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 border border-purple-400 bg-purple-400/20 rotate-45 inline-block" />
-                  <span>Entrypoint</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 inline-block" />
-                  <span>File Node</span>
-                </div>
-                <div className="flex items-center gap-2 col-span-2">
-                  <span className="w-4 h-0.5 border-t border-dashed border-amber-400 inline-block" />
-                  <span>Import Cycle Link</span>
-                </div>
+              <div className="text-slate-500 text-[10px] uppercase tracking-wider font-semibold">
+                {leftSidebarTab === 'tree' ? 'Hotspot Legend' : 'Hierarchy Legend'}
               </div>
+              {leftSidebarTab === 'tree' ? (
+                <div className="grid grid-cols-2 gap-x-2 gap-y-2 text-[10px] text-slate-400 font-medium">
+                  <div className="flex items-center gap-1.5">
+                    <AlertTriangle className="w-3 h-3 text-rose-400" />
+                    <span className="text-rose-400">Critical (&gt;75)</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Flame className="w-3 h-3 text-orange-400" />
+                    <span className="text-orange-400">High (&gt;50)</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-amber-400" />
+                    <span className="text-amber-300">Medium (&gt;25)</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                    <span className="text-emerald-400">Low (&le;25)</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-x-2 gap-y-2 text-[10px] text-slate-400 font-medium">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 border border-purple-400 bg-purple-400/20 rotate-45 inline-block" />
+                    <span>Entrypoint</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 inline-block" />
+                    <span>File Node</span>
+                  </div>
+                  <div className="flex items-center gap-2 col-span-2">
+                    <span className="w-4 h-0.5 border-t border-dashed border-amber-400 inline-block" />
+                    <span>Import Cycle Link</span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}

@@ -6,6 +6,8 @@ import { getHotspots } from '../lib/api'
 interface HotspotMapProps {
   repoId: string | number
   sha?: string | null
+  startDate?: string
+  endDate?: string
 }
 
 interface TreemapNode {
@@ -15,11 +17,15 @@ interface TreemapNode {
   riskScore?: number
   complexity?: number
   churnCount?: number
+  loc?: number
   x?: number
   y?: number
   width?: number
   height?: number
 }
+
+type SortKey = 'file' | 'complexity' | 'churn_count' | 'risk_score' | 'loc'
+type SortDir = 'asc' | 'desc'
 
 const RISK_COLORS = {
   critical: '#dc2626',
@@ -82,13 +88,16 @@ export function HotspotMap({ repoId, sha }: HotspotMapProps) {
     riskScore: hotspot.risk_score,
     complexity: hotspot.complexity,
     churnCount: hotspot.churn_count,
+    loc: hotspot.loc,
   }))
 
   return (
-    <section className="glass-panel rounded-[28px] overflow-hidden shadow-2xl relative border border-white/10 p-5 flex flex-col justify-between">
-      <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 rounded-full blur-[60px] pointer-events-none" />
+    <section className="glass-panel rounded-[28px] shadow-2xl relative border border-white/10 p-5 flex flex-col gap-4">
+      <div className="absolute inset-0 overflow-hidden rounded-[28px] pointer-events-none">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 rounded-full blur-[60px]" />
+      </div>
 
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 relative z-10">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10">
         <div>
           <h2 className="font-head text-[18px] font-semibold text-white tracking-tight flex items-center gap-2">
             Complexity Churn Hotspots
@@ -107,7 +116,8 @@ export function HotspotMap({ repoId, sha }: HotspotMapProps) {
         </div>
       </div>
 
-      <div className="relative z-10 flex-grow" style={{ minHeight: 280 }}>
+      {/* ── Treemap ─────────────────────────────────────────────── */}
+      <div className="relative z-10" style={{ minHeight: 280 }}>
         {hotspotState.isLoading ? (
           <div className="h-[280px] flex items-center justify-center text-slate-400 font-mono text-xs animate-pulse">Loading hotspots...</div>
         ) : hotspots.length === 0 ? (
@@ -121,6 +131,7 @@ export function HotspotMap({ repoId, sha }: HotspotMapProps) {
               content={<HotspotCell />}
             >
               <Tooltip
+                allowEscapeViewBox={{ x: true, y: true }}
                 content={({ payload }) => {
                   if (!payload?.[0]) return null
                   const item = payload[0].payload as TreemapNode
@@ -130,6 +141,7 @@ export function HotspotMap({ repoId, sha }: HotspotMapProps) {
                       <div className="space-y-1 font-mono text-[11px]">
                         <p className="text-slate-400">Complexity: <span className="text-white font-bold">{item.complexity ?? 0}</span></p>
                         <p className="text-slate-400">Churn count: <span className="text-white font-bold">{item.churnCount ?? 0}</span></p>
+                        <p className="text-slate-400">LOC: <span className="text-white font-bold">{item.loc ?? '—'}</span></p>
                         <p className="text-slate-400">Risk score: <span className="text-red-400 font-bold">{item.riskScore ?? 0}/100</span></p>
                       </div>
                     </div>

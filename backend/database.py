@@ -1,7 +1,8 @@
+import asyncio
 import logging
 from pathlib import Path
 
-from sqlalchemy import text
+from sqlalchemy import event, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
@@ -12,15 +13,46 @@ _IS_SQLITE = DATABASE_URL.startswith("sqlite")
 
 engine = create_async_engine(
     DATABASE_URL,
-    connect_args={"check_same_thread": False, "timeout": 30} if _IS_SQLITE else {},
+    connect_args={"check_same_thread": False, "timeout": 60} if _IS_SQLITE else {},
     echo=False,
 )
+
+if _IS_SQLITE:
+    @event.listens_for(engine.sync_engine, "connect")
+    def set_sqlite_pragma(dbapi_connection, connection_record):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA busy_timeout=60000")
+        cursor.execute("PRAGMA synchronous=NORMAL")
+        cursor.close()
 
 AsyncSessionLocal = async_sessionmaker(
     engine,
     class_=AsyncSession,
     expire_on_commit=False,
 )
+
+
+async def commit_with_retry(session: AsyncSession, max_retries: int = 3, initial_delay: float = 0.1) -> None:
+    """Commit an AsyncSession transaction with a 3-attempt retry loop for transient SQLite database locks."""
+    for attempt in range(1, max_retries + 1):
+        try:
+            await session.commit()
+            return
+        except Exception as exc:
+            err_msg = str(exc).lower()
+            is_lock_error = "database is locked" in err_msg or "locked" in err_msg
+            if is_lock_error and attempt < max_retries:
+                delay = initial_delay * (2 ** (attempt - 1))
+                logger.warning(
+                    "SQLite database locked on commit (attempt %d/%d). Retrying in %.2fs...",
+                    attempt,
+                    max_retries,
+                    delay,
+                )
+                await asyncio.sleep(delay)
+            else:
+                raise
 
 
 class Base(DeclarativeBase):
@@ -138,3 +170,68 @@ async def init_db():
         applied = await apply_sql_migrations(conn)
 
     logger.info("Database initialized", extra={"migrations_applied": len(applied)})
+    await mark_stale_jobs_as_error()
+
+    # Auto-seed the facebook-react demo data if database is empty
+    from backend.demo_seeder import seed_demo_data_if_empty
+    async with AsyncSessionLocal() as session:
+        try:
+            await seed_demo_data_if_empty(session)
+        except Exception as exc:
+            logger.error(f"Failed to auto-seed demo data: {exc}", exc_info=True)
+
+
+
+async def mark_stale_jobs_as_error() -> None:
+    """Queries for any AnalysisJob in active statuses and marks them as error on startup.
+    Also cleans up leftover temporary repository folders under REPO_STORAGE_PATH.
+    """
+    from backend.shared.models import AnalysisJob
+    from backend.features.repo_ingestion.router import ACTIVE_JOB_STATUSES
+    from backend.features.repo_ingestion.clone_service import cleanup_repo, REPO_STORAGE_PATH
+    import shutil
+    from sqlalchemy import select
+
+    logger.info("Checking for stale/orphaned analysis jobs on startup...")
+    async with AsyncSessionLocal() as session:
+        try:
+            stmt = select(AnalysisJob).where(AnalysisJob.status.in_(ACTIVE_JOB_STATUSES))
+            result = await session.execute(stmt)
+            stale_jobs = result.scalars().all()
+
+            if not stale_jobs:
+                logger.info("No stale/orphaned analysis jobs found.")
+                return
+
+            logger.warning(
+                f"Found {len(stale_jobs)} stale/orphaned analysis jobs. Marking as error and cleaning up storage..."
+            )
+            for job in stale_jobs:
+                logger.info(f"Aborting stale job id={job.id} (status={job.status}, repo_id={job.repo_id})")
+                job.status = "error"
+                job.error_message = "System restart aborted the analysis job"
+
+                # Clean up repository folders matching the stale job repo_id
+                try:
+                    cleanup_repo(job.repo_id)
+                except Exception as exc:
+                    logger.warning(
+                        f"Failed to clean up repo directory for repo_id={job.repo_id} during startup: {exc}"
+                    )
+
+                # Also clean up folder matching job.id if it exists under REPO_STORAGE_PATH
+                try:
+                    job_dir = REPO_STORAGE_PATH / str(job.id)
+                    if job_dir.exists():
+                        shutil.rmtree(job_dir)
+                except Exception as exc:
+                    logger.warning(
+                        f"Failed to clean up job directory for job_id={job.id} during startup: {exc}"
+                    )
+
+            await session.commit()
+            logger.info("Stale/orphaned analysis jobs cleanup completed successfully.")
+        except Exception as exc:
+            await session.rollback()
+            logger.error(f"Failed to mark stale jobs as error during startup: {exc}", exc_info=True)
+

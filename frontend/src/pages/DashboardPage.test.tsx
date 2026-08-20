@@ -275,4 +275,44 @@ describe('DashboardPage', () => {
     expect(screen.getByTestId('graph-explorer')).toHaveTextContent('graph none nodes 0')
     expect(getGraphMock).not.toHaveBeenCalled()
   })
+
+  it('renders time range selector buttons and handles preset switching', async () => {
+    const user = userEvent.setup()
+    renderDashboard()
+
+    expect(await screen.findByText('Time Range')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /all time/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /last 7 days/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /last 30 days/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /last year/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /custom range/i })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /last 7 days/i }))
+    await waitFor(() => {
+      expect(getHealthTimelineMock).toHaveBeenCalledWith(7, expect.any(String), expect.any(String))
+    })
+
+    await user.click(screen.getByRole('button', { name: /custom range/i }))
+    expect(screen.getByLabelText('Start Date')).toBeInTheDocument()
+    expect(screen.getByLabelText('End Date')).toBeInTheDocument()
+  })
+
+  it('displays single-point-of-failure warning card under bus factor card when bus_factor_min equals 1', async () => {
+    getHealthTimelineMock.mockResolvedValue([
+      makeSnapshot({ sha: 'xyz999', full_sha: 'xyz999', bus_factor_min: 1 }),
+    ])
+
+    renderDashboard()
+
+    expect(await screen.findByTestId('bus-factor-warning')).toBeInTheDocument()
+    expect(screen.getByText('Single Point of Failure Warning')).toBeInTheDocument()
+    expect(screen.getByText(/vulnerable to a single-point-of-failure/i)).toBeInTheDocument()
+  })
+
+  it('renders the floating back to top button on the dashboard', async () => {
+    renderDashboard()
+
+    expect(await screen.findByTestId('scroll-to-top')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /scroll back to top/i })).toBeInTheDocument()
+  })
 })
