@@ -28,8 +28,7 @@ export interface Repo {
   github_stars: number | null
   github_language: string | null
   github_description: string | null
-  total_file_count?: number
-  total_repo_loc?: number
+  active_contributors_count?: number
 }
 
 export interface Commit {

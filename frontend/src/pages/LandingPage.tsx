@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import type { ChangeEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ingestRepo } from '../lib/api'
+import useSWR from 'swr'
+import { ingestRepo, listRepos } from '../lib/api'
 import { ThemeToggle } from '../components/ui/ThemeToggle'
 
 const PLACEHOLDERS = ['facebook/react', 'vercel/next.js', 'expressjs/express', 'vuejs/vue']
@@ -57,6 +58,9 @@ export default function LandingPage() {
   const [maxCommits, setMaxCommits] = useState('500')
   const [branch, setBranch] = useState('')
   const navigate = useNavigate()
+
+  const reposState = useSWR('recent-repos', () => listRepos())
+  const recentRepos = reposState.data || []
 
   useEffect(() => {
     const timer = setInterval(() => setPhIdx((idx) => (idx + 1) % PLACEHOLDERS.length), 2800)
@@ -241,6 +245,42 @@ export default function LandingPage() {
               Or load facebook/react demo instantly →
             </button>
           </div>
+
+          {recentRepos.length > 0 && (
+            <div className="mt-12 text-left max-w-4xl mx-auto" aria-label="Analyzed repositories list">
+              <h2 className="font-head text-lg font-semibold text-white mb-4 tracking-tight flex items-center justify-between">
+                <span>Analyzed Repositories</span>
+                <span className="text-xs font-mono text-slate-400 font-normal">{recentRepos.length} Total</span>
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                {recentRepos.map((r) => (
+                  <div
+                    key={r.id}
+                    onClick={() => navigate(`/dashboard/${r.repo_slug}`)}
+                    className="glass-panel rounded-[20px] p-4 border border-white/10 hover:border-purple-500/40 hover:bg-white/[0.04] transition-all cursor-pointer flex flex-col justify-between group"
+                  >
+                    <div>
+                      <div className="font-mono text-sm font-bold text-white group-hover:text-purple-300 transition-colors truncate">
+                        {r.repo_slug}
+                      </div>
+                      {r.github_description && (
+                        <p className="text-slate-400 text-xs mt-1 line-clamp-2">{r.github_description}</p>
+                      )}
+                    </div>
+                    <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between text-[11px] font-mono text-slate-400">
+                      <span>{r.analyzed_commits} commits</span>
+                      <span className="flex items-center gap-1 text-purple-300 font-semibold bg-purple-500/10 px-2 py-0.5 rounded-full border border-purple-500/15">
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                        </svg>
+                        {r.active_contributors_count ?? 0} active contributors
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="mt-20 grid grid-cols-1 md:grid-cols-3 gap-6 text-left max-w-4xl mx-auto" aria-label="Static product capabilities">
             {[

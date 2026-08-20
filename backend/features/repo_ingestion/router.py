@@ -7,7 +7,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
-from sqlalchemy import delete, desc, select
+from sqlalchemy import delete, desc, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -1054,6 +1054,34 @@ async def ingest_progress(repo_id: int):
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
+async def _count_active_contributors(db: AsyncSession, repo_id: int) -> int:
+    result = await db.execute(
+        select(func.count(func.distinct(func.coalesce(Commit.author_email, Commit.author_name))))
+        .where(Commit.repo_id == repo_id)
+    )
+    return result.scalar() or 0
+
+
+async def _active_contributors_map(db: AsyncSession, repo_ids: list[int]) -> dict[int, int]:
+    if not repo_ids:
+        return {}
+    result = await db.execute(
+        select(
+            Commit.repo_id,
+            func.count(func.distinct(func.coalesce(Commit.author_email, Commit.author_name))),
+        )
+        .where(Commit.repo_id.in_(repo_ids))
+        .group_by(Commit.repo_id)
+    )
+    return {repo_id: count for repo_id, count in result.all()}
+
+
+def _repo_to_out(repo: Repo, active_contributors_count: int = 0) -> RepoOut:
+    out = RepoOut.model_validate(repo)
+    out.active_contributors_count = active_contributors_count
+    return out
+
+
 @router.get("", response_model=list[RepoOut])
 async def list_repos(
     slug: str | None = None,
@@ -1072,7 +1100,10 @@ async def list_repos(
         query = query.where(Repo.repo_slug == slug)
     query = query.order_by(desc(Repo.ingested_at)).limit(limit).offset(offset)
     result = await db.execute(query)
-    return result.scalars().all()
+    repos = result.scalars().all()
+    repo_ids = [repo.id for repo in repos]
+    contrib_map = await _active_contributors_map(db, repo_ids)
+    return [_repo_to_out(repo, contrib_map.get(repo.id, 0)) for repo in repos]
 
 
 @router.get("/by-slug/{slug}", response_model=RepoOut)
@@ -1081,7 +1112,8 @@ async def get_repo_by_slug(slug: str, db: AsyncSession = Depends(get_db)):
     repo = result.scalar_one_or_none()
     if not repo:
         raise _http_error(404, "Repository not found.", "repo_not_found")
-    return repo
+    count = await _count_active_contributors(db, repo.id)
+    return _repo_to_out(repo, count)
 
 
 @router.get("/{repo_id}", response_model=RepoOut)
@@ -1089,7 +1121,8 @@ async def get_repo(repo_id: int, db: AsyncSession = Depends(get_db)):
     repo = await db.get(Repo, repo_id)
     if not repo:
         raise _http_error(404, "Repository not found.", "repo_not_found")
-    return repo
+    count = await _count_active_contributors(db, repo.id)
+    return _repo_to_out(repo, count)
 
 
 @router.get("/{repo_id}/timeline", response_model=TimelineResponse)
@@ -1152,8 +1185,9 @@ async def get_commit_detail(repo_id: int, sha: str, db: AsyncSession = Depends(g
             "demo_mode": False,
         }
 
+    count = await _count_active_contributors(db, repo.id)
     return {
-        "repo": repo,
+        "repo": _repo_to_out(repo, count),
         "commit": commit,
         "snapshot": _snapshot_payload(commit, snapshot),
         "graph": await _graph_payload(db, repo_id, commit),
