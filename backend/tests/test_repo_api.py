@@ -10,30 +10,19 @@ from sqlalchemy.orm import Session, sessionmaker
 from backend.database import Base
 from backend.features.llm_analysis.cache import make_cache_key
 from backend.features.llm_analysis.router import explain_commit_stream
-from backend.features.repo_ingestion.router import (
-    cancel_ingestion,
-    get_bus_factor,
-    get_commit_detail,
-    get_graph,
-    get_hotspots,
-    get_llm_usage,
-    get_repo_by_slug,
-    get_timeline,
-    ingest_progress,
-    ingest_repo,
-    list_repos,
-    run_ingestion,
-)
-from backend.shared.models import (
-    AnalysisJob,
-    BusFactor,
-    Commit,
-    GraphEdge,
-    GraphNode,
-    HealthSnapshot,
-    LLMNarrative,
-    Repo,
-)
+from backend.features.repo_ingestion.router import (cancel_ingestion,
+                                                    get_bus_factor,
+                                                    get_commit_detail,
+                                                    get_graph, get_hotspots,
+                                                    get_llm_usage,
+                                                    get_repo_by_slug,
+                                                    get_timeline,
+                                                    ingest_progress,
+                                                    ingest_repo, list_repos,
+                                                    run_ingestion)
+from backend.shared.models import (AnalysisJob, BusFactor, Commit, GraphEdge,
+                                   GraphNode, HealthSnapshot, LLMNarrative,
+                                   Repo)
 from backend.shared.schemas import IngestRequest, NarrativeRequest
 
 pytestmark = pytest.mark.anyio
@@ -762,13 +751,8 @@ async def test_ingestion_rollback_preserves_old_data_on_mid_ingestion_failure(
     import sys
     import types
 
-    from sqlalchemy.ext.asyncio import (
-        AsyncSession,
-        async_sessionmaker,
-    )
-    from sqlalchemy.ext.asyncio import (
-        create_async_engine as _create,
-    )
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+    from sqlalchemy.ext.asyncio import create_async_engine as _create
 
     from backend.database import Base
     from backend.shared.models import AnalysisJob, Commit, Repo
@@ -981,13 +965,8 @@ async def test_ingestion_rollback_preserves_old_data_on_mid_ingestion_failure(
 
 @pytest.mark.anyio
 async def test_mark_stale_jobs_as_error(tmp_path, monkeypatch):
-    from sqlalchemy.ext.asyncio import (
-        AsyncSession,
-        async_sessionmaker,
-    )
-    from sqlalchemy.ext.asyncio import (
-        create_async_engine as _create,
-    )
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+    from sqlalchemy.ext.asyncio import create_async_engine as _create
 
     from backend.database import Base, mark_stale_jobs_as_error
     from backend.shared.models import AnalysisJob, Repo

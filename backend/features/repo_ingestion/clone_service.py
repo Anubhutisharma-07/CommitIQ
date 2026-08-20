@@ -1,7 +1,9 @@
 import asyncio
 import logging
+import os
 import re
 import shutil
+import stat
 from pathlib import Path
 
 import httpx
@@ -134,8 +136,6 @@ async def clone_repo(
     else:
         auth_url = repo_url
 
-    import os
-
     env = {**os.environ, "GIT_TERMINAL_PROMPT": "0", "GIT_ASKPASS": ""}
 
     clone_cmd = [
@@ -214,9 +214,6 @@ async def count_available_commits(repo_path: Path) -> int:
 
 def _remove_readonly(func, path, _excinfo):
     try:
-        import os
-        import stat
-
         os.chmod(path, stat.S_IWRITE)
         func(path)
     except Exception:
@@ -229,28 +226,8 @@ def cleanup_repo(repo_id: int) -> bool:
     if not target.exists():
         return True
 
-    def remove_readonly(func, path, _):
-        import os
-        import stat
-
-        try:
-            os.chmod(path, stat.S_IWRITE)
-            func(path)
-        except Exception:
-            pass
-
     try:
-        try:
-            shutil.rmtree(target, onerror=_remove_readonly)
-        except TypeError:
-            import os
-            import stat
-
-        def remove_readonly(func, path, _):
-            os.chmod(path, stat.S_IWRITE)
-            func(path)
-
-        shutil.rmtree(target, onerror=remove_readonly)
+        shutil.rmtree(target, onerror=_remove_readonly)
         return True
     except OSError as exc:
         logger.warning(
