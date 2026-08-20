@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useState } from 'react'
 import { ResponsiveContainer, Tooltip, Treemap } from 'recharts'
 import useSWR from 'swr'
 import { getHotspots } from '../lib/api'
@@ -23,9 +23,6 @@ interface TreemapNode {
   width?: number
   height?: number
 }
-
-type SortKey = 'file' | 'complexity' | 'churn_count' | 'risk_score' | 'loc'
-type SortDir = 'asc' | 'desc'
 
 const RISK_COLORS = {
   critical: '#dc2626',
@@ -58,71 +55,28 @@ function HotspotCell(props: TreemapNode) {
   )
 }
 
-function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
-  if (!active) return <span className="text-slate-600 ml-1">↕</span>
-  return <span className="text-cyan-400 ml-1">{dir === 'asc' ? '↑' : '↓'}</span>
-}
+export function HotspotMap({ repoId, sha }: HotspotMapProps) {
+  const [offset, setOffset] = useState(0)
+  const limit = 50
 
-function Th({
-  label,
-  sortKey,
-  currentSort,
-  currentDir,
-  onSort,
-  align = 'left',
-}: {
-  label: string
-  sortKey: SortKey
-  currentSort: SortKey
-  currentDir: SortDir
-  onSort: (key: SortKey) => void
-  align?: 'left' | 'right'
-}) {
-  return (
-    <th
-      className={`px-3 py-2 font-mono text-[10px] font-bold tracking-wider uppercase cursor-pointer select-none hover:text-cyan-400 transition-colors ${align === 'right' ? 'text-right' : 'text-left'}`}
-      onClick={() => onSort(sortKey)}
-    >
-      {label}
-      <SortIcon active={currentSort === sortKey} dir={currentDir} />
-    </th>
+  const hotspotState = useSWR(['hotspots', repoId, sha, limit, offset], () =>
+    getHotspots(repoId, sha || undefined, limit, offset)
   )
-}
+  const hotspots = hotspotState.data?.hotspots || []
+  const total = hotspotState.data?.total ?? hotspots.length
 
-export function HotspotMap({ repoId, sha, startDate, endDate }: HotspotMapProps) {
-  const hotspotState = useSWR(
-    ['hotspots', repoId, sha, startDate, endDate],
-    () => getHotspots(repoId, sha || undefined, startDate, endDate)
-  )
-  const hotspots = useMemo(() => hotspotState.data?.hotspots || [], [hotspotState.data])
+  const currentPage = Math.floor(offset / limit) + 1
+  const totalPages = Math.ceil(total / limit) || 1
 
-  // ── Sorting state ──────────────────────────────────────────────
-  const [sortKey, setSortKey] = useState<SortKey>('risk_score')
-  const [sortDir, setSortDir] = useState<SortDir>('desc')
+  const handlePrevPage = () => {
+    setOffset((prev) => Math.max(0, prev - limit))
+  }
 
-  const handleSort = useCallback((key: SortKey) => {
-    if (key === sortKey) {
-      setSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'))
-    } else {
-      setSortKey(key)
-      setSortDir('desc')
+  const handleNextPage = () => {
+    if (offset + limit < total) {
+      setOffset((prev) => prev + limit)
     }
-  }, [sortKey])
-
-  const sortedHotspots = useMemo(() => {
-    const sorted = [...hotspots]
-    sorted.sort((a, b) => {
-      const valA = a[sortKey]
-      const valB = b[sortKey]
-      if (typeof valA === 'string' && typeof valB === 'string') {
-        return sortDir === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA)
-      }
-      return sortDir === 'asc'
-        ? (Number(valA) || 0) - (Number(valB) || 0)
-        : (Number(valB) || 0) - (Number(valA) || 0)
-    })
-    return sorted
-  }, [hotspots, sortKey, sortDir])
+  }
 
   const treemapData: TreemapNode[] = hotspots.map((hotspot) => ({
     name: hotspot.file.split('/').pop() || hotspot.file,
@@ -142,7 +96,14 @@ export function HotspotMap({ repoId, sha, startDate, endDate }: HotspotMapProps)
 
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10">
         <div>
-          <h2 className="font-head text-[18px] font-semibold text-white tracking-tight">Complexity Churn Hotspots</h2>
+          <h2 className="font-head text-[18px] font-semibold text-white tracking-tight flex items-center gap-2">
+            Complexity Churn Hotspots
+            {total > 0 && (
+              <span className="text-[11px] font-mono font-normal px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-slate-300">
+                Total: {total}
+              </span>
+            )}
+          </h2>
           <p className="text-slate-400 text-xs mt-1">Area represents file complexity scaled by recent churn volume</p>
         </div>
         <div className="flex gap-3 text-[10px] font-bold tracking-wider uppercase font-mono">
@@ -189,59 +150,32 @@ export function HotspotMap({ repoId, sha, startDate, endDate }: HotspotMapProps)
         )}
       </div>
 
-      {/* ── Sortable Table ──────────────────────────────────────── */}
-      {hotspots.length > 0 && (
-        <div className="relative z-10 overflow-x-auto rounded-xl border border-white/5">
-          <table className="w-full text-xs">
-            <thead className="bg-white/5 border-b border-white/10">
-              <tr>
-                <Th label="File" sortKey="file" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
-                <Th label="LOC" sortKey="loc" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} align="right" />
-                <Th label="Churn" sortKey="churn_count" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} align="right" />
-                <Th label="Complexity" sortKey="complexity" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} align="right" />
-                <Th label="Risk" sortKey="risk_score" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} align="right" />
-              </tr>
-            </thead>
-            <tbody>
-              {sortedHotspots.slice(0, 50).map((hp, i) => {
-                const risk = getRiskLevel(hp.risk_score)
-                const riskColor = RISK_COLORS[risk]
-                return (
-                  <tr
-                    key={`${hp.file}-${i}`}
-                    className="border-b border-white/5 hover:bg-white/5 transition-colors"
-                  >
-                    <td className="px-3 py-2 font-mono text-slate-300 max-w-[280px] truncate" title={hp.file}>
-                      {hp.file}
-                    </td>
-                    <td className="px-3 py-2 font-mono text-right text-slate-400">
-                      {hp.loc ?? '—'}
-                    </td>
-                    <td className="px-3 py-2 font-mono text-right text-slate-400">
-                      {hp.churn_count}
-                    </td>
-                    <td className="px-3 py-2 font-mono text-right text-slate-400">
-                      {hp.complexity.toFixed(2)}
-                    </td>
-                    <td className="px-3 py-2 font-mono text-right">
-                      <span
-                        className="inline-flex items-center gap-1.5 font-bold"
-                        style={{ color: riskColor }}
-                      >
-                        <span
-                          className="w-2 h-2 rounded-full"
-                          style={{ backgroundColor: riskColor }}
-                        />
-                        {hp.risk_score.toFixed(1)}
-                      </span>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+      {total > limit && (
+        <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between relative z-10 text-xs font-mono text-slate-400">
+          <span>
+            Page {currentPage} of {totalPages} ({offset + 1}-{Math.min(offset + limit, total)} of {total})
+          </span>
+          <div className="flex gap-2">
+            <button
+              onClick={handlePrevPage}
+              disabled={offset === 0}
+              aria-label="Previous page"
+              className="px-3 py-1 rounded-lg border border-white/10 bg-white/5 text-white hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed transition"
+            >
+              Previous
+            </button>
+            <button
+              onClick={handleNextPage}
+              disabled={offset + limit >= total}
+              aria-label="Next page"
+              className="px-3 py-1 rounded-lg border border-white/10 bg-white/5 text-white hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed transition"
+            >
+              Next
+            </button>
+          </div>
         </div>
       )}
     </section>
   )
 }
+

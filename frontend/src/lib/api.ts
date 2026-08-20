@@ -69,7 +69,7 @@ export async function listRepos(slug?: string): Promise<Repo[]> {
 
 export async function ingestRepo(url: string, maxCommits?: number): Promise<IngestResponse> {
   return request<IngestResponse>(
-    client.post('/repos/ingest', { repo_url: url,branch, max_commits: maxCommits || 500 })
+    client.post('/repos/ingest', { repo_url: url, max_commits: maxCommits || 500 })
   )
 }
 
@@ -131,15 +131,15 @@ export async function getGraphDiff(
 export async function getHotspots(
   repoId: string | number,
   sha?: string,
-  startDate?: string,
-  endDate?: string,
+  limit?: number,
+  offset?: number
 ): Promise<HotspotResponse> {
-  const params: Record<string, string> = {}
+  const params: Record<string, unknown> = {}
   if (sha) params.sha = sha
-  if (startDate) params.start_date = startDate
-  if (endDate) params.end_date = endDate
+  if (limit !== undefined) params.limit = limit
+  if (offset !== undefined) params.offset = offset
   return request<HotspotResponse>(
-    client.get(`/repos/${repoId}/hotspots`, { params: Object.keys(params).length ? params : undefined })
+    client.get(`/repos/${repoId}/hotspots`, { params: Object.keys(params).length > 0 ? params : undefined })
   )
 }
 

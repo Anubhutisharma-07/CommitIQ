@@ -4,7 +4,7 @@ import json
 
 import pytest
 from fastapi import HTTPException
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from backend.database import Base
@@ -362,6 +362,78 @@ async def test_graph_bus_factor_and_usage_endpoints_return_seeded_data(db_sessio
     bus_factor = await get_bus_factor(repo_id=1, db=db_session)
     assert bus_factor["modules"][0]["risk_level"] == "critical"
     assert bus_factor["modules"][0]["top_contributor"] == "Noor"
+
+
+async def test_get_hotspots_pagination(db_session: AsyncSessionAdapter):
+    repo = (await db_session.execute(select(Repo).where(Repo.id == 1))).scalar_one()
+
+    # Get existing commits
+    commits = (await db_session.execute(select(Commit).where(Commit.repo_id == 1))).scalars().all()
+    c1, c2 = commits[0], commits[1]
+
+    c3 = Commit(
+        repo_id=repo.id,
+        sha="789ghi012jkl",
+        full_sha="789ghi012jkl7890789ghi012jkl7890789ghi01",
+        message="update service layer",
+        author_name="Noor",
+        author_email="noor@example.com",
+        committed_at=datetime(2026, 1, 3, tzinfo=timezone.utc),
+        insertions=10,
+        deletions=5,
+        files_changed=1,
+    )
+    db_session.session.add(c3)
+    db_session.session.flush()
+
+    db_session.session.add_all([
+        GraphNode(
+            repo_id=repo.id,
+            commit_id=c1.id,
+            full_sha=c1.full_sha,
+            file_path="src/service.py",
+            module_name="service.py",
+            loc=160,
+            avg_complexity=7.25,
+            health_color="yellow",
+            is_entry_point=False,
+        ),
+        GraphNode(
+            repo_id=repo.id,
+            commit_id=c3.id,
+            full_sha=c3.full_sha,
+            file_path="src/service.py",
+            module_name="service.py",
+            loc=160,
+            avg_complexity=7.25,
+            health_color="yellow",
+            is_entry_point=False,
+        ),
+    ])
+    db_session.session.commit()
+
+    # Default pagination
+    res_default = await get_hotspots(repo_id=1, db=db_session)
+    assert res_default["repo_id"] == 1
+    assert res_default["total"] == 1
+    assert res_default["limit"] == 50
+    assert res_default["offset"] == 0
+    assert len(res_default["hotspots"]) == 1
+    assert res_default["hotspots"][0]["file"] == "src/service.py"
+
+    # Custom limit & offset
+    res_limit = await get_hotspots(repo_id=1, limit=1, offset=0, db=db_session)
+    assert res_limit["total"] == 1
+    assert res_limit["limit"] == 1
+    assert res_limit["offset"] == 0
+    assert len(res_limit["hotspots"]) == 1
+
+    # Out-of-bounds offset
+    res_oob = await get_hotspots(repo_id=1, limit=10, offset=10, db=db_session)
+    assert res_oob["total"] == 1
+    assert res_oob["limit"] == 10
+    assert res_oob["offset"] == 10
+    assert len(res_oob["hotspots"]) == 0
 
     usage = await get_llm_usage(repo_id=1, db=db_session)
     assert usage["total_calls"] == 1

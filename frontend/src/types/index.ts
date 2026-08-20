@@ -194,6 +194,9 @@ export interface HotspotResponse {
   repo_id: number
   commit_sha: string
   hotspots: HotspotEntry[]
+  total?: number
+  limit?: number
+  offset?: number
 }
 
 export interface GraphDiffResponse {

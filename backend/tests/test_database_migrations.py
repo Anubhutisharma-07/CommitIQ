@@ -1,7 +1,7 @@
 import asyncio
 from pathlib import Path
 
-from backend.database import apply_sql_migrations
+from backend.database import apply_sql_migrations, check_database_migrations, get_unapplied_migrations
 
 
 class FakeResult:
@@ -103,5 +103,57 @@ def test_apply_sql_migrations_keeps_sqlite_add_column_idempotent(tmp_path: Path)
 
         assert reapplied == ["0001_add_repo_status"]
         assert [column[1] for column in columns] == ["id", "status"]
+
+    asyncio.run(run_assertions())
+
+
+def test_get_unapplied_migrations_detects_pending_files(tmp_path: Path):
+    m1 = tmp_path / "0001_init.sql"
+    m2 = tmp_path / "0002_add_field.sql"
+    m1.write_text("SELECT 1;", encoding="utf-8")
+    m2.write_text("SELECT 2;", encoding="utf-8")
+
+    async def run_assertions():
+        conn = FakeAsyncConnection()
+        unapplied_before = await get_unapplied_migrations(conn, tmp_path)
+        assert unapplied_before == ["0001_init", "0002_add_field"]
+
+        await apply_sql_migrations(conn, tmp_path, is_sqlite=True)
+
+        unapplied_after = await get_unapplied_migrations(conn, tmp_path)
+        assert unapplied_after == []
+
+    asyncio.run(run_assertions())
+
+
+def test_check_database_migrations_warns_in_development(tmp_path: Path):
+    m1 = tmp_path / "0001_feature.sql"
+    m1.write_text("SELECT 1;", encoding="utf-8")
+
+    async def run_assertions():
+        conn = FakeAsyncConnection()
+        res = await check_database_migrations(conn, env="development", migrations_dir=tmp_path)
+
+        assert res["status"] == "unapplied_detected"
+        assert res["unapplied"] == ["0001_feature"]
+        assert res["applied"] == []
+        assert res["auto_applied"] is False
+        assert conn.applied_versions == set()
+
+    asyncio.run(run_assertions())
+
+
+def test_check_database_migrations_auto_applies_in_production(tmp_path: Path):
+    m1 = tmp_path / "0001_feature.sql"
+    m1.write_text("SELECT 1;", encoding="utf-8")
+
+    async def run_assertions():
+        conn = FakeAsyncConnection()
+        res = await check_database_migrations(conn, env="production", migrations_dir=tmp_path)
+
+        assert res["status"] == "applied"
+        assert res["applied"] == ["0001_feature"]
+        assert res["auto_applied"] is True
+        assert conn.applied_versions == {"0001_feature"}
 
     asyncio.run(run_assertions())
