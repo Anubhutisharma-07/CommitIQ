@@ -20,6 +20,7 @@ from backend.features.repo_ingestion.clone_service import (
     clone_repo,
     count_available_commits,
     fetch_github_metadata,
+    fetch_github_pull_requests,
     make_repo_slug,
     parse_github_url,
     sanitize_repo_url,
@@ -36,6 +37,7 @@ from backend.shared.models import (
     HealthSnapshot,
     LLMNarrative,
     Repo,
+    PullRequest,
 )
 from backend.shared.schemas import (
     BusFactorWrapper,
@@ -375,7 +377,7 @@ async def _commit_graph_rows(
 
 
 async def _clear_repo_data(db: AsyncSession, repo_id: int) -> None:
-    for model in (LLMNarrative, GraphEdge, GraphNode, HealthSnapshot, Commit, BusFactor):
+    for model in (LLMNarrative, GraphEdge, GraphNode, HealthSnapshot, Commit, BusFactor, PullRequest):
         await db.execute(delete(model).where(model.repo_id == repo_id))
 
 
@@ -446,10 +448,27 @@ async def run_ingestion(repo_id: int, job_id: int, max_commits: int,branch: str 
         bus_entries = await asyncio.to_thread(compute_bus_factor_from_history, commit_history, clone_path)
         min_bus_factor = min((entry["contributor_count"] for entry in bus_entries), default=1)
 
+        owner, repo_name = parse_github_url(repo_url)
+        pr_list = await fetch_github_pull_requests(owner, repo_name)
+
         # --- single atomic transaction: clear old data + write all new data ---
         async with AsyncSessionLocal() as db:
             await _clear_repo_data(db, repo_id)
             await _raise_if_cancelled(job_id)
+
+            for pr_data in pr_list:
+                pr = PullRequest(
+                    repo_id=repo_id,
+                    pr_number=pr_data["pr_number"],
+                    title=pr_data["title"],
+                    state=pr_data["state"],
+                    author=pr_data["author"],
+                    created_at=pr_data["created_at"],
+                    first_review_at=pr_data["first_review_at"],
+                    merged_at=pr_data["merged_at"],
+                    closed_at=pr_data["closed_at"],
+                )
+                db.add(pr)
 
             prev_health = None
             prev_avg_complexity = 0.0

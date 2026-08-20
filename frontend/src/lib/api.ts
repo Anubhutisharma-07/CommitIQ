@@ -14,6 +14,10 @@ import type {
   PredictRequest,
   Repo,
   TimelineResponse,
+  CycleTimeMetrics,
+  DoraMetrics,
+  TeamHealthMetrics,
+  CodeQualityMetrics,
 } from '../types'
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '')
@@ -114,6 +118,22 @@ export async function getGraph(repoId: string | number, sha?: string): Promise<G
 
 export async function getBusFactor(repoId: string | number): Promise<BusFactorWrapper> {
   return request<BusFactorWrapper>(client.get(`/repos/${repoId}/bus-factor`))
+}
+
+export async function getCycleTime(repoId: string | number): Promise<CycleTimeMetrics> {
+  return request<CycleTimeMetrics>(client.get(`/metrics/repos/${repoId}/cycle-time`))
+}
+
+export async function getDoraMetrics(repoId: string | number): Promise<DoraMetrics> {
+  return request<DoraMetrics>(client.get(`/metrics/repos/${repoId}/dora`))
+}
+
+export async function getTeamHealthMetrics(repoId: string | number): Promise<TeamHealthMetrics> {
+  return request<TeamHealthMetrics>(client.get(`/metrics/repos/${repoId}/team-health`))
+}
+
+export async function getCodeQualityMetrics(repoId: string | number): Promise<CodeQualityMetrics> {
+  return request<CodeQualityMetrics>(client.get(`/metrics/repos/${repoId}/code-quality`))
 }
 
 export async function getGraphDiff(

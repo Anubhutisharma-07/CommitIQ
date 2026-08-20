@@ -403,3 +403,44 @@ export function formatDelta(delta: number | null): string {
   const sign = delta > 0 ? '+' : ''
   return `${sign}${delta.toFixed(1)}`
 }
+
+export interface BottleneckPR {
+  pr_number: number
+  title: string
+  author: string
+  cycle_time_hours: number
+  url: string
+}
+
+export interface CycleTimeMetrics {
+  avg_cycle_time_hours: number
+  avg_pickup_time_hours: number
+  avg_review_time_hours: number
+  total_prs_analyzed: number
+  bottlenecks: BottleneckPR[]
+}
+
+export interface DoraMetrics {
+  deployment_frequency: string
+  deployment_frequency_value: number
+  change_failure_rate: string
+  change_failure_rate_value: number
+  mttr_hours: number
+  mttr_category: string
+  dora_score: string
+}
+
+export interface TeamHealthMetrics {
+  burnout_risk_score: string
+  weekend_commits_percent: number
+  after_hours_commits_percent: number
+  context_switching_score: string
+  avg_files_per_day: number
+}
+
+export interface CodeQualityMetrics {
+  churn_rate_percent: number
+  churn_category: string
+  ai_assisted_commits: number
+  ai_impact_score: string
+}

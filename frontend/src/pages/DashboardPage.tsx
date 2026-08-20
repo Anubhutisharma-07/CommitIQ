@@ -18,6 +18,10 @@ import { GraphExplorer } from '../components/GraphExplorer'
 import { HealthTimeline } from '../components/HealthTimeline'
 import { HotspotMap } from '../components/HotspotMap'
 import { NarrativeCard } from '../components/NarrativeCard'
+import { CycleTimeDashboard } from '../components/CycleTimeDashboard'
+import { DoraMetricsDashboard } from '../components/DoraMetricsDashboard'
+import { TeamHealthDashboard } from '../components/TeamHealthDashboard'
+import { CodeQualityDashboard } from '../components/CodeQualityDashboard'
 import { TimeRangeSelector, type TimeRangePreset } from '../components/TimeRangeSelector'
 import { HealthBadge } from '../components/ui/HealthBadge'
 import { ThemeToggle } from '../components/ui/ThemeToggle'
@@ -632,9 +636,14 @@ export default function DashboardPage() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-            {busState.error ? (
-              <div className="glass-panel rounded-[28px] p-6 text-rose-300 border border-rose-500/20 bg-rose-500/10">
-                Could not retrieve module ownership datasets.
+            {repoId && <CycleTimeDashboard repoId={repoId} />}
+            {repoId && <DoraMetricsDashboard repoId={repoId} />}
+          </div>
+
+          {repoId && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+              <div className="w-full">
+                <TeamHealthDashboard repoId={repoId} />
               </div>
             ) : (
               <div>
@@ -661,7 +670,8 @@ export default function DashboardPage() {
                   </div>
                 )}
               </div>
-            )}
+            </div>
+          )}
 
             {repoId && (
               <HotspotMap
