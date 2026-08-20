@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { ResponsiveContainer, Tooltip, Treemap } from 'recharts'
 import useSWR from 'swr'
 import { getHotspots } from '../lib/api'
@@ -52,8 +53,28 @@ function HotspotCell(props: TreemapNode) {
 }
 
 export function HotspotMap({ repoId, sha }: HotspotMapProps) {
-  const hotspotState = useSWR(['hotspots', repoId, sha], () => getHotspots(repoId, sha || undefined))
+  const [offset, setOffset] = useState(0)
+  const limit = 50
+
+  const hotspotState = useSWR(['hotspots', repoId, sha, limit, offset], () =>
+    getHotspots(repoId, sha || undefined, limit, offset)
+  )
   const hotspots = hotspotState.data?.hotspots || []
+  const total = hotspotState.data?.total ?? hotspots.length
+
+  const currentPage = Math.floor(offset / limit) + 1
+  const totalPages = Math.ceil(total / limit) || 1
+
+  const handlePrevPage = () => {
+    setOffset((prev) => Math.max(0, prev - limit))
+  }
+
+  const handleNextPage = () => {
+    if (offset + limit < total) {
+      setOffset((prev) => prev + limit)
+    }
+  }
+
   const treemapData: TreemapNode[] = hotspots.map((hotspot) => ({
     name: hotspot.file.split('/').pop() || hotspot.file,
     fullPath: hotspot.file,
@@ -69,7 +90,14 @@ export function HotspotMap({ repoId, sha }: HotspotMapProps) {
 
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 relative z-10">
         <div>
-          <h2 className="font-head text-[18px] font-semibold text-white tracking-tight">Complexity Churn Hotspots</h2>
+          <h2 className="font-head text-[18px] font-semibold text-white tracking-tight flex items-center gap-2">
+            Complexity Churn Hotspots
+            {total > 0 && (
+              <span className="text-[11px] font-mono font-normal px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-slate-300">
+                Total: {total}
+              </span>
+            )}
+          </h2>
           <p className="text-slate-400 text-xs mt-1">Area represents file complexity scaled by recent churn volume</p>
         </div>
         <div className="flex gap-3 text-[10px] font-bold tracking-wider uppercase font-mono">
@@ -112,6 +140,33 @@ export function HotspotMap({ repoId, sha }: HotspotMapProps) {
           </ResponsiveContainer>
         )}
       </div>
+
+      {total > limit && (
+        <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between relative z-10 text-xs font-mono text-slate-400">
+          <span>
+            Page {currentPage} of {totalPages} ({offset + 1}-{Math.min(offset + limit, total)} of {total})
+          </span>
+          <div className="flex gap-2">
+            <button
+              onClick={handlePrevPage}
+              disabled={offset === 0}
+              aria-label="Previous page"
+              className="px-3 py-1 rounded-lg border border-white/10 bg-white/5 text-white hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed transition"
+            >
+              Previous
+            </button>
+            <button
+              onClick={handleNextPage}
+              disabled={offset + limit >= total}
+              aria-label="Next page"
+              className="px-3 py-1 rounded-lg border border-white/10 bg-white/5 text-white hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed transition"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
     </section>
   )
 }
+

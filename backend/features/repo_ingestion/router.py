@@ -4,7 +4,7 @@ import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy import delete, desc, select
 from sqlalchemy.exc import IntegrityError
@@ -39,6 +39,7 @@ from backend.shared.schemas import (
     BusFactorWrapper,
     CommitDetailResponse,
     GraphResponse,
+    HotspotResponse,
     IngestRequest,
     IngestResponse,
     JobProgressOut,
@@ -873,8 +874,17 @@ async def get_bus_factor(repo_id: int, db: AsyncSession = Depends(get_db)):
     return await _bus_factor_payload(db, repo_id)
 
 
-@router.get("/{repo_id}/hotspots")
-async def get_hotspots(repo_id: int, sha: str | None = None, db: AsyncSession = Depends(get_db)):
+@router.get("/{repo_id}/hotspots", response_model=HotspotResponse)
+async def get_hotspots(
+    repo_id: int,
+    sha: str | None = None,
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    db: AsyncSession = Depends(get_db),
+):
+    limit_val = limit.default if hasattr(limit, "default") else limit
+    offset_val = offset.default if hasattr(offset, "default") else offset
+
     commit = await _find_commit(db, repo_id, sha)
     if not commit:
         raise _http_error(404, "Commit not found.", "commit_not_found")
@@ -885,7 +895,14 @@ async def get_hotspots(repo_id: int, sha: str | None = None, db: AsyncSession = 
     )
     nodes = nodes_result.scalars().all()
     if not nodes:
-        return {"repo_id": repo_id, "commit_sha": commit.sha, "hotspots": []}
+        return {
+            "repo_id": repo_id,
+            "commit_sha": commit.sha,
+            "hotspots": [],
+            "total": 0,
+            "limit": limit_val,
+            "offset": offset_val,
+        }
 
     file_paths = [node.file_path for node in nodes]
     commits_result = await db.execute(
@@ -916,10 +933,17 @@ async def get_hotspots(repo_id: int, sha: str | None = None, db: AsyncSession = 
             "risk_score": round(risk_score, 1),
         })
 
+    sorted_hotspots = sorted(hotspots, key=lambda item: item["risk_score"], reverse=True)
+    total = len(sorted_hotspots)
+    paginated_hotspots = sorted_hotspots[offset_val : offset_val + limit_val]
+
     return {
         "repo_id": repo_id,
         "commit_sha": commit.sha,
-        "hotspots": sorted(hotspots, key=lambda item: item["risk_score"], reverse=True)[:50],
+        "hotspots": paginated_hotspots,
+        "total": total,
+        "limit": limit_val,
+        "offset": offset_val,
     }
 
 

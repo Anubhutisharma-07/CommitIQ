@@ -197,6 +197,22 @@ class GraphResponse(BaseModel):
     edges: list[GraphEdgeOut]
 
 
+class HotspotItem(BaseModel):
+    file: str
+    complexity: float
+    churn_count: int
+    risk_score: float
+
+
+class HotspotResponse(BaseModel):
+    repo_id: int
+    commit_sha: str
+    hotspots: list[HotspotItem]
+    total: int
+    limit: int
+    offset: int
+
+
 class BusFactorEntryOut(BaseModel):
     module_path: str
     contributor_count: int

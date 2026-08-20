@@ -95,9 +95,18 @@ export async function getGraphDiff(
   )
 }
 
-export async function getHotspots(repoId: string | number, sha?: string): Promise<HotspotResponse> {
+export async function getHotspots(
+  repoId: string | number,
+  sha?: string,
+  limit?: number,
+  offset?: number
+): Promise<HotspotResponse> {
+  const params: Record<string, unknown> = {}
+  if (sha) params.sha = sha
+  if (limit !== undefined) params.limit = limit
+  if (offset !== undefined) params.offset = offset
   return request<HotspotResponse>(
-    client.get(`/repos/${repoId}/hotspots`, { params: sha ? { sha } : undefined })
+    client.get(`/repos/${repoId}/hotspots`, { params: Object.keys(params).length > 0 ? params : undefined })
   )
 }
 
