@@ -1,6 +1,5 @@
 import axios, { AxiosError } from 'axios'
 import type {
-  ApiError,
   BusFactorWrapper,
   CommitDetailResponse,
   GraphResponse,
@@ -26,13 +25,28 @@ const client = axios.create({
   timeout: 30000,
 })
 
+interface ErrorDetailItem {
+  msg?: string
+  detail?: string
+}
+
 function normalizeError(error: unknown): Error {
   if (axios.isAxiosError(error)) {
-    const axiosError = error as AxiosError<ApiError | string>
+    const axiosError = error as AxiosError<Record<string, unknown>>
     const data = axiosError.response?.data
     if (typeof data === 'string') return new Error(data)
-    if (data?.detail) return new Error(data.detail)
-    if (data?.message) return new Error(data.message)
+    if (data && typeof data === 'object') {
+      if ('detail' in data) {
+        if (typeof data.detail === 'string') return new Error(data.detail)
+        if (Array.isArray(data.detail)) {
+          const msgs = (data.detail as ErrorDetailItem[])
+            .map((d: ErrorDetailItem) => d.msg?.replace(/^Value error,\s*/, '') || d.detail)
+            .filter((val): val is string => Boolean(val))
+          if (msgs.length > 0) return new Error(msgs.join('; '))
+        }
+      }
+      if ('message' in data && typeof data.message === 'string') return new Error(data.message)
+    }
     return new Error(axiosError.message)
   }
   return error instanceof Error ? error : new Error('Unexpected API error')
@@ -47,10 +61,14 @@ async function request<T>(promise: Promise<{ data: T }>): Promise<T> {
   }
 }
 
-export async function ingestRepo(url: string, maxCommits?: number): Promise<IngestResponse> {
+export async function ingestRepo(url: string, maxCommits?: number,branch?: string,): Promise<IngestResponse> {
   return request<IngestResponse>(
-    client.post('/repos/ingest', { repo_url: url, max_commits: maxCommits || 500 })
+    client.post('/repos/ingest', { repo_url: url,branch, max_commits: maxCommits || 500 })
   )
+}
+
+export async function rescanRepo(repoId: string | number): Promise<IngestResponse> {
+  return request<IngestResponse>(client.post(`/repos/${repoId}/rescan`))
 }
 
 export async function getRepoBySlug(slug: string): Promise<Repo> {
@@ -61,8 +79,17 @@ export async function getRepo(repoId: string | number): Promise<Repo> {
   return request<Repo>(client.get(`/repos/${repoId}`))
 }
 
-export async function getHealthTimeline(repoId: string | number): Promise<HealthSnapshot[]> {
-  const data = await request<TimelineResponse>(client.get(`/repos/${repoId}/timeline`))
+export async function getHealthTimeline(
+  repoId: string | number,
+  startDate?: string,
+  endDate?: string,
+): Promise<HealthSnapshot[]> {
+  const params: Record<string, string> = {}
+  if (startDate) params.start_date = startDate
+  if (endDate) params.end_date = endDate
+  const data = await request<TimelineResponse>(
+    client.get(`/repos/${repoId}/timeline`, { params: Object.keys(params).length ? params : undefined })
+  )
   return data.commits
 }
 
@@ -95,9 +122,18 @@ export async function getGraphDiff(
   )
 }
 
-export async function getHotspots(repoId: string | number, sha?: string): Promise<HotspotResponse> {
+export async function getHotspots(
+  repoId: string | number,
+  sha?: string,
+  startDate?: string,
+  endDate?: string,
+): Promise<HotspotResponse> {
+  const params: Record<string, string> = {}
+  if (sha) params.sha = sha
+  if (startDate) params.start_date = startDate
+  if (endDate) params.end_date = endDate
   return request<HotspotResponse>(
-    client.get(`/repos/${repoId}/hotspots`, { params: sha ? { sha } : undefined })
+    client.get(`/repos/${repoId}/hotspots`, { params: Object.keys(params).length ? params : undefined })
   )
 }
 
@@ -180,4 +216,4 @@ export async function streamNarrative(
   if (buffer.trim().startsWith('data: ')) {
     onChunk(JSON.parse(buffer.trim().slice(6)) as NarrativeStreamChunk)
   }
-}
+} 

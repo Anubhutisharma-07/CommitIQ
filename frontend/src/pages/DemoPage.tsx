@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ingestRepo } from '../lib/api'
+import { ingestRepo, getRepoBySlug } from '../lib/api'
 import { Sparkles, AlertCircle } from 'lucide-react'
 
 export default function DemoPage() {
@@ -12,6 +12,16 @@ export default function DemoPage() {
     setLoading(true)
     setError(null)
     try {
+      try {
+        const existingRepo = await getRepoBySlug('facebook-react')
+        if (existingRepo && existingRepo.status === 'ready') {
+          navigate('/dashboard/facebook-react', { replace: true })
+          return
+        }
+      } catch {
+        // Not analyzed/loaded yet, proceed to trigger live ingestion
+      }
+
       const demoUrl = 'https://github.com/facebook/react'
       const response = await ingestRepo(demoUrl, 100)
       navigate(`/analyze?repo_id=${response.repo_id}&name=${encodeURIComponent(demoUrl)}`, { replace: true })
