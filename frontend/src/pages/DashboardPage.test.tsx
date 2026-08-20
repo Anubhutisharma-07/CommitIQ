@@ -315,4 +315,85 @@ describe('DashboardPage', () => {
     expect(await screen.findByTestId('scroll-to-top')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /scroll back to top/i })).toBeInTheDocument()
   })
+
+    // ── Issue #349: Export Report dropdown tests ───────────────────────────
+
+  it('shows the Export button on the dashboard when data is loaded', async () => {
+    renderDashboard()
+
+    expect(await screen.findByTestId('export-report-button')).toBeInTheDocument()
+  })
+
+  it('opens the export dropdown and shows both export options', async () => {
+    const user = userEvent.setup()
+    renderDashboard()
+
+    await screen.findByText('Improve ingestion resilience')
+
+    await user.click(screen.getByTestId('export-report-button'))
+
+    expect(screen.getByTestId('export-dropdown-menu')).toBeInTheDocument()
+    expect(screen.getByTestId('export-timeline-csv')).toBeInTheDocument()
+    expect(screen.getByTestId('export-busfactor-json')).toBeInTheDocument()
+    expect(screen.getByText(/2 commit\(s\)/)).toBeInTheDocument()
+    expect(screen.getByText(/1 module\(s\)/)).toBeInTheDocument()
+  })
+
+  it('triggers timeline CSV download when Export Timeline CSV is clicked', async () => {
+    const user = userEvent.setup()
+    const createUrlSpy = vi.spyOn(URL, 'createObjectURL')
+    renderDashboard()
+
+    await screen.findByText('Improve ingestion resilience')
+
+    await user.click(screen.getByTestId('export-report-button'))
+    await user.click(screen.getByTestId('export-timeline-csv'))
+
+    expect(createUrlSpy).toHaveBeenCalledTimes(1)
+    const blob = createUrlSpy.mock.calls[0][0] as Blob
+    expect(blob.type).toBe('text/csv;charset=utf-8;')
+    createUrlSpy.mockRestore()
+  })
+
+  it('triggers bus factor JSON download when Export Bus Factor JSON is clicked', async () => {
+    const user = userEvent.setup()
+    const createUrlSpy = vi.spyOn(URL, 'createObjectURL')
+    renderDashboard()
+
+    await screen.findByText('Improve ingestion resilience')
+
+    await user.click(screen.getByTestId('export-report-button'))
+    await user.click(screen.getByTestId('export-busfactor-json'))
+
+    expect(createUrlSpy).toHaveBeenCalledTimes(1)
+    const blob = createUrlSpy.mock.calls[0][0] as Blob
+    expect(blob.type).toBe('application/json;charset=utf-8;')
+    createUrlSpy.mockRestore()
+  })
+
+  it('disables export button when there is no data (empty timeline + no bus factor)', async () => {
+    getHealthTimelineMock.mockResolvedValue([])
+    getBusFactorMock.mockResolvedValue({ repo_id: 7, modules: [] })
+
+    renderDashboard()
+
+    const exportBtn = await screen.findByTestId('export-report-button')
+    expect(exportBtn).toBeDisabled()
+  })
+
+  it('closes the export dropdown when clicking outside', async () => {
+    const user = userEvent.setup()
+    renderDashboard()
+
+    await screen.findByText('Improve ingestion resilience')
+
+    await user.click(screen.getByTestId('export-report-button'))
+    expect(screen.getByTestId('export-dropdown-menu')).toBeInTheDocument()
+
+    await user.click(document.body)
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('export-dropdown-menu')).not.toBeInTheDocument()
+    })
+  })
 })
