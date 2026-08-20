@@ -5,6 +5,7 @@
   [![CI](https://github.com/eshaanag/CommitIQ/actions/workflows/ci.yml/badge.svg)](https://github.com/eshaanag/CommitIQ/actions/workflows/ci.yml)
   [![CodeQL](https://github.com/eshaanag/CommitIQ/actions/workflows/codeql.yml/badge.svg)](https://github.com/eshaanag/CommitIQ/actions/workflows/codeql.yml)
   [![codecov](https://codecov.io/gh/eshaanag/CommitIQ/branch/main/graph/badge.svg)](https://codecov.io/gh/eshaanag/CommitIQ)
+  [![docs tested](https://docrunner.dev/api/badge/eshaanag/CommitIQ)](https://docrunner.dev/repo/eshaanag/CommitIQ)
   [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
   [![Discord](https://img.shields.io/discord/1234567890?label=Discord&logo=discord&color=5865F2)](https://discord.gg/commitiq)
 </div>
