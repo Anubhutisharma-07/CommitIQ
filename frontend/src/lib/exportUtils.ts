@@ -87,7 +87,7 @@ export function buildTimelineCsv(commits: HealthSnapshot[]): string {
       c.churn_rate,
       c.num_files_changed,
       c.bus_factor_min,
-    ]),
+    ])
   )
 
   // Join with \r\n for maximum spreadsheet compatibility (Excel / Sheets).
@@ -126,9 +126,7 @@ export function exportTimelineCsv(commits: HealthSnapshot[]): Blob | null {
  *      top_contributor_email, top_contributor_pct,
  *      total_commits_to_module, risk_level
  */
-export function buildBusFactorJson(
-  data: BusFactorWrapper | null | undefined,
-): object | null {
+export function buildBusFactorJson(data: BusFactorWrapper | null | undefined): object | null {
   if (!data || !data.modules || data.modules.length === 0) return null
 
   const modules: Array<{
@@ -164,9 +162,7 @@ export function buildBusFactorJson(
  * Returns the Blob that was created (useful for testing) or null if the
  * data was empty.
  */
-export function exportBusFactorJson(
-  data: BusFactorWrapper | null | undefined,
-): Blob | null {
+export function exportBusFactorJson(data: BusFactorWrapper | null | undefined): Blob | null {
   const payload = buildBusFactorJson(data)
   if (!payload) return null
 

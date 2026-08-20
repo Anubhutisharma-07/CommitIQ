@@ -1,7 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import useSWR from 'swr'
-import { getBusFactor, getGraph, getHealthTimeline, getIngestProgress, getLLMUsage, getRepoBySlug, rescanRepo } from '../lib/api'
+import {
+  getBusFactor,
+  getGraph,
+  getHealthTimeline,
+  getIngestProgress,
+  getLLMUsage,
+  getRepoBySlug,
+  rescanRepo,
+} from '../lib/api'
 import type { HealthSnapshot } from '../types'
 import { BusFactorTable } from '../components/BusFactorTable'
 import { CommitList } from '../components/CommitList'
@@ -14,10 +22,21 @@ import { TimeRangeSelector, type TimeRangePreset } from '../components/TimeRange
 import { HealthBadge } from '../components/ui/HealthBadge'
 import { ThemeToggle } from '../components/ui/ThemeToggle'
 import { ScrollToTop } from '../components/ui/ScrollToTop'
-import { Layers, Compass, BarChart2, Activity, GitBranch, RefreshCw, AlertTriangle, Download, ChevronDown, FileText, FileJson } from 'lucide-react'
+import {
+  Layers,
+  Compass,
+  BarChart2,
+  Activity,
+  GitBranch,
+  RefreshCw,
+  AlertTriangle,
+  Download,
+  ChevronDown,
+  FileText,
+  FileJson,
+} from 'lucide-react'
 import { sanitizeCommitMessage } from '../lib/utils'
 import { exportTimelineCsv, exportBusFactorJson } from '../lib/exportUtils'
-
 
 export default function DashboardPage() {
   const { repoSlug = '' } = useParams<{ repoSlug: string }>()
@@ -36,7 +55,9 @@ export default function DashboardPage() {
     if (timeRangePreset === 'custom') {
       return {
         startDate: customStartDate ? new Date(customStartDate).toISOString() : undefined,
-        endDate: customEndDate ? new Date(`${customEndDate}T23:59:59.999Z`).toISOString() : undefined,
+        endDate: customEndDate
+          ? new Date(`${customEndDate}T23:59:59.999Z`).toISOString()
+          : undefined,
       }
     }
     const now = new Date()
@@ -91,18 +112,23 @@ export default function DashboardPage() {
     setCustomStartDate('')
     setCustomEndDate('')
   }
-  
+
   const repoState = useSWR(repoSlug ? ['repo', repoSlug] : null, () => getRepoBySlug(repoSlug))
   const repo = repoState.data
   const repoId = repo?.id
-  const timelineState = useSWR(
-    repoId ? ['timeline', repoId, startDate, endDate] : null,
-    () => getHealthTimeline(repoId as number, startDate, endDate)
+  const timelineState = useSWR(repoId ? ['timeline', repoId, startDate, endDate] : null, () =>
+    getHealthTimeline(repoId as number, startDate, endDate)
   )
   const commits = useMemo(() => timelineState.data || [], [timelineState.data])
-  const busState = useSWR(repoId ? ['bus-factor', repoId] : null, () => getBusFactor(repoId as number))
-  const graphState = useSWR(repoId && selected ? ['graph', repoId, selected.sha] : null, () => getGraph(repoId as number, selected?.sha))
-  const usageState = useSWR(repoId ? ['llm-usage', repoId] : null, () => getLLMUsage(repoId as number))
+  const busState = useSWR(repoId ? ['bus-factor', repoId] : null, () =>
+    getBusFactor(repoId as number)
+  )
+  const graphState = useSWR(repoId && selected ? ['graph', repoId, selected.sha] : null, () =>
+    getGraph(repoId as number, selected?.sha)
+  )
+  const usageState = useSWR(repoId ? ['llm-usage', repoId] : null, () =>
+    getLLMUsage(repoId as number)
+  )
 
   const handleRescan = async () => {
     if (!repoId || isRescanning) return
@@ -170,7 +196,9 @@ export default function DashboardPage() {
     return (
       <div className="min-h-screen bg-[#07080d] flex flex-col items-center justify-center gap-4 text-slate-300">
         <Activity className="w-8 h-8 text-purple-400 animate-spin" />
-        <span className="text-sm font-medium animate-pulse">Initializing spatial dashboard workspace...</span>
+        <span className="text-sm font-medium animate-pulse">
+          Initializing spatial dashboard workspace...
+        </span>
       </div>
     )
   }
@@ -184,7 +212,8 @@ export default function DashboardPage() {
           </div>
           <h3 className="font-head text-[18px] font-semibold text-white">Repository Not Loaded</h3>
           <p className="text-slate-400 text-xs leading-relaxed">
-            The requested repository slug could not be verified or loaded into the active environment workspace.
+            The requested repository slug could not be verified or loaded into the active
+            environment workspace.
           </p>
           <button
             onClick={() => navigate('/')}
@@ -210,7 +239,12 @@ export default function DashboardPage() {
               aria-label="Open sidebar"
             >
               <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 6h16M4 12h16M4 18h16"
+                />
               </svg>
             </button>
 
@@ -226,7 +260,9 @@ export default function DashboardPage() {
 
             <div className="flex items-center gap-2 bg-white/5 border border-white/5 px-3 py-1.5 rounded-full max-w-[150px] sm:max-w-[240px]">
               <GitBranch className="w-3.5 h-3.5 text-purple-300 flex-shrink-0" />
-              <span className="font-mono text-xs text-slate-200 font-semibold truncate select-all">{repo.name}</span>
+              <span className="font-mono text-xs text-slate-200 font-semibold truncate select-all">
+                {repo.name}
+              </span>
             </div>
 
             <HealthBadge score={latestScore} size="md" />
@@ -240,8 +276,10 @@ export default function DashboardPage() {
               className="text-xs font-semibold text-purple-200 hover:text-white bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 rounded-full px-4 py-2 transition-all flex items-center gap-1.5 disabled:opacity-50"
               title="Check for new remote commits and update metrics without wiping historical data"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${isRescanning ? 'animate-spin text-purple-400' : ''}`} />
-              <span>{isRescanning ? (rescanStage || 'Updating...') : 'Update Analysis'}</span>
+              <RefreshCw
+                className={`w-3.5 h-3.5 ${isRescanning ? 'animate-spin text-purple-400' : ''}`}
+              />
+              <span>{isRescanning ? rescanStage || 'Updating...' : 'Update Analysis'}</span>
             </button>
 
             <div ref={exportMenuRef} className="relative">
@@ -256,7 +294,9 @@ export default function DashboardPage() {
               >
                 <Download className="w-3.5 h-3.5" />
                 <span>Export</span>
-                <ChevronDown className={`w-3 h-3 transition-transform ${isExportMenuOpen ? 'rotate-180' : ''}`} />
+                <ChevronDown
+                  className={`w-3 h-3 transition-transform ${isExportMenuOpen ? 'rotate-180' : ''}`}
+                />
               </button>
 
               {isExportMenuOpen && (
@@ -326,14 +366,19 @@ export default function DashboardPage() {
           />
         )}
 
-        <aside className={`w-80 flex-shrink-0 flex flex-col overflow-hidden bg-[#0a0b10]/40 backdrop-blur-2xl transition-transform duration-300 ease-in-out z-40 border-r border-white/5
+        <aside
+          className={`w-80 flex-shrink-0 flex flex-col overflow-hidden bg-[#0a0b10]/40 backdrop-blur-2xl transition-transform duration-300 ease-in-out z-40 border-r border-white/5
           fixed md:static inset-y-0 left-0 pt-[88px] md:pt-0
           ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
-        `}>
+        `}
+        >
           <div className="p-5 border-b border-white/5 flex items-center justify-between">
             <div className="min-w-0 flex-1">
               <div className="font-mono text-xs font-bold text-white truncate">{repo.name}</div>
-              <div className="text-slate-400 text-[10px] mt-1 font-semibold uppercase tracking-wider">{repo.analyzed_commits} commits compiled • {repo.active_contributors_count ?? 0} active contributors</div>
+              <div className="text-slate-400 text-[10px] mt-1 font-semibold uppercase tracking-wider">
+                {repo.analyzed_commits} commits compiled • {repo.active_contributors_count ?? 0}{' '}
+                active contributors
+              </div>
             </div>
             <button
               onClick={() => setIsSidebarOpen(false)}
@@ -341,13 +386,22 @@ export default function DashboardPage() {
               aria-label="Close sidebar"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </button>
           </div>
 
           <div className="p-5 border-b border-white/5 bg-white/[0.01]">
-            <CostMeter usage={usageState.data} loading={usageState.isLoading} error={usageState.error?.message} />
+            <CostMeter
+              usage={usageState.data}
+              loading={usageState.isLoading}
+              error={usageState.error?.message}
+            />
           </div>
 
           <div className="flex-grow overflow-hidden pt-5">
@@ -363,12 +417,15 @@ export default function DashboardPage() {
           </div>
         </aside>
 
-        <main ref={mainRef} className="flex-grow overflow-y-auto p-4 sm:p-6 space-y-6 relative z-10">
+        <main
+          ref={mainRef}
+          className="flex-grow overflow-y-auto p-4 sm:p-6 space-y-6 relative z-10"
+        >
           {rescanError && (
             <div className="glass-panel rounded-[20px] p-4 text-rose-300 border border-rose-500/30 bg-rose-500/10 flex items-center justify-between text-xs font-medium">
               <span>Failed to update repository analysis: {rescanError}</span>
-              <button 
-                onClick={() => setRescanError(null)} 
+              <button
+                onClick={() => setRescanError(null)}
                 className="text-slate-400 hover:text-white px-2 py-1 rounded bg-white/5"
               >
                 Dismiss
@@ -419,7 +476,9 @@ export default function DashboardPage() {
                   <span className="font-mono text-[10px] font-bold text-purple-300 bg-purple-500/10 px-2 py-0.5 rounded-full border border-purple-500/15">
                     {selected.sha.slice(0, 12)}
                   </span>
-                  <h3 className="font-head text-[18px] font-semibold text-white tracking-tight truncate mt-2">{sanitizeCommitMessage(selected.message)}</h3>
+                  <h3 className="font-head text-[18px] font-semibold text-white tracking-tight truncate mt-2">
+                    {sanitizeCommitMessage(selected.message)}
+                  </h3>
                 </div>
                 <button
                   onClick={() => navigate(`/dashboard/${repo.repo_slug}/commit/${selected.sha}`)}
@@ -433,27 +492,31 @@ export default function DashboardPage() {
                   {
                     label: 'Codebase Complexity',
                     value: selected.avg_complexity === 0 ? '-' : selected.avg_complexity.toFixed(1),
-                    unit: selected.avg_complexity === 0 ? 'no code changed' : 'Avg cyclomatic score',
-                    icon: <BarChart2 className="w-4.5 h-4.5 text-rose-400" />
+                    unit:
+                      selected.avg_complexity === 0 ? 'no code changed' : 'Avg cyclomatic score',
+                    icon: <BarChart2 className="w-4.5 h-4.5 text-rose-400" />,
                   },
                   {
                     label: 'Commit Churn',
                     value: `${selectedChurnPct.toFixed(0)}%`,
                     unit: `${selected.num_files_changed} modified components`,
-                    icon: <Activity className="w-4.5 h-4.5 text-sky-400" />
+                    icon: <Activity className="w-4.5 h-4.5 text-sky-400" />,
                   },
                   {
                     label: 'Minimum Bus Factor',
                     value: String(selected.bus_factor_min),
                     unit: 'Crucial owners limit',
-                    icon: <Compass className="w-4.5 h-4.5 text-emerald-400" />
+                    icon: <Compass className="w-4.5 h-4.5 text-emerald-400" />,
                   },
                   {
                     label: 'Semantic Drift',
                     value: `${(selected.subscores?.semantic_drift ?? selected.semantic_health_score ?? 100).toFixed(0)}`,
                     unit: `${selected.avg_semantic_drift?.toFixed(2) ?? '0.00'} avg drift`,
-                    badge: selected.semantic_drift_method === 'graphcodebert' ? 'GraphCodeBERT' : undefined,
-                    icon: <Layers className="w-4.5 h-4.5 text-purple-400" />
+                    badge:
+                      selected.semantic_drift_method === 'graphcodebert'
+                        ? 'GraphCodeBERT'
+                        : undefined,
+                    icon: <Layers className="w-4.5 h-4.5 text-purple-400" />,
                   },
                 ].map((metric) => (
                   <div
@@ -477,9 +540,7 @@ export default function DashboardPage() {
                     <div className="font-head text-[36px] font-extralight text-white tracking-tight Outfit">
                       {metric.value}
                     </div>
-                    <div className="text-slate-500 text-[11px] font-medium mt-1">
-                      {metric.unit}
-                    </div>
+                    <div className="text-slate-500 text-[11px] font-medium mt-1">{metric.unit}</div>
                   </div>
                 ))}
               </div>
@@ -492,17 +553,25 @@ export default function DashboardPage() {
                       </div>
                       <div className="space-y-2">
                         {selectedRiskReasons.map((reason) => (
-                          <div key={`${reason.code}-${reason.label}`} className="flex items-start justify-between gap-3 text-xs">
+                          <div
+                            key={`${reason.code}-${reason.label}`}
+                            className="flex items-start justify-between gap-3 text-xs"
+                          >
                             <div className="min-w-0">
                               <div className="text-slate-100 font-semibold">{reason.label}</div>
-                              <div className="text-slate-500 leading-relaxed mt-0.5">{reason.detail}</div>
+                              <div className="text-slate-500 leading-relaxed mt-0.5">
+                                {reason.detail}
+                              </div>
                             </div>
-                            <span className={`flex-shrink-0 rounded-full px-2 py-0.5 font-mono text-[9px] uppercase border ${reason.severity === 'critical'
-                                ? 'bg-rose-500/10 text-rose-300 border-rose-500/20'
-                                : reason.severity === 'high'
-                                  ? 'bg-orange-500/10 text-orange-300 border-orange-500/20'
-                                  : 'bg-amber-500/10 text-amber-300 border-amber-500/20'
-                              }`}>
+                            <span
+                              className={`flex-shrink-0 rounded-full px-2 py-0.5 font-mono text-[9px] uppercase border ${
+                                reason.severity === 'critical'
+                                  ? 'bg-rose-500/10 text-rose-300 border-rose-500/20'
+                                  : reason.severity === 'high'
+                                    ? 'bg-orange-500/10 text-orange-300 border-orange-500/20'
+                                    : 'bg-amber-500/10 text-amber-300 border-amber-500/20'
+                              }`}
+                            >
                               {reason.severity}
                             </span>
                           </div>
@@ -523,10 +592,16 @@ export default function DashboardPage() {
                       </div>
                       <div className="space-y-2">
                         {selectedPersistentHotspots.map((hotspot) => (
-                          <div key={hotspot.path} className="flex items-center justify-between gap-3 text-xs">
-                            <span className="font-mono text-slate-200 truncate min-w-0">{hotspot.path}</span>
+                          <div
+                            key={hotspot.path}
+                            className="flex items-center justify-between gap-3 text-xs"
+                          >
+                            <span className="font-mono text-slate-200 truncate min-w-0">
+                              {hotspot.path}
+                            </span>
                             <span className="flex-shrink-0 text-slate-500">
-                              {hotspot.recent_commit_count} commits / cx {hotspot.complexity.toFixed(1)}
+                              {hotspot.recent_commit_count} commits / cx{' '}
+                              {hotspot.complexity.toFixed(1)}
                             </span>
                           </div>
                         ))}
@@ -564,7 +639,9 @@ export default function DashboardPage() {
             ) : (
               <div>
                 <BusFactorTable modules={busState.data?.modules || []} />
-                {(selected?.bus_factor_min === 1 || (busState.data?.modules && busState.data.modules.some(m => m.contributor_count === 1))) && (
+                {(selected?.bus_factor_min === 1 ||
+                  (busState.data?.modules &&
+                    busState.data.modules.some((m) => m.contributor_count === 1))) && (
                   <div
                     data-testid="bus-factor-warning"
                     className="mt-4 p-4 rounded-[20px] bg-amber-500/10 border border-amber-500/30 text-amber-200 flex items-start gap-3 text-xs shadow-lg backdrop-blur-xl"
@@ -575,7 +652,10 @@ export default function DashboardPage() {
                         Single Point of Failure Warning
                       </span>
                       <p className="text-slate-300 leading-relaxed text-[11px]">
-                        The computed minimum bus factor for this repository is <strong>1</strong>. Key modules depend entirely on a single principal contributor, leaving the repository vulnerable to a single-point-of-failure if that contributor becomes unavailable.
+                        The computed minimum bus factor for this repository is <strong>1</strong>.
+                        Key modules depend entirely on a single principal contributor, leaving the
+                        repository vulnerable to a single-point-of-failure if that contributor
+                        becomes unavailable.
                       </p>
                     </div>
                   </div>
@@ -583,7 +663,14 @@ export default function DashboardPage() {
               </div>
             )}
 
-            {repoId && <HotspotMap repoId={repoId} sha={selected?.sha || null} startDate={startDate} endDate={endDate} />}
+            {repoId && (
+              <HotspotMap
+                repoId={repoId}
+                sha={selected?.sha || null}
+                startDate={startDate}
+                endDate={endDate}
+              />
+            )}
           </div>
         </main>
       </div>

@@ -52,7 +52,7 @@ function renderDemoPage() {
   return render(
     <MemoryRouter>
       <DemoPage />
-    </MemoryRouter>,
+    </MemoryRouter>
   )
 }
 
@@ -83,20 +83,22 @@ describe('DemoPage', () => {
     await waitFor(() => {
       expect(mockNavigate).toHaveBeenCalledWith(
         '/analyze?repo_id=31&name=https%3A%2F%2Fgithub.com%2Ffacebook%2Freact',
-        { replace: true },
+        { replace: true }
       )
     })
   })
 
   it('navigates directly to the dashboard when the demo repo is already completed', async () => {
     const user = userEvent.setup()
-    getRepoBySlugMock.mockResolvedValue(makeRepo({
-      id: 31,
-      name: 'facebook/react',
-      owner: 'facebook',
-      repo_slug: 'facebook-react',
-      status: 'ready',
-    }))
+    getRepoBySlugMock.mockResolvedValue(
+      makeRepo({
+        id: 31,
+        name: 'facebook/react',
+        owner: 'facebook',
+        repo_slug: 'facebook-react',
+        status: 'ready',
+      })
+    )
     renderDemoPage()
 
     await user.click(screen.getByRole('button', { name: /start demo analysis/i }))

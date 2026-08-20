@@ -1,9 +1,9 @@
 ---
 name: Bug report
 about: Report a reproducible defect in CommitIQ
-title: "fix: "
+title: 'fix: '
 labels: bug
-assignees: ""
+assignees: ''
 ---
 
 ## What happened?

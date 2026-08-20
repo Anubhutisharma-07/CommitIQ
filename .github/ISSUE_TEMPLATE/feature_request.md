@@ -1,9 +1,9 @@
 ---
 name: Feature request
 about: Propose a product improvement
-title: "feat: "
+title: 'feat: '
 labels: enhancement
-assignees: ""
+assignees: ''
 ---
 
 ## Problem

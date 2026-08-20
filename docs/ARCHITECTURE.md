@@ -60,5 +60,6 @@ CommitIQ utilizes robust CI/CD practices to maintain code quality:
 ## 🔮 Future Considerations
 
 As CommitIQ scales, the architecture may expand to include:
+
 - Dedicated caching layers (e.g., Redis) to optimize frequent data reads.
 - Microservice separation if specific background tasks require distinct scaling profiles.
