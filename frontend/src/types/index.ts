@@ -421,3 +421,11 @@ export interface DoraMetrics {
   mttr_category: string
   dora_score: string
 }
+
+export interface TeamHealthMetrics {
+  burnout_risk_score: string
+  weekend_commits_percent: number
+  after_hours_commits_percent: number
+  context_switching_score: string
+  avg_files_per_day: number
+}

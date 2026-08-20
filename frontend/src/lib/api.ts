@@ -16,6 +16,7 @@ import type {
   TimelineResponse,
   CycleTimeMetrics,
   DoraMetrics,
+  TeamHealthMetrics,
 } from '../types'
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '')
@@ -124,6 +125,10 @@ export async function getCycleTime(repoId: string | number): Promise<CycleTimeMe
 
 export async function getDoraMetrics(repoId: string | number): Promise<DoraMetrics> {
   return request<DoraMetrics>(client.get(`/metrics/repos/${repoId}/dora`))
+}
+
+export async function getTeamHealthMetrics(repoId: string | number): Promise<TeamHealthMetrics> {
+  return request<TeamHealthMetrics>(client.get(`/metrics/repos/${repoId}/team-health`))
 }
 
 export async function getGraphDiff(

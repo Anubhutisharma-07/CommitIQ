@@ -12,6 +12,7 @@ import { HotspotMap } from '../components/HotspotMap'
 import { NarrativeCard } from '../components/NarrativeCard'
 import { CycleTimeDashboard } from '../components/CycleTimeDashboard'
 import { DoraMetricsDashboard } from '../components/DoraMetricsDashboard'
+import { TeamHealthDashboard } from '../components/TeamHealthDashboard'
 import { TimeRangeSelector, type TimeRangePreset } from '../components/TimeRangeSelector'
 import { HealthBadge } from '../components/ui/HealthBadge'
 import { ThemeToggle } from '../components/ui/ThemeToggle'
@@ -471,6 +472,12 @@ export default function DashboardPage() {
             {repoId && <CycleTimeDashboard repoId={repoId} />}
             {repoId && <DoraMetricsDashboard repoId={repoId} />}
           </div>
+
+          {repoId && (
+            <div className="w-full">
+              <TeamHealthDashboard repoId={repoId} />
+            </div>
+          )}
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
             <div className="w-full">
