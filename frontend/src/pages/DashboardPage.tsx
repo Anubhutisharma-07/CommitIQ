@@ -141,7 +141,7 @@ export default function DashboardPage() {
           <div className="p-5 border-b border-white/5 flex items-center justify-between">
             <div className="min-w-0 flex-1">
               <div className="font-mono text-xs font-bold text-white truncate">{repo.name}</div>
-              <div className="text-slate-400 text-[10px] mt-1 font-semibold uppercase tracking-wider">{repo.analyzed_commits} commits compiled</div>
+              <div className="text-slate-400 text-[10px] mt-1 font-semibold uppercase tracking-wider">{repo.analyzed_commits} commits compiled • {repo.active_contributors_count ?? 0} active contributors</div>
             </div>
             <button 
               onClick={() => setIsSidebarOpen(false)}

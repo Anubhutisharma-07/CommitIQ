@@ -314,12 +314,15 @@ async def test_list_and_lookup_repos(db_session: AsyncSessionAdapter):
     listed = await list_repos(slug=None, db=db_session)
     assert len(listed) == 1
     assert listed[0].repo_slug == "example-project"
+    assert listed[0].active_contributors_count == 2
 
     filtered = await list_repos(slug="example-project", db=db_session)
     assert len(filtered) == 1
+    assert filtered[0].active_contributors_count == 2
 
     by_slug = await get_repo_by_slug("example-project", db=db_session)
     assert by_slug.github_stars == 42
+    assert by_slug.active_contributors_count == 2
 
     with pytest.raises(HTTPException) as exc_info:
         await get_repo_by_slug("missing", db=db_session)

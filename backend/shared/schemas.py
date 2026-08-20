@@ -86,6 +86,7 @@ class RepoOut(BaseModel):
     github_stars: int | None
     github_language: str | None
     github_description: str | None
+    active_contributors_count: int = 0
 
 
 class CommitOut(BaseModel):

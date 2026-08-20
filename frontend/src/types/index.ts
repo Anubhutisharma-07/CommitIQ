@@ -28,6 +28,7 @@ export interface Repo {
   github_stars: number | null
   github_language: string | null
   github_description: string | null
+  active_contributors_count?: number
 }
 
 export interface Commit {
