@@ -12,6 +12,8 @@
 
 <br />
 
+**[🎥 Watch the Live Demo Video](https://drive.google.com/file/d/1v5jkYuX3P398lGy5Kcka2EYvcR_6ax1B/view)**
+
 CommitIQ analyzes a repository's commit history and turns raw engineering activity into actionable maintainability signals: **complexity**, **churn**, **dependency risk**, **semantic drift**, **ownership concentration**, and **AI-generated commit narratives**.
 
 ## 🚀 Why CommitIQ?
