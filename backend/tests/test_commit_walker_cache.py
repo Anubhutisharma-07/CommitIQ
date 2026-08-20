@@ -14,14 +14,12 @@ import os
 import time
 from unittest.mock import patch
 
-from backend.features.repo_ingestion.commit_walker import (
-    _CACHE_TTL_SECONDS,
-    _cache_is_valid,
-    _cache_path,
-    _load_cache,
-    _save_cache,
-    walk_commits,
-)
+from backend.features.repo_ingestion.commit_walker import (_CACHE_TTL_SECONDS,
+                                                           _cache_is_valid,
+                                                           _cache_path,
+                                                           _load_cache,
+                                                           _save_cache,
+                                                           walk_commits)
 
 
 def _mock_commit_data(count: int) -> list[dict]:

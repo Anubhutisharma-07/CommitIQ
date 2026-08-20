@@ -4,10 +4,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from backend.database import Base
 from backend.features.repo_ingestion.router import rescan_repo, run_rescan
-from backend.shared.models import (
-    AnalysisJob,
-    Repo,
-)
+from backend.shared.models import AnalysisJob, Repo
 
 pytestmark = pytest.mark.anyio
 

@@ -1,15 +1,5 @@
-from sqlalchemy import (
-    Boolean,
-    Column,
-    DateTime,
-    Float,
-    ForeignKey,
-    Index,
-    Integer,
-    String,
-    Text,
-    UniqueConstraint,
-)
+from sqlalchemy import (Boolean, Column, DateTime, Float, ForeignKey, Index,
+                        Integer, String, Text, UniqueConstraint)
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 

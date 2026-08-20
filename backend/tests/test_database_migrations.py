@@ -1,11 +1,8 @@
 import asyncio
 from pathlib import Path
 
-from backend.database import (
-    apply_sql_migrations,
-    check_database_migrations,
-    get_unapplied_migrations,
-)
+from backend.database import (apply_sql_migrations, check_database_migrations,
+                              get_unapplied_migrations)
 
 
 class FakeResult:
