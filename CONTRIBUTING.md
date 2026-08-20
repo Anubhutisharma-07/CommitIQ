@@ -46,8 +46,8 @@ Before starting, ensure you have the following installed on your local system:
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/eshaanag/CommitIQ---.git
-cd CommitIQ---
+git clone https://github.com/eshaanag/CommitIQ.git
+cd CommitIQ
 ```
 
 ### 2. Backend Setup
