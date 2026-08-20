@@ -146,18 +146,74 @@ def build_import_edges(repo_path: Path, all_files: list[str]) -> list[dict]:
     return edges
 
 
-def build_cochange_edges(commit_history: list[dict], min_cooccurrence: int = 3) -> list[dict]:
+def resolve_renamed_path(file_path: str, rename_map: dict[str, str] | None = None) -> str:
+    """
+    Resolve a file path to its latest name using a rename mapping dictionary.
+    Traverses chains of renames (e.g. A -> B -> C returns C) with cycle protection.
+    """
+    if not rename_map or file_path not in rename_map:
+        return file_path
+
+    current = file_path
+    visited = set()
+    while current in rename_map and current not in visited:
+        visited.add(current)
+        current = rename_map[current]
+
+    return current
+
+
+def build_rename_map_from_history(commit_history: list[dict]) -> dict[str, str]:
+    """
+    Build a path resolution mapping dictionary from commit history.
+    Maps older file names to their latest canonical file names.
+    """
+    rename_map: dict[str, str] = {}
+    for commit in commit_history:
+        renames = commit.get("renames") or commit.get("rename_map") or {}
+        if isinstance(renames, dict):
+            for old_path, new_path in renames.items():
+                if old_path and new_path and old_path != new_path:
+                    rename_map[old_path] = new_path
+        elif isinstance(renames, list):
+            for item in renames:
+                if isinstance(item, (tuple, list)) and len(item) == 2:
+                    old_path, new_path = item
+                    if old_path and new_path and old_path != new_path:
+                        rename_map[old_path] = new_path
+    return rename_map
+
+
+def build_cochange_edges(
+    commit_history: list[dict],
+    min_cooccurrence: int = 3,
+    rename_map: dict[str, str] | None = None,
+) -> list[dict]:
     """
     If files A and B are changed together in ≥ min_cooccurrence commits → co-change edge.
-    Reveals hidden coupling not visible in import graphs.
+    Normalizes file paths to their latest names using rename_map
+    so file renames don't distort co-change coupling metrics.
     """
+    history_rename_map = build_rename_map_from_history(commit_history)
+    if rename_map:
+        history_rename_map.update(rename_map)
+
     cochange_counts = defaultdict(int)
 
     for commit in commit_history:
-        files = sorted({file_path for file_path in commit.get("files_list", []) if file_path})
+        raw_files = commit.get("files_list", [])
+        resolved_files = set()
+        for fpath in raw_files:
+            if not fpath:
+                continue
+            canonical_path = resolve_renamed_path(fpath, history_rename_map)
+            resolved_files.add(canonical_path)
+
+        files = sorted(resolved_files)
         for i, f1 in enumerate(files):
             for f2 in files[i + 1 :]:
-                cochange_counts[(f1, f2)] += 1
+                if f1 != f2:
+                    cochange_counts[(f1, f2)] += 1
 
     edges = []
     for (f1, f2), count in sorted(cochange_counts.items()):
@@ -175,10 +231,26 @@ def build_cochange_edges(commit_history: list[dict], min_cooccurrence: int = 3) 
     return edges
 
 
-def get_top_files_by_frequency(commit_history: list[dict], top_n: int = 50) -> list[str]:
-    """Return the top N most frequently changed files."""
+def get_top_files_by_frequency(
+    commit_history: list[dict],
+    top_n: int = 50,
+    rename_map: dict[str, str] | None = None,
+) -> list[str]:
+    """Return the top N most frequently changed files, normalizing renamed paths."""
+    history_rename_map = build_rename_map_from_history(commit_history)
+    if rename_map:
+        history_rename_map.update(rename_map)
+
     freq = defaultdict(int)
     for commit in commit_history:
+        seen_in_commit = set()
         for f in commit.get("files_list", []):
-            freq[f] += 1
+            if not f:
+                continue
+            canonical_path = resolve_renamed_path(f, history_rename_map)
+            if canonical_path not in seen_in_commit:
+                seen_in_commit.add(canonical_path)
+                freq[canonical_path] += 1
+
     return [f for f, _ in sorted(freq.items(), key=lambda x: -x[1])[:top_n]]
+
