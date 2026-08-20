@@ -33,7 +33,9 @@ export function DoraMetricsDashboard({ repoId }: DoraMetricsDashboardProps) {
       .finally(() => {
         if (active) setLoading(false)
       })
-    return () => { active = false }
+    return () => {
+      active = false
+    }
   }, [repoId])
 
   if (loading) {
@@ -57,15 +59,22 @@ export function DoraMetricsDashboard({ repoId }: DoraMetricsDashboardProps) {
   const overallColor = CATEGORY_COLORS[metrics.dora_score] || CATEGORY_COLORS.Medium
 
   return (
-    <div className="glass-panel rounded-[28px] overflow-hidden shadow-2xl relative border border-white/10 flex flex-col h-full" style={{ minHeight: '350px' }}>
+    <div
+      className="glass-panel rounded-[28px] overflow-hidden shadow-2xl relative border border-white/10 flex flex-col h-full"
+      style={{ minHeight: '350px' }}
+    >
       <div className="absolute top-0 right-0 w-48 h-48 bg-indigo-500/5 rounded-full blur-[80px] pointer-events-none" />
 
       <div className="px-6 py-5 border-b border-white/5 relative z-10 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <TrendingUp className="w-5 h-5 text-indigo-400" />
-          <h2 className="font-head text-[18px] font-semibold text-white tracking-tight">DORA Performance</h2>
+          <h2 className="font-head text-[18px] font-semibold text-white tracking-tight">
+            DORA Performance
+          </h2>
         </div>
-        <div className={`px-3 py-1 rounded-full border text-xs font-bold uppercase tracking-wider ${overallColor}`}>
+        <div
+          className={`px-3 py-1 rounded-full border text-xs font-bold uppercase tracking-wider ${overallColor}`}
+        >
           {metrics.dora_score} Performer
         </div>
       </div>
@@ -94,9 +103,19 @@ export function DoraMetricsDashboard({ repoId }: DoraMetricsDashboardProps) {
   )
 }
 
-function MetricCard({ title, value, category, icon }: { title: string, value: string, category: string, icon: React.ReactNode }) {
+function MetricCard({
+  title,
+  value,
+  category,
+  icon,
+}: {
+  title: string
+  value: string
+  category: string
+  icon: React.ReactNode
+}) {
   const colorClass = CATEGORY_COLORS[category] || CATEGORY_COLORS.Medium
-  
+
   return (
     <div className="bg-white/5 border border-white/5 hover:border-white/10 rounded-[20px] p-5 transition-all shadow-inner flex flex-col justify-between">
       <div className="flex items-center justify-between mb-2">
@@ -109,7 +128,9 @@ function MetricCard({ title, value, category, icon }: { title: string, value: st
         <div className="font-head text-[32px] font-extralight text-white tracking-tight mt-2">
           {value}
         </div>
-        <div className={`inline-flex items-center px-2 py-0.5 rounded-md border text-[10px] font-mono font-bold mt-2 ${colorClass}`}>
+        <div
+          className={`inline-flex items-center px-2 py-0.5 rounded-md border text-[10px] font-mono font-bold mt-2 ${colorClass}`}
+        >
           {category}
         </div>
       </div>

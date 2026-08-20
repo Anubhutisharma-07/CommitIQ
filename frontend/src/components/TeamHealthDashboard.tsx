@@ -1,7 +1,14 @@
 import { useEffect, useState } from 'react'
 import { getTeamHealthMetrics } from '../lib/api'
 import type { TeamHealthMetrics } from '../types'
-import { Activity, BatteryWarning, BrainCircuit, HeartPulse, MoonStar, ShieldAlert } from 'lucide-react'
+import {
+  Activity,
+  BatteryWarning,
+  BrainCircuit,
+  HeartPulse,
+  MoonStar,
+  ShieldAlert,
+} from 'lucide-react'
 
 interface TeamHealthDashboardProps {
   repoId: string | number
@@ -32,7 +39,9 @@ export function TeamHealthDashboard({ repoId }: TeamHealthDashboardProps) {
       .finally(() => {
         if (active) setLoading(false)
       })
-    return () => { active = false }
+    return () => {
+      active = false
+    }
   }, [repoId])
 
   if (loading) {
@@ -57,12 +66,17 @@ export function TeamHealthDashboard({ repoId }: TeamHealthDashboardProps) {
   const contextColor = HEALTH_COLORS[metrics.context_switching_score] || HEALTH_COLORS.Medium
 
   return (
-    <div className="glass-panel rounded-[28px] overflow-hidden shadow-2xl relative border border-white/10 flex flex-col h-full" style={{ minHeight: '350px' }}>
+    <div
+      className="glass-panel rounded-[28px] overflow-hidden shadow-2xl relative border border-white/10 flex flex-col h-full"
+      style={{ minHeight: '350px' }}
+    >
       <div className="absolute top-0 right-0 w-48 h-48 bg-fuchsia-500/5 rounded-full blur-[80px] pointer-events-none" />
 
       <div className="px-6 py-5 border-b border-white/5 relative z-10 flex items-center gap-2">
         <HeartPulse className="w-5 h-5 text-fuchsia-400" />
-        <h2 className="font-head text-[18px] font-semibold text-white tracking-tight">Team Health</h2>
+        <h2 className="font-head text-[18px] font-semibold text-white tracking-tight">
+          Team Health
+        </h2>
       </div>
 
       <div className="p-6 relative z-10 grid grid-cols-1 md:grid-cols-2 gap-6 flex-grow">
@@ -73,26 +87,40 @@ export function TeamHealthDashboard({ repoId }: TeamHealthDashboardProps) {
               <BatteryWarning className="w-4 h-4 text-orange-400" />
               <span className="font-head text-sm font-semibold tracking-wide">Burnout Risk</span>
             </div>
-            <div className={`px-2.5 py-0.5 rounded-full border text-[10px] font-bold uppercase tracking-wider ${burnoutColor}`}>
+            <div
+              className={`px-2.5 py-0.5 rounded-full border text-[10px] font-bold uppercase tracking-wider ${burnoutColor}`}
+            >
               {metrics.burnout_risk_score}
             </div>
           </div>
-          
+
           <div className="flex flex-col gap-3 mt-2">
             <div className="flex justify-between items-end">
               <span className="text-xs text-slate-400">Weekend Commits</span>
-              <span className="font-mono text-sm text-white">{metrics.weekend_commits_percent}%</span>
+              <span className="font-mono text-sm text-white">
+                {metrics.weekend_commits_percent}%
+              </span>
             </div>
             <div className="w-full bg-white/5 rounded-full h-1.5">
-              <div className="bg-orange-400 h-1.5 rounded-full" style={{ width: `${Math.min(100, metrics.weekend_commits_percent)}%` }} />
+              <div
+                className="bg-orange-400 h-1.5 rounded-full"
+                style={{ width: `${Math.min(100, metrics.weekend_commits_percent)}%` }}
+              />
             </div>
 
             <div className="flex justify-between items-end mt-2">
-              <span className="text-xs text-slate-400">After Hours <MoonStar className="w-3 h-3 inline ml-1 mb-0.5 text-indigo-300"/></span>
-              <span className="font-mono text-sm text-white">{metrics.after_hours_commits_percent}%</span>
+              <span className="text-xs text-slate-400">
+                After Hours <MoonStar className="w-3 h-3 inline ml-1 mb-0.5 text-indigo-300" />
+              </span>
+              <span className="font-mono text-sm text-white">
+                {metrics.after_hours_commits_percent}%
+              </span>
             </div>
             <div className="w-full bg-white/5 rounded-full h-1.5">
-              <div className="bg-indigo-400 h-1.5 rounded-full" style={{ width: `${Math.min(100, metrics.after_hours_commits_percent)}%` }} />
+              <div
+                className="bg-indigo-400 h-1.5 rounded-full"
+                style={{ width: `${Math.min(100, metrics.after_hours_commits_percent)}%` }}
+              />
             </div>
           </div>
         </div>
@@ -102,9 +130,13 @@ export function TeamHealthDashboard({ repoId }: TeamHealthDashboardProps) {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2 text-slate-300">
               <BrainCircuit className="w-4 h-4 text-sky-400" />
-              <span className="font-head text-sm font-semibold tracking-wide">Context Switching</span>
+              <span className="font-head text-sm font-semibold tracking-wide">
+                Context Switching
+              </span>
             </div>
-            <div className={`px-2.5 py-0.5 rounded-full border text-[10px] font-bold uppercase tracking-wider ${contextColor}`}>
+            <div
+              className={`px-2.5 py-0.5 rounded-full border text-[10px] font-bold uppercase tracking-wider ${contextColor}`}
+            >
               {metrics.context_switching_score}
             </div>
           </div>
@@ -117,7 +149,8 @@ export function TeamHealthDashboard({ repoId }: TeamHealthDashboardProps) {
               Avg files changed / contributor / day
             </span>
             <p className="text-[10px] text-slate-500 mt-4 leading-relaxed max-w-[80%] mx-auto">
-              High values indicate developers are juggling too many distinct areas of the codebase simultaneously.
+              High values indicate developers are juggling too many distinct areas of the codebase
+              simultaneously.
             </p>
           </div>
         </div>

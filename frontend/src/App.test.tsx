@@ -19,9 +19,13 @@ vi.mock('./lib/api', () => ({
   cancelIngest: vi.fn(),
   getBusFactor: vi.fn(),
   getCycleTime: vi.fn(() => Promise.resolve({ avg_cycle_time_hours: 0, bottlenecks: [] })),
-  getDoraMetrics: vi.fn(() => Promise.resolve({ dora_score: "Elite" })),
-  getTeamHealthMetrics: vi.fn(() => Promise.resolve({ burnout_risk_score: "Low", context_switching_score: "Low" })),
-  getCodeQualityMetrics: vi.fn(() => Promise.resolve({ churn_category: "Low", ai_impact_score: "Low" })),
+  getDoraMetrics: vi.fn(() => Promise.resolve({ dora_score: 'Elite' })),
+  getTeamHealthMetrics: vi.fn(() =>
+    Promise.resolve({ burnout_risk_score: 'Low', context_switching_score: 'Low' })
+  ),
+  getCodeQualityMetrics: vi.fn(() =>
+    Promise.resolve({ churn_category: 'Low', ai_impact_score: 'Low' })
+  ),
   getGraph: vi.fn(),
   getHealthTimeline: vi.fn(),
   getIngestProgress: vi.fn(),
