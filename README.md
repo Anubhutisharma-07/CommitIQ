@@ -5,9 +5,7 @@
   [![CI](https://github.com/eshaanag/CommitIQ/actions/workflows/ci.yml/badge.svg)](https://github.com/eshaanag/CommitIQ/actions/workflows/ci.yml)
   [![CodeQL](https://github.com/eshaanag/CommitIQ/actions/workflows/codeql.yml/badge.svg)](https://github.com/eshaanag/CommitIQ/actions/workflows/codeql.yml)
   [![codecov](https://codecov.io/gh/eshaanag/CommitIQ/branch/main/graph/badge.svg)](https://codecov.io/gh/eshaanag/CommitIQ)
-  [![docs tested](https://docrunner.dev/api/badge/eshaanag/CommitIQ)](https://docrunner.dev/repo/eshaanag/CommitIQ)
   [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-  [![Discord](https://img.shields.io/discord/1234567890?label=Discord&logo=discord&color=5865F2)](https://discord.gg/commitiq)
 </div>
 
 <br />
@@ -105,9 +103,9 @@ Thanks goes to these wonderful people who have contributed to CommitIQ:
 <table>
   <tbody>
     <tr>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/eshaanag"><img src="https://avatars.githubusercontent.com/u/10000000?v=4" width="100px;" alt="Eshaan Agrawal"/><br /><sub><b>Eshaan Agrawal</b></sub></a><br /><a href="https://github.com/eshaanag/CommitIQ/commits?author=eshaanag" title="Code">💻</a> <a href="#design-eshaanag" title="Design">🎨</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/PrathamReddy888"><img src="https://avatars.githubusercontent.com/u/10000001?v=4" width="100px;" alt="Pratham Reddy"/><br /><sub><b>Pratham Reddy</b></sub></a><br /><a href="https://github.com/eshaanag/CommitIQ/commits?author=PrathamReddy888" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/adityakryadav"><img src="https://avatars.githubusercontent.com/u/10000002?v=4" width="100px;" alt="Aditya Yadav"/><br /><sub><b>Aditya Yadav</b></sub></a><br /><a href="https://github.com/eshaanag/CommitIQ/commits?author=adityakryadav" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/eshaanag"><img src="https://github.com/eshaanag.png" width="100px;" alt="Eshaan Agrawal"/><br /><sub><b>Eshaan Agrawal</b></sub></a><br /><a href="https://github.com/eshaanag/CommitIQ/commits?author=eshaanag" title="Code">💻</a> <a href="#design-eshaanag" title="Design">🎨</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/PrathamReddy888"><img src="https://github.com/PrathamReddy888.png" width="100px;" alt="Pratham Reddy"/><br /><sub><b>Pratham Reddy</b></sub></a><br /><a href="https://github.com/eshaanag/CommitIQ/commits?author=PrathamReddy888" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/adityakryadav"><img src="https://github.com/adityakryadav.png" width="100px;" alt="Aditya Yadav"/><br /><sub><b>Aditya Yadav</b></sub></a><br /><a href="https://github.com/eshaanag/CommitIQ/commits?author=adityakryadav" title="Code">💻</a></td>
     </tr>
   </tbody>
 </table>
