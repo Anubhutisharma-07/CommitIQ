@@ -428,10 +428,11 @@ def test_stream_commit_diff_stats_parses_numstat_lines(monkeypatch, tmp_path):
         lambda repo_path, cmd: iter(mock_diff_lines),
     )
 
-    files, insertions, deletions = stream_commit_diff_stats(tmp_path, "abc123456789")
+    files, insertions, deletions, renames = stream_commit_diff_stats(tmp_path, "abc123456789")
     assert files == ["backend/main.py", "src/utils.ts", "assets/logo.png"]
     assert insertions == 60
     assert deletions == 2
+    assert renames == {}
 
 
 def test_stream_commit_diff_stats_handles_empty_stream(monkeypatch, tmp_path):
@@ -442,7 +443,46 @@ def test_stream_commit_diff_stats_handles_empty_stream(monkeypatch, tmp_path):
         lambda repo_path, cmd: iter([]),
     )
 
-    files, insertions, deletions = stream_commit_diff_stats(tmp_path, "abc123456789")
+    files, insertions, deletions, renames = stream_commit_diff_stats(tmp_path, "abc123456789")
     assert files == []
     assert insertions == 0
     assert deletions == 0
+    assert renames == {}
+
+
+def test_parse_numstat_rename():
+    from backend.features.repo_ingestion.commit_walker import parse_numstat_rename
+
+    assert parse_numstat_rename("src/main.py") == ("src/main.py", None)
+    assert parse_numstat_rename("old_name.py => new_name.py") == ("new_name.py", "old_name.py")
+    assert parse_numstat_rename("src/{legacy => current}/app.py") == ("src/current/app.py", "src/legacy/app.py")
+
+
+def test_resolve_renamed_path_chained_resolution():
+    from backend.features.repo_ingestion.graph_builder import resolve_renamed_path
+
+    rename_map = {
+        "src/v1/main.py": "src/v2/main.py",
+        "src/v2/main.py": "src/core/main.py",
+    }
+    assert resolve_renamed_path("src/v1/main.py", rename_map) == "src/core/main.py"
+    assert resolve_renamed_path("src/v2/main.py", rename_map) == "src/core/main.py"
+    assert resolve_renamed_path("src/unchanged.py", rename_map) == "src/unchanged.py"
+
+
+def test_build_cochange_edges_normalizes_renamed_file_paths():
+    from backend.features.repo_ingestion.graph_builder import build_cochange_edges
+
+    # 2 commits with old_name.py + common.py, 1 commit with new_name.py + common.py
+    commit_history = [
+        {"files_list": ["old_name.py", "common.py"], "renames": {}},
+        {"files_list": ["old_name.py", "common.py"], "renames": {}},
+        {"files_list": ["new_name.py", "common.py"], "renames": {"old_name.py": "new_name.py"}},
+    ]
+
+    edges = build_cochange_edges(commit_history, min_cooccurrence=3)
+    assert len(edges) == 1
+    assert edges[0]["source_file"] == "common.py"
+    assert edges[0]["target_file"] == "new_name.py"
+    assert edges[0]["weight"] == 3
+

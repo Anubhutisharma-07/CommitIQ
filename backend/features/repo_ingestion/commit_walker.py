@@ -150,17 +150,48 @@ def stream_git_diff_lines(
         return
 
 
+def parse_numstat_rename(file_path: str) -> tuple[str, str | None]:
+    """
+    Parse git numstat rename path format.
+    e.g. "src/{old => new}/utils.py" -> ("src/new/utils.py", "src/old/utils.py")
+         "old.py => new.py"          -> ("new.py", "old.py")
+         "src/regular.py"             -> ("src/regular.py", None)
+    """
+    if "=>" not in file_path:
+        return file_path, None
+
+    # Handle curly brace renames: "path/{old => new}/file.ext"
+    match = re.search(r"^(.*?)(?:\{([^}]*)\})(.*)$", file_path)
+    if match:
+        prefix, brace_content, suffix = match.groups()
+        if "=>" in brace_content:
+            old_part, new_part = brace_content.split("=>", 1)
+            old_full = f"{prefix}{old_part.strip()}{suffix}".replace("//", "/")
+            new_full = f"{prefix}{new_part.strip()}{suffix}".replace("//", "/")
+            return new_full, old_full
+
+    # Handle direct renames: "old.py => new.py"
+    parts = file_path.split("=>", 1)
+    if len(parts) == 2:
+        old_full = parts[0].strip()
+        new_full = parts[1].strip()
+        return new_full, old_full
+
+    return file_path, None
+
+
 def stream_commit_diff_stats(
     repo_path: Path,
     commit_sha: str,
-) -> tuple[list[str], int, int]:
+) -> tuple[list[str], int, int, dict[str, str]]:
     """
     Stream and parse git diff stats line-by-line using a generator stream
     instead of pulling the entire raw diff output string into memory (Issue #300).
-    Returns (files_changed, total_insertions, total_deletions).
+    Returns (files_changed, total_insertions, total_deletions, rename_map).
     """
     cmd = ["git", "diff-tree", "--no-commit-id", "--numstat", "-r", commit_sha]
     files_changed: list[str] = []
+    rename_map: dict[str, str] = {}
     total_insertions = 0
     total_deletions = 0
 
@@ -170,16 +201,23 @@ def stream_commit_diff_stats(
             continue
         parts = line.split("\t", 2)
         if len(parts) == 3:
-            ins_str, del_str, file_path = parts
+            ins_str, del_str, raw_file_path = parts
             ins = int(ins_str) if ins_str.isdigit() else 0
             dels = int(del_str) if del_str.isdigit() else 0
             total_insertions += ins
             total_deletions += dels
-            files_changed.append(file_path)
-        elif len(parts) == 1:
-            files_changed.append(parts[0])
 
-    return files_changed, total_insertions, total_deletions
+            new_path, old_path = parse_numstat_rename(raw_file_path)
+            files_changed.append(new_path)
+            if old_path:
+                rename_map[old_path] = new_path
+        elif len(parts) == 1:
+            new_path, old_path = parse_numstat_rename(parts[0])
+            files_changed.append(new_path)
+            if old_path:
+                rename_map[old_path] = new_path
+
+    return files_changed, total_insertions, total_deletions, rename_map
 
 
 def _walk_commits_uncached(repo_path: Path, limit: int) -> Iterator[dict]:
@@ -198,7 +236,7 @@ def _walk_commits_uncached(repo_path: Path, limit: int) -> Iterator[dict]:
         parent_sha = commit.parents[0].hexsha if commit.parents else None
 
         # Issue #300: Stream git diff stats line-by-line to avoid memory spikes on giant commits
-        files_changed, insertions, deletions = stream_commit_diff_stats(repo_path, commit.hexsha)
+        files_changed, insertions, deletions, renames = stream_commit_diff_stats(repo_path, commit.hexsha)
 
         # Fallback to commit.stats if git diff-tree was empty
         if not files_changed:
@@ -207,10 +245,12 @@ def _walk_commits_uncached(repo_path: Path, limit: int) -> Iterator[dict]:
                 files_changed = list(stats.files.keys())
                 insertions = stats.total.get("insertions", 0)
                 deletions = stats.total.get("deletions", 0)
+                renames = {}
             except Exception:
                 files_changed = []
                 insertions = 0
                 deletions = 0
+                renames = {}
 
         # ── Issue #266: resolve author identity with graceful fallbacks ──
         # ``commit.author.name`` / ``commit.author.email`` can be None or

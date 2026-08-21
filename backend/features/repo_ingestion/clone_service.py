@@ -259,8 +259,11 @@ async def fetch_github_metadata(owner: str, repo: str) -> dict:
 
 
 async def fetch_github_pull_requests(owner: str, repo: str, limit: int = 500) -> list[dict]:
-    """Fetch pull requests for the repository."""
-    from dateutil.parser import parse as parse_date
+    try:
+        from dateutil.parser import parse as parse_date
+    except ImportError:
+        def parse_date(s: str):
+            return datetime.fromisoformat(s.replace("Z", "+00:00"))
 
     headers = {"Accept": "application/vnd.github+json"}
     if GITHUB_TOKEN:
