@@ -1,9 +1,8 @@
-from unittest.mock import AsyncMock
-
+import asyncio
 import pytest
+from unittest.mock import AsyncMock
 from sqlalchemy import text
-
-from backend.database import _IS_SQLITE, commit_with_retry, engine
+from backend.database import commit_with_retry, engine, _IS_SQLITE
 
 
 @pytest.mark.anyio
@@ -38,9 +37,7 @@ async def test_commit_with_retry_retries_up_to_3_times_on_lock():
 @pytest.mark.anyio
 async def test_commit_with_retry_fails_after_3_retries():
     session = AsyncMock()
-    session.commit = AsyncMock(
-        side_effect=RuntimeError("(sqlite3.OperationalError) database is locked")
-    )
+    session.commit = AsyncMock(side_effect=RuntimeError("(sqlite3.OperationalError) database is locked"))
 
     with pytest.raises(RuntimeError) as exc_info:
         await commit_with_retry(session, max_retries=3, initial_delay=0.01)
