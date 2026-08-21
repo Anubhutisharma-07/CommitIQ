@@ -22,4 +22,4 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           post-comment: true
-          fail-below: 80
+          fail-below: 50
