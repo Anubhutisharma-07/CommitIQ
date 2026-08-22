@@ -121,4 +121,14 @@ describe('LandingPage', () => {
       expect(ingestRepoMock).toHaveBeenCalledWith('https://github.com/example/project', 25, 'main')
     })
   })
+
+  it('renders Pixelary credit link in the footer with proper crawlable attributes', () => {
+    renderLandingPage()
+
+    const pixelaryLink = screen.getByRole('link', { name: 'Pixelary' })
+    expect(pixelaryLink).toBeInTheDocument()
+    expect(pixelaryLink).toHaveAttribute('href', 'https://www.pixelary.in')
+    expect(pixelaryLink).toHaveAttribute('target', '_blank')
+    expect(pixelaryLink).toHaveAttribute('rel', 'noopener noreferrer')
+  })
 })

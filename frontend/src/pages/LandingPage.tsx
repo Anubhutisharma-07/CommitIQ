@@ -388,8 +388,19 @@ export default function LandingPage() {
         </div>
       </main>
 
-      <footer className="py-8 text-center text-xs text-slate-500 select-none">
+      <footer className="py-8 text-center text-xs text-slate-500 select-none space-y-1">
         <p>CommitIQ Spatial Intel — Designed for Vision Pro & High Performance Computing</p>
+        <p>
+          Built by{' '}
+          <a
+            href="https://www.pixelary.in"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-slate-400 underline decoration-slate-600 underline-offset-2 transition-colors"
+          >
+            Pixelary
+          </a>
+        </p>
       </footer>
     </div>
   )
