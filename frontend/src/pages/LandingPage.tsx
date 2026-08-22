@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react'
 import type { ChangeEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import useSWR from 'swr'
+import { Trash2 } from 'lucide-react'
 import { ingestRepo, listRepos } from '../lib/api'
 import { ThemeToggle } from '../components/ui/ThemeToggle'
+import { ConfirmDeleteRepoModal } from '../components/ConfirmDeleteRepoModal'
 
 const PLACEHOLDERS = ['facebook/react', 'vercel/next.js', 'expressjs/express', 'vuejs/vue']
 
@@ -57,6 +59,7 @@ export default function LandingPage() {
   const [phIdx, setPhIdx] = useState(0)
   const [maxCommits, setMaxCommits] = useState('500')
   const [branch, setBranch] = useState('')
+  const [pendingDelete, setPendingDelete] = useState<{ id: number; slug: string } | null>(null)
   const navigate = useNavigate()
 
   const reposState = useSWR('recent-repos', () => listRepos())
@@ -300,10 +303,20 @@ export default function LandingPage() {
                   <div
                     key={r.id}
                     onClick={() => navigate(`/dashboard/${r.repo_slug}`)}
-                    className="glass-panel rounded-[20px] p-4 border border-white/10 hover:border-purple-500/40 hover:bg-white/[0.04] transition-all cursor-pointer flex flex-col justify-between group"
+                    className="relative glass-panel rounded-[20px] p-4 border border-white/10 hover:border-purple-500/40 hover:bg-white/[0.04] transition-all cursor-pointer flex flex-col justify-between group"
                   >
+                    <button
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        setPendingDelete({ id: r.id, slug: r.repo_slug })
+                      }}
+                      aria-label={`Delete ${r.repo_slug}`}
+                      className="absolute top-3 right-3 p-1.5 rounded-full text-slate-500 opacity-0 group-hover:opacity-100 hover:text-rose-400 hover:bg-rose-500/10 transition-all"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
                     <div>
-                      <div className="font-mono text-sm font-bold text-white group-hover:text-purple-300 transition-colors truncate">
+                      <div className="font-mono text-sm font-bold text-white group-hover:text-purple-300 transition-colors truncate pr-6">
                         {r.repo_slug}
                       </div>
                       {r.github_description && (
@@ -402,6 +415,21 @@ export default function LandingPage() {
           </a>
         </p>
       </footer>
+
+      {pendingDelete && (
+        <ConfirmDeleteRepoModal
+          repoId={pendingDelete.id}
+          repoSlug={pendingDelete.slug}
+          onClose={() => setPendingDelete(null)}
+          onDeleted={(deletedId) => {
+            reposState.mutate(
+              (current) => (current || []).filter((repo) => repo.id !== deletedId),
+              false
+            )
+            setPendingDelete(null)
+          }}
+        />
+      )}
     </div>
   )
 }
