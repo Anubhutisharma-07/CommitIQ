@@ -499,4 +499,3 @@ export interface RepoCompareResponse {
   insights: RepoCompareInsight[]
   verdict: string
 }
-

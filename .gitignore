@@ -20,3 +20,9 @@ coverage.xml
 coverage/
 scratch/
 
+# Agent Rules
+AGENTS.md
+.agents/
+backend/.coverage
+backend/coverage.xml
+

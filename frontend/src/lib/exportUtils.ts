@@ -11,7 +11,12 @@
  *     distributions for data-pipeline / API consumers.
  */
 
-import type { BusFactorEntry, BusFactorWrapper, HealthSnapshot, RepoCompareResponse } from '../types'
+import type {
+  BusFactorEntry,
+  BusFactorWrapper,
+  HealthSnapshot,
+  RepoCompareResponse,
+} from '../types'
 
 // ---------------------------------------------------------------------------
 // CSV helpers
@@ -190,14 +195,34 @@ export function buildComparisonReportCsv(data: RepoCompareResponse | null | unde
     ['Overall Health Score', b.health_score, h.health_score, d.health_score_delta],
     ['Average Complexity', b.avg_complexity, h.avg_complexity, d.avg_complexity_delta],
     ['Maximum Complexity', b.max_complexity, h.max_complexity, d.max_complexity_delta],
-    ['Churn Rate', `${(b.churn_rate * 100).toFixed(1)}%`, `${(h.churn_rate * 100).toFixed(1)}%`, `${(d.churn_rate_delta * 100).toFixed(1)}%`],
+    [
+      'Churn Rate',
+      `${(b.churn_rate * 100).toFixed(1)}%`,
+      `${(h.churn_rate * 100).toFixed(1)}%`,
+      `${(d.churn_rate_delta * 100).toFixed(1)}%`,
+    ],
     ['Total LOC', b.total_loc, h.total_loc, d.total_loc_delta],
     ['Min Bus Factor', b.bus_factor_min, h.bus_factor_min, d.bus_factor_min_delta],
     ['Hotspot Count', b.hotspot_count, h.hotspot_count, d.hotspot_count_delta],
-    ['Active Contributors', b.active_contributors, h.active_contributors, d.active_contributors_delta],
+    [
+      'Active Contributors',
+      b.active_contributors,
+      h.active_contributors,
+      d.active_contributors_delta,
+    ],
     ['Total Commits', b.total_commits, h.total_commits, d.total_commits_delta],
-    ['Dependency Density', b.dependency_density ?? 0, h.dependency_density ?? 0, (h.dependency_density ?? 0) - (b.dependency_density ?? 0)],
-    ['Semantic Health Score', b.semantic_health_score ?? 100, h.semantic_health_score ?? 100, (h.semantic_health_score ?? 100) - (b.semantic_health_score ?? 100)],
+    [
+      'Dependency Density',
+      b.dependency_density ?? 0,
+      h.dependency_density ?? 0,
+      (h.dependency_density ?? 0) - (b.dependency_density ?? 0),
+    ],
+    [
+      'Semantic Health Score',
+      b.semantic_health_score ?? 100,
+      h.semantic_health_score ?? 100,
+      (h.semantic_health_score ?? 100) - (b.semantic_health_score ?? 100),
+    ],
   ]
 
   const tableCsv = rows.map((r) => buildCsvRow(r)).join('\r\n')
@@ -208,13 +233,17 @@ export function buildComparisonReportCsv(data: RepoCompareResponse | null | unde
     '',
     'Key Insights',
     buildCsvRow(['Category', 'Advantage / Winner', 'Summary']),
-    ...data.insights.map((ins) => buildCsvRow([ins.category, ins.winner || 'Tie / Comparable', ins.summary])),
+    ...data.insights.map((ins) =>
+      buildCsvRow([ins.category, ins.winner || 'Tie / Comparable', ins.summary])
+    ),
   ].join('\r\n')
 
   return `${tableCsv}\r\n${verdictSection}`
 }
 
-export function exportComparisonReportCsv(data: RepoCompareResponse | null | undefined): Blob | null {
+export function exportComparisonReportCsv(
+  data: RepoCompareResponse | null | undefined
+): Blob | null {
   if (!data) return null
   const csv = buildComparisonReportCsv(data)
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
@@ -224,7 +253,9 @@ export function exportComparisonReportCsv(data: RepoCompareResponse | null | und
   return blob
 }
 
-export function buildComparisonReportJson(data: RepoCompareResponse | null | undefined): object | null {
+export function buildComparisonReportJson(
+  data: RepoCompareResponse | null | undefined
+): object | null {
   if (!data) return null
   return {
     exported_at: new Date().toISOString(),
@@ -246,7 +277,9 @@ export function buildComparisonReportJson(data: RepoCompareResponse | null | und
   }
 }
 
-export function exportComparisonReportJson(data: RepoCompareResponse | null | undefined): Blob | null {
+export function exportComparisonReportJson(
+  data: RepoCompareResponse | null | undefined
+): Blob | null {
   const payload = buildComparisonReportJson(data)
   if (!payload || !data) return null
   const json = JSON.stringify(payload, null, 2)
@@ -256,7 +289,6 @@ export function exportComparisonReportJson(data: RepoCompareResponse | null | un
   triggerDownload(blob, `comparison_${baseSlug}_vs_${headSlug}.json`)
   return blob
 }
-
 
 // ---------------------------------------------------------------------------
 // Download trigger (shared)

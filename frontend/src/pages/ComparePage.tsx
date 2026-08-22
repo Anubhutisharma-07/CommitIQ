@@ -101,9 +101,8 @@ export default function ComparePage() {
     data: comparison,
     error: compareError,
     isLoading: isCompareLoading,
-  } = useSWR<RepoCompareResponse>(
-    shouldFetch ? ['repos-compare', baseSlug, headSlug] : null,
-    () => compareRepos(baseSlug, headSlug)
+  } = useSWR<RepoCompareResponse>(shouldFetch ? ['repos-compare', baseSlug, headSlug] : null, () =>
+    compareRepos(baseSlug, headSlug)
   )
 
   // Close export dropdown on outside click
@@ -190,12 +189,7 @@ export default function ComparePage() {
     ]
   }, [comparison])
 
-  const renderDeltaPill = (
-    val: number,
-    isHigherBetter = true,
-    suffix = '',
-    precision = 1
-  ) => {
+  const renderDeltaPill = (val: number, isHigherBetter = true, suffix = '', precision = 1) => {
     if (val === 0 || isNaN(val)) {
       return (
         <span className="inline-flex items-center gap-1 font-mono text-[11px] text-slate-400 bg-white/5 px-2 py-0.5 rounded-full border border-white/5">
@@ -348,7 +342,11 @@ export default function ComparePage() {
                     {isReposLoading ? 'Loading repositories...' : 'Select base repository'}
                   </option>
                   {repos.map((r) => (
-                    <option key={r.repo_slug} value={r.repo_slug} className="bg-[#0d0f18] text-white">
+                    <option
+                      key={r.repo_slug}
+                      value={r.repo_slug}
+                      className="bg-[#0d0f18] text-white"
+                    >
                       {r.name} ({r.repo_slug})
                     </option>
                   ))}
@@ -388,7 +386,11 @@ export default function ComparePage() {
                     {isReposLoading ? 'Loading repositories...' : 'Select comparison repository'}
                   </option>
                   {repos.map((r) => (
-                    <option key={r.repo_slug} value={r.repo_slug} className="bg-[#0d0f18] text-white">
+                    <option
+                      key={r.repo_slug}
+                      value={r.repo_slug}
+                      className="bg-[#0d0f18] text-white"
+                    >
                       {r.name} ({r.repo_slug})
                     </option>
                   ))}
@@ -404,7 +406,8 @@ export default function ComparePage() {
           <div className="glass-panel rounded-[20px] p-5 text-amber-300 border border-amber-500/30 bg-amber-500/10 flex items-center gap-3 text-xs font-medium">
             <AlertCircle className="w-5 h-5 flex-shrink-0 text-amber-400" />
             <span>
-              Please select two different repositories to generate a meaningful comparative analysis.
+              Please select two different repositories to generate a meaningful comparative
+              analysis.
             </span>
           </div>
         )}
@@ -624,12 +627,7 @@ export default function ComparePage() {
                     <span className="flex items-center gap-1.5">
                       <Flame className="w-3.5 h-3.5 text-sky-400" /> Churn Rate
                     </span>
-                    {renderDeltaPill(
-                      comparison.deltas.churn_rate_delta * 100,
-                      false,
-                      '%',
-                      1
-                    )}
+                    {renderDeltaPill(comparison.deltas.churn_rate_delta * 100, false, '%', 1)}
                   </div>
                   <div className="flex items-baseline justify-between pt-1">
                     <div>
@@ -712,7 +710,13 @@ export default function ComparePage() {
                           stroke="#64748b"
                           tickLine={false}
                           tick={{ fontSize: 10 }}
-                          label={{ value: 'Commit Sample Index', position: 'insideBottom', offset: -4, fontSize: 10, fill: '#64748b' }}
+                          label={{
+                            value: 'Commit Sample Index',
+                            position: 'insideBottom',
+                            offset: -4,
+                            fontSize: 10,
+                            fill: '#64748b',
+                          }}
                         />
                         <YAxis
                           domain={[0, 100]}
@@ -784,10 +788,7 @@ export default function ComparePage() {
                         fill="#38bdf8"
                         fillOpacity={0.25}
                       />
-                      <Legend
-                        wrapperStyle={{ fontSize: '10px', paddingTop: '8px' }}
-                        iconSize={8}
-                      />
+                      <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '8px' }} iconSize={8} />
                       <Tooltip
                         contentStyle={{
                           backgroundColor: '#0a0b10e6',
@@ -828,7 +829,9 @@ export default function ComparePage() {
                                 : 'bg-white/5 text-slate-400 border-white/10'
                           }`}
                         >
-                          {insight.winner ? `Advantage: ${insight.winner.split('_')[0]}` : 'Balanced'}
+                          {insight.winner
+                            ? `Advantage: ${insight.winner.split('_')[0]}`
+                            : 'Balanced'}
                         </span>
                       </div>
                       <p className="text-xs text-slate-200 leading-relaxed font-normal">
@@ -848,7 +851,8 @@ export default function ComparePage() {
                     Full Metric Benchmark Table
                   </h4>
                   <p className="text-[11px] text-slate-400 mt-0.5">
-                    Complete comparative matrix between {comparison.base.repo.name} and {comparison.head.repo.name}
+                    Complete comparative matrix between {comparison.base.repo.name} and{' '}
+                    {comparison.head.repo.name}
                   </p>
                 </div>
               </div>
@@ -858,65 +862,147 @@ export default function ComparePage() {
                   <thead>
                     <tr className="border-b border-white/5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                       <th className="py-3 px-4">Metric</th>
-                      <th className="py-3 px-4 text-purple-300">Base ({comparison.base.repo.name})</th>
-                      <th className="py-3 px-4 text-sky-300">Target ({comparison.head.repo.name})</th>
+                      <th className="py-3 px-4 text-purple-300">
+                        Base ({comparison.base.repo.name})
+                      </th>
+                      <th className="py-3 px-4 text-sky-300">
+                        Target ({comparison.head.repo.name})
+                      </th>
                       <th className="py-3 px-4">Delta (Target − Base)</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5 font-mono">
                     <tr className="hover:bg-white/[0.02] transition-colors">
-                      <td className="py-3 px-4 font-sans font-medium text-slate-200">Overall Health Score</td>
-                      <td className="py-3 px-4 font-bold text-purple-200">{comparison.base.metrics_summary.health_score.toFixed(1)} / 100</td>
-                      <td className="py-3 px-4 font-bold text-sky-200">{comparison.head.metrics_summary.health_score.toFixed(1)} / 100</td>
-                      <td className="py-3 px-4">{renderDeltaPill(comparison.deltas.health_score_delta, true, ' pts', 1)}</td>
+                      <td className="py-3 px-4 font-sans font-medium text-slate-200">
+                        Overall Health Score
+                      </td>
+                      <td className="py-3 px-4 font-bold text-purple-200">
+                        {comparison.base.metrics_summary.health_score.toFixed(1)} / 100
+                      </td>
+                      <td className="py-3 px-4 font-bold text-sky-200">
+                        {comparison.head.metrics_summary.health_score.toFixed(1)} / 100
+                      </td>
+                      <td className="py-3 px-4">
+                        {renderDeltaPill(comparison.deltas.health_score_delta, true, ' pts', 1)}
+                      </td>
                     </tr>
                     <tr className="hover:bg-white/[0.02] transition-colors">
-                      <td className="py-3 px-4 font-sans font-medium text-slate-200">Average Cyclomatic Complexity</td>
-                      <td className="py-3 px-4 text-slate-300">{comparison.base.metrics_summary.avg_complexity.toFixed(2)}</td>
-                      <td className="py-3 px-4 text-slate-300">{comparison.head.metrics_summary.avg_complexity.toFixed(2)}</td>
-                      <td className="py-3 px-4">{renderDeltaPill(comparison.deltas.avg_complexity_delta, false, '', 2)}</td>
+                      <td className="py-3 px-4 font-sans font-medium text-slate-200">
+                        Average Cyclomatic Complexity
+                      </td>
+                      <td className="py-3 px-4 text-slate-300">
+                        {comparison.base.metrics_summary.avg_complexity.toFixed(2)}
+                      </td>
+                      <td className="py-3 px-4 text-slate-300">
+                        {comparison.head.metrics_summary.avg_complexity.toFixed(2)}
+                      </td>
+                      <td className="py-3 px-4">
+                        {renderDeltaPill(comparison.deltas.avg_complexity_delta, false, '', 2)}
+                      </td>
                     </tr>
                     <tr className="hover:bg-white/[0.02] transition-colors">
-                      <td className="py-3 px-4 font-sans font-medium text-slate-200">Maximum File Complexity</td>
-                      <td className="py-3 px-4 text-slate-300">{comparison.base.metrics_summary.max_complexity.toFixed(2)}</td>
-                      <td className="py-3 px-4 text-slate-300">{comparison.head.metrics_summary.max_complexity.toFixed(2)}</td>
-                      <td className="py-3 px-4">{renderDeltaPill(comparison.deltas.max_complexity_delta, false, '', 2)}</td>
+                      <td className="py-3 px-4 font-sans font-medium text-slate-200">
+                        Maximum File Complexity
+                      </td>
+                      <td className="py-3 px-4 text-slate-300">
+                        {comparison.base.metrics_summary.max_complexity.toFixed(2)}
+                      </td>
+                      <td className="py-3 px-4 text-slate-300">
+                        {comparison.head.metrics_summary.max_complexity.toFixed(2)}
+                      </td>
+                      <td className="py-3 px-4">
+                        {renderDeltaPill(comparison.deltas.max_complexity_delta, false, '', 2)}
+                      </td>
                     </tr>
                     <tr className="hover:bg-white/[0.02] transition-colors">
-                      <td className="py-3 px-4 font-sans font-medium text-slate-200">Component Churn Rate</td>
-                      <td className="py-3 px-4 text-slate-300">{(comparison.base.metrics_summary.churn_rate * 100).toFixed(1)}%</td>
-                      <td className="py-3 px-4 text-slate-300">{(comparison.head.metrics_summary.churn_rate * 100).toFixed(1)}%</td>
-                      <td className="py-3 px-4">{renderDeltaPill(comparison.deltas.churn_rate_delta * 100, false, '%', 1)}</td>
+                      <td className="py-3 px-4 font-sans font-medium text-slate-200">
+                        Component Churn Rate
+                      </td>
+                      <td className="py-3 px-4 text-slate-300">
+                        {(comparison.base.metrics_summary.churn_rate * 100).toFixed(1)}%
+                      </td>
+                      <td className="py-3 px-4 text-slate-300">
+                        {(comparison.head.metrics_summary.churn_rate * 100).toFixed(1)}%
+                      </td>
+                      <td className="py-3 px-4">
+                        {renderDeltaPill(comparison.deltas.churn_rate_delta * 100, false, '%', 1)}
+                      </td>
                     </tr>
                     <tr className="hover:bg-white/[0.02] transition-colors">
-                      <td className="py-3 px-4 font-sans font-medium text-slate-200">Minimum Bus Factor (Resilience)</td>
-                      <td className="py-3 px-4 text-slate-300">{comparison.base.metrics_summary.bus_factor_min}</td>
-                      <td className="py-3 px-4 text-slate-300">{comparison.head.metrics_summary.bus_factor_min}</td>
-                      <td className="py-3 px-4">{renderDeltaPill(comparison.deltas.bus_factor_min_delta, true, '', 0)}</td>
+                      <td className="py-3 px-4 font-sans font-medium text-slate-200">
+                        Minimum Bus Factor (Resilience)
+                      </td>
+                      <td className="py-3 px-4 text-slate-300">
+                        {comparison.base.metrics_summary.bus_factor_min}
+                      </td>
+                      <td className="py-3 px-4 text-slate-300">
+                        {comparison.head.metrics_summary.bus_factor_min}
+                      </td>
+                      <td className="py-3 px-4">
+                        {renderDeltaPill(comparison.deltas.bus_factor_min_delta, true, '', 0)}
+                      </td>
                     </tr>
                     <tr className="hover:bg-white/[0.02] transition-colors">
-                      <td className="py-3 px-4 font-sans font-medium text-slate-200">High-Risk Hotspot Count</td>
-                      <td className="py-3 px-4 text-slate-300">{comparison.base.metrics_summary.hotspot_count}</td>
-                      <td className="py-3 px-4 text-slate-300">{comparison.head.metrics_summary.hotspot_count}</td>
-                      <td className="py-3 px-4">{renderDeltaPill(comparison.deltas.hotspot_count_delta, false, '', 0)}</td>
+                      <td className="py-3 px-4 font-sans font-medium text-slate-200">
+                        High-Risk Hotspot Count
+                      </td>
+                      <td className="py-3 px-4 text-slate-300">
+                        {comparison.base.metrics_summary.hotspot_count}
+                      </td>
+                      <td className="py-3 px-4 text-slate-300">
+                        {comparison.head.metrics_summary.hotspot_count}
+                      </td>
+                      <td className="py-3 px-4">
+                        {renderDeltaPill(comparison.deltas.hotspot_count_delta, false, '', 0)}
+                      </td>
                     </tr>
                     <tr className="hover:bg-white/[0.02] transition-colors">
-                      <td className="py-3 px-4 font-sans font-medium text-slate-200">Active Contributors Count</td>
-                      <td className="py-3 px-4 text-slate-300">{comparison.base.metrics_summary.active_contributors}</td>
-                      <td className="py-3 px-4 text-slate-300">{comparison.head.metrics_summary.active_contributors}</td>
-                      <td className="py-3 px-4">{renderDeltaPill(comparison.deltas.active_contributors_delta, true, '', 0)}</td>
+                      <td className="py-3 px-4 font-sans font-medium text-slate-200">
+                        Active Contributors Count
+                      </td>
+                      <td className="py-3 px-4 text-slate-300">
+                        {comparison.base.metrics_summary.active_contributors}
+                      </td>
+                      <td className="py-3 px-4 text-slate-300">
+                        {comparison.head.metrics_summary.active_contributors}
+                      </td>
+                      <td className="py-3 px-4">
+                        {renderDeltaPill(comparison.deltas.active_contributors_delta, true, '', 0)}
+                      </td>
                     </tr>
                     <tr className="hover:bg-white/[0.02] transition-colors">
-                      <td className="py-3 px-4 font-sans font-medium text-slate-200">Total Analyzed Commits</td>
-                      <td className="py-3 px-4 text-slate-300">{comparison.base.metrics_summary.analyzed_commits}</td>
-                      <td className="py-3 px-4 text-slate-300">{comparison.head.metrics_summary.analyzed_commits}</td>
-                      <td className="py-3 px-4">{renderDeltaPill(comparison.head.metrics_summary.analyzed_commits - comparison.base.metrics_summary.analyzed_commits, true, '', 0)}</td>
+                      <td className="py-3 px-4 font-sans font-medium text-slate-200">
+                        Total Analyzed Commits
+                      </td>
+                      <td className="py-3 px-4 text-slate-300">
+                        {comparison.base.metrics_summary.analyzed_commits}
+                      </td>
+                      <td className="py-3 px-4 text-slate-300">
+                        {comparison.head.metrics_summary.analyzed_commits}
+                      </td>
+                      <td className="py-3 px-4">
+                        {renderDeltaPill(
+                          comparison.head.metrics_summary.analyzed_commits -
+                            comparison.base.metrics_summary.analyzed_commits,
+                          true,
+                          '',
+                          0
+                        )}
+                      </td>
                     </tr>
                     <tr className="hover:bg-white/[0.02] transition-colors">
-                      <td className="py-3 px-4 font-sans font-medium text-slate-200">Total Lines of Code (LOC)</td>
-                      <td className="py-3 px-4 text-slate-300">{comparison.base.metrics_summary.total_loc.toLocaleString()}</td>
-                      <td className="py-3 px-4 text-slate-300">{comparison.head.metrics_summary.total_loc.toLocaleString()}</td>
-                      <td className="py-3 px-4">{renderDeltaPill(comparison.deltas.total_loc_delta, true, '', 0)}</td>
+                      <td className="py-3 px-4 font-sans font-medium text-slate-200">
+                        Total Lines of Code (LOC)
+                      </td>
+                      <td className="py-3 px-4 text-slate-300">
+                        {comparison.base.metrics_summary.total_loc.toLocaleString()}
+                      </td>
+                      <td className="py-3 px-4 text-slate-300">
+                        {comparison.head.metrics_summary.total_loc.toLocaleString()}
+                      </td>
+                      <td className="py-3 px-4">
+                        {renderDeltaPill(comparison.deltas.total_loc_delta, true, '', 0)}
+                      </td>
                     </tr>
                   </tbody>
                 </table>

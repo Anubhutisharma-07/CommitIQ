@@ -2,11 +2,11 @@
   <h1>CommitIQ</h1>
   <p><strong>Repository health intelligence for professional engineering teams.</strong></p>
 
-  [![CI](https://github.com/eshaanag/CommitIQ/actions/workflows/ci.yml/badge.svg)](https://github.com/eshaanag/CommitIQ/actions/workflows/ci.yml)
-  [![CodeQL](https://github.com/eshaanag/CommitIQ/actions/workflows/codeql.yml/badge.svg)](https://github.com/eshaanag/CommitIQ/actions/workflows/codeql.yml)
-  [![codecov](https://codecov.io/gh/eshaanag/CommitIQ/branch/main/graph/badge.svg)](https://codecov.io/gh/eshaanag/CommitIQ)
-  [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-  [![Discord](https://img.shields.io/discord/1234567890?label=Discord&logo=discord&color=5865F2)](https://discord.gg/commitiq)
+[![CI](https://github.com/eshaanag/CommitIQ/actions/workflows/ci.yml/badge.svg)](https://github.com/eshaanag/CommitIQ/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/eshaanag/CommitIQ/actions/workflows/codeql.yml/badge.svg)](https://github.com/eshaanag/CommitIQ/actions/workflows/codeql.yml)
+[![codecov](https://codecov.io/gh/eshaanag/CommitIQ/branch/main/graph/badge.svg)](https://codecov.io/gh/eshaanag/CommitIQ)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Discord](https://img.shields.io/discord/1234567890?label=Discord&logo=discord&color=5865F2)](https://discord.gg/commitiq)
 </div>
 
 <br />
@@ -16,6 +16,7 @@ CommitIQ analyzes a repository's commit history and turns raw engineering activi
 ## 🚀 Why CommitIQ?
 
 Most GitHub dashboards show activity. CommitIQ focuses on **code health**. It helps developers and maintainers answer critical questions:
+
 - Which files are becoming risky over time?
 - Where is churn hiding architectural debt?
 - Which parts of the repo depend too heavily on one contributor?
@@ -43,26 +44,28 @@ Try the live application: [**https://commit-iq-iota.vercel.app**](https://commit
 
 ## 🛠️ Tech Stack
 
-| Area | Stack |
-| :--- | :--- |
-| **Backend** | FastAPI, SQLAlchemy Async ORM, SQLite (default) / Postgres |
-| **Analysis** | GitPython, git subprocesses, radon, lizard, custom graphs |
-| **Semantic Drift**| difflib fallback, GraphCodeBERT (optional) |
-| **AI Layer** | Anthropic Claude, Google Gemini fallback |
-| **Frontend** | React, TypeScript, Vite, SWR, Recharts, react-force-graph-2d |
-| **Quality** | Pytest, Vitest, ESLint, CodeQL, Codecov, Pre-commit, Playwright |
+| Area               | Stack                                                           |
+| :----------------- | :-------------------------------------------------------------- |
+| **Backend**        | FastAPI, SQLAlchemy Async ORM, SQLite (default) / Postgres      |
+| **Analysis**       | GitPython, git subprocesses, radon, lizard, custom graphs       |
+| **Semantic Drift** | difflib fallback, GraphCodeBERT (optional)                      |
+| **AI Layer**       | Anthropic Claude, Google Gemini fallback                        |
+| **Frontend**       | React, TypeScript, Vite, SWR, Recharts, react-force-graph-2d    |
+| **Quality**        | Pytest, Vitest, ESLint, CodeQL, Codecov, Pre-commit, Playwright |
 
 ---
 
 ## 💻 Run Locally
 
 ### 1. Clone the repository
+
 ```bash
 git clone https://github.com/eshaanag/CommitIQ.git
 cd CommitIQ
 ```
 
 ### 2. Backend Setup
+
 ```bash
 cp .env.example .env
 python -m venv .venv
@@ -72,13 +75,15 @@ uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ### 3. Frontend Setup
+
 ```bash
 cd frontend
 cp .env.example .env
 npm install
 npm run dev
 ```
-The frontend runs at `http://localhost:5173`. 
+
+The frontend runs at `http://localhost:5173`.
 
 ---
 
@@ -87,6 +92,7 @@ The frontend runs at `http://localhost:5173`.
 We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details on setting up your environment, running tests, and our pull request process.
 
 Before pushing, please ensure you have our pre-commit hooks installed:
+
 ```bash
 pip install pre-commit
 pre-commit install

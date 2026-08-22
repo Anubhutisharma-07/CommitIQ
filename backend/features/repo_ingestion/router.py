@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Annotated
@@ -72,32 +73,18 @@ class IngestionCancelled(RuntimeError):
     pass
 
 
-async def _update_job(job_id: int, db: AsyncSession | None = None, **kwargs) -> None:
-    if db is not None:
-        try:
-            job = await db.get(AnalysisJob, job_id)
+async def _update_job(job_id: int, **kwargs) -> None:
+    from backend.database import AsyncSessionLocal, commit_with_retry
+
+    try:
+        async with AsyncSessionLocal() as session:
+            job = await session.get(AnalysisJob, job_id)
             if job:
                 for key, value in kwargs.items():
                     setattr(job, key, value)
-        except Exception as exc:
-            logger.warning("Failed to update job id=%s in active session: %s", job_id, exc)
-        return
-
-    from backend.database import AsyncSessionLocal
-
-    for attempt in range(5):
-        try:
-            async with AsyncSessionLocal() as session:
-                job = await session.get(AnalysisJob, job_id)
-                if job:
-                    for key, value in kwargs.items():
-                        setattr(job, key, value)
-                    await session.commit()
-            break
-        except Exception as exc:
-            if attempt == 4:
-                logger.warning("Failed to update job id=%s after 5 attempts: %s", job_id, exc)
-            await asyncio.sleep(0.1 * (2**attempt))
+                await commit_with_retry(session, max_retries=3)
+    except Exception as exc:
+        logger.warning("Failed to update job id=%s after 3 retry attempts: %s", job_id, exc)
 
 
 async def _raise_if_cancelled(job_id: int) -> None:
@@ -1394,8 +1381,7 @@ async def compare_repos(
 
     def _normalize_slug(slug_val: str) -> str:
         s = slug_val.strip()
-        if "github.com/" in s:
-            s = s.split("github.com/")[-1]
+        s = re.sub(r"^(?:https?://)?(?:www\.)?github\.com/", "", s, flags=re.IGNORECASE)
         while s.endswith("/") or s.endswith(".git"):
             s = s[:-1] if s.endswith("/") else s[:-4]
         return s.strip("/").replace("/", "_").lower()

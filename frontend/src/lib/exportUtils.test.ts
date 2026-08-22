@@ -366,7 +366,8 @@ describe('Comparison Report Exports', () => {
         summary: 'facebook/react has a higher health score (85.0 vs 80.0).',
       },
     ],
-    verdict: 'facebook/react demonstrates superior overall health (+5.0 pts) compared to vuejs/vue.',
+    verdict:
+      'facebook/react demonstrates superior overall health (+5.0 pts) compared to vuejs/vue.',
   }
 
   beforeEach(() => {
