@@ -69,9 +69,8 @@ export function ConfirmDeleteRepoModal({
           Delete repository?
         </h2>
         <p className="text-slate-400 text-sm leading-relaxed mb-1">
-          This will permanently remove{' '}
-          <span className="font-mono text-slate-200">{repoSlug}</span> and all of its analyzed
-          commits, timelines, and graphs.
+          This will permanently remove <span className="font-mono text-slate-200">{repoSlug}</span>{' '}
+          and all of its analyzed commits, timelines, and graphs.
         </p>
         <p className="text-slate-500 text-xs mb-6">This action cannot be undone.</p>
 
