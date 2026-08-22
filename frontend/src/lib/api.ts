@@ -91,6 +91,10 @@ export async function getRepo(repoId: string | number): Promise<Repo> {
   return request<Repo>(client.get(`/repos/${repoId}`))
 }
 
+export async function deleteRepo(repoId: string | number): Promise<void> {
+  return request<void>(client.delete(`/repos/${repoId}`))
+}
+
 export async function getHealthTimeline(
   repoId: string | number,
   startDate?: string,

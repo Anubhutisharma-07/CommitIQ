@@ -1188,6 +1188,26 @@ async def get_repo(repo_id: int, db: AsyncSession = Depends(get_db)):
     return _repo_to_out(repo, count)
 
 
+@router.delete("/{repo_id}", status_code=204)
+async def delete_repo(repo_id: int, db: AsyncSession = Depends(get_db)):
+    repo = await db.get(Repo, repo_id)
+    if not repo:
+        raise _http_error(404, "Repository not found.", "repo_not_found")
+
+    active_job = await _latest_active_job(db, repo_id)
+    if active_job:
+        raise _http_error(
+            409,
+            "Cannot delete a repository while an analysis job is in progress.",
+            "repo_ingestion_active",
+        )
+
+    await db.delete(repo)
+    await db.commit()
+    cleanup_repo(repo_id)
+    return None
+
+
 @router.get("/{repo_id}/timeline", response_model=TimelineResponse)
 async def get_timeline(
     repo_id: int,
