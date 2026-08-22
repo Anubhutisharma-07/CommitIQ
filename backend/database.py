@@ -267,8 +267,7 @@ async def mark_stale_jobs_as_error() -> None:
     from sqlalchemy import select
 
     from backend.features.repo_ingestion.clone_service import REPO_STORAGE_PATH, cleanup_repo
-    from backend.features.repo_ingestion.router import ACTIVE_JOB_STATUSES
-    from backend.shared.models import AnalysisJob
+    from backend.shared.models import ACTIVE_JOB_STATUSES, AnalysisJob
 
     logger.info("Checking for stale/orphaned analysis jobs on startup...")
     async with AsyncSessionLocal() as session:
