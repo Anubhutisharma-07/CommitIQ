@@ -245,16 +245,6 @@ async def init_db(env: str = ENVIRONMENT):
 
     logger.info("Database initialized", extra={"migration_status": migration_res})
     await mark_stale_jobs_as_error()
-
-    # Auto-seed the facebook-react demo data if database is empty
-    from backend.demo_seeder import seed_demo_data_if_empty
-
-    async with AsyncSessionLocal() as session:
-        try:
-            await seed_demo_data_if_empty(session)
-        except Exception as exc:
-            logger.error(f"Failed to auto-seed demo data: {exc}", exc_info=True)
-
     return migration_res
 
 

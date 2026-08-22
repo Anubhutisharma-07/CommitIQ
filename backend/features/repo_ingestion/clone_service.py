@@ -264,7 +264,7 @@ async def fetch_github_metadata(owner: str, repo: str) -> dict:
                     "github_description": data.get("description", "")[:300],
                 }
     except Exception as exc:
-        logger.debug("Failed to fetch GitHub metadata for %s/%s: %s", safe_owner, safe_repo, exc)
+        logger.debug("Failed to fetch GitHub metadata: %s", exc)
     return {"github_stars": None, "github_language": None, "github_description": None}
 
 

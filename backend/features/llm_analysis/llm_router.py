@@ -45,9 +45,6 @@ def model_for_provider(provider: LLMProvider | str) -> str:
     return "none"
 
 
-from backend.features.llm_analysis.cost_guard import provider_from_model
-
-
 async def stream_narrative(
     prompt: str,
     max_tokens: int = 600,
