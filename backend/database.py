@@ -214,6 +214,23 @@ async def check_database_migrations(
         }
 
 
+async def _ensure_sqlite_columns(conn) -> None:
+    """Ensure newly added columns in SQLAlchemy models exist in SQLite tables."""
+    if not _IS_SQLITE:
+        return
+    for table_name, table in Base.metadata.tables.items():
+        existing_cols = await _sqlite_columns(conn, table_name)
+        if not existing_cols:
+            continue
+        for column in table.columns:
+            if column.name not in existing_cols:
+                col_type = column.type.compile(engine.sync_engine.dialect)
+                try:
+                    await conn.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {column.name} {col_type}"))
+                except Exception as exc:
+                    logger.debug(f"Column {column.name} check on {table_name}: {exc}")
+
+
 async def init_db(env: str = ENVIRONMENT):
     """Initialize database schema for local SQLite and hosted Postgres."""
     from backend.shared import models  # noqa: F401
@@ -223,6 +240,7 @@ async def init_db(env: str = ENVIRONMENT):
             await conn.execute(text("PRAGMA foreign_keys=ON"))
 
         await conn.run_sync(Base.metadata.create_all)
+        await _ensure_sqlite_columns(conn)
         migration_res = await check_database_migrations(conn, env=env)
 
     logger.info("Database initialized", extra={"migration_status": migration_res})
