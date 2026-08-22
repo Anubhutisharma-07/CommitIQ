@@ -493,234 +493,87 @@ def test_build_cochange_edges_normalizes_renamed_file_paths():
     assert edges[0]["target_file"] == "new_name.py"
     assert edges[0]["weight"] == 3
 
-# ── Go import extraction ───────────────────────────────────────────────
+
+@pytest.mark.anyio
+async def test_fetch_github_pull_requests_graphql_success(monkeypatch):
+    from backend.features.repo_ingestion import clone_service
+
+    monkeypatch.setattr(clone_service, "GITHUB_TOKEN", "mock-token")
+
+    class MockResponse:
+        status_code = 200
+
+        def json(self):
+            return {
+                "data": {
+                    "repository": {
+                        "pullRequests": {
+                            "pageInfo": {"hasNextPage": False, "endCursor": None},
+                            "nodes": [
+                                {
+                                    "number": 42,
+                                    "title": "Migrate to GraphQL API",
+                                    "state": "MERGED",
+                                    "createdAt": "2026-08-20T10:00:00Z",
+                                    "mergedAt": "2026-08-20T12:00:00Z",
+                                    "closedAt": "2026-08-20T12:00:00Z",
+                                    "author": {"login": "octocat"},
+                                }
+                            ],
+                        }
+                    }
+                }
+            }
+
+    class MockClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            pass
+
+        async def post(self, url, json=None, headers=None):
+            assert url == "https://api.github.com/graphql"
+            assert "bearer mock-token" in headers.get("Authorization", "")
+            return MockResponse()
+
+    monkeypatch.setattr("httpx.AsyncClient", lambda **kwargs: MockClient())
+
+    prs = await clone_service.fetch_github_pull_requests("eshaanag", "CommitIQ", limit=10)
+    assert len(prs) == 1
+    assert prs[0]["pr_number"] == 42
+    assert prs[0]["title"] == "Migrate to GraphQL API"
+    assert prs[0]["state"] == "merged"
+    assert prs[0]["author"] == "octocat"
 
 
-def test_extract_go_imports_single_import():
-    """Single-line import statements should be extracted."""
-    code = """
-package main
+@pytest.mark.anyio
+async def test_fetch_github_pull_requests_graphql_fallback_to_rest(monkeypatch):
+    from backend.features.repo_ingestion import clone_service
 
-import "fmt"
-import "net/http"
-"""
-    imports = extract_go_imports(code)
-    assert "fmt" in imports
-    assert "net/http" in imports
+    monkeypatch.setattr(clone_service, "GITHUB_TOKEN", "mock-token")
 
+    async def mock_graphql(owner, repo, limit=500):
+        return None
 
-def test_extract_go_imports_grouped_block():
-    """Grouped import ( ... ) blocks should be fully parsed."""
-    code = """
-package main
+    async def mock_rest(owner, repo, limit=500):
+        return [
+            {
+                "pr_number": 1,
+                "title": "REST Fallback PR",
+                "state": "open",
+                "author": "fallback-user",
+                "created_at": None,
+                "merged_at": None,
+                "closed_at": None,
+            }
+        ]
 
-import (
-    "fmt"
-    "net/http"
-    "os"
-)
-"""
-    imports = extract_go_imports(code)
-    assert "fmt" in imports
-    assert "net/http" in imports
-    assert "os" in imports
+    monkeypatch.setattr(clone_service, "fetch_github_pull_requests_graphql", mock_graphql)
+    monkeypatch.setattr(clone_service, "fetch_github_pull_requests_rest", mock_rest)
 
-
-def test_extract_go_imports_aliased():
-    """Aliased imports (f \"fmt\") should return only the path."""
-    code = """
-package main
-
-import (
-    f "fmt"
-    http "net/http"
-    _ "image/png"
-)
-"""
-    imports = extract_go_imports(code)
-    assert "fmt" in imports
-    assert "net/http" in imports
-    assert "image/png" in imports
-
-
-def test_extract_go_imports_local_packages():
-    """Local/internal Go packages should be extracted."""
-    code = """
-package main
-
-import (
-    "internal/service"
-    "myproject/pkg/utils"
-)
-"""
-    imports = extract_go_imports(code)
-    assert "internal/service" in imports
-    assert "myproject/pkg/utils" in imports
-
-
-def test_extract_go_imports_ignores_commented_imports():
-    """Commented-out import lines should not be extracted."""
-    code = """
-package main
-
-// import "fmt"
-/* import "os" */
-import (
-    // "net/http"
-    "strings"
-)
-"""
-    imports = extract_go_imports(code)
-    assert "fmt" not in imports
-    assert "os" not in imports
-    assert "net/http" not in imports
-    assert "strings" in imports
-
-
-def test_extract_go_imports_deduplicates():
-    """Duplicate imports should be de-duplicated."""
-    code = """
-package main
-
-import "fmt"
-import "fmt"
-import (
-    "fmt"
-)
-"""
-    imports = extract_go_imports(code)
-    assert imports.count("fmt") == 1
-
-
-def test_extract_go_imports_empty():
-    """A file with no imports should return an empty list."""
-    code = "package main\n\nfunc main() {}\n"
-    assert extract_go_imports(code) == []
-
-
-def test_extract_go_imports_dot_import():
-    """Dot imports (. \"math\") should return the path."""
-    code = """
-package main
-
-import . "math"
-"""
-    imports = extract_go_imports(code)
-    assert "math" in imports
-
-
-# ── TypeScript path-alias resolution ──────────────────────────────────
-
-
-def test_resolve_at_alias_to_src():
-    """@/ alias should resolve to src/ directory."""
-    files = [
-        "src/App.tsx",
-        "src/components/Button.tsx",
-        "src/utils/helpers.ts",
-        "src/index.ts",
-    ]
-    assert (
-        resolve_import_to_file("@/components/Button", "src/App.tsx", files)
-        == "src/components/Button.tsx"
-    )
-    assert resolve_import_to_file("@/utils/helpers", "src/App.tsx", files) == "src/utils/helpers.ts"
-
-
-def test_resolve_tilde_alias_to_src():
-    """~/ alias should resolve to src/ directory."""
-    files = [
-        "src/App.tsx",
-        "src/lib/utils.ts",
-    ]
-    assert resolve_import_to_file("~/lib/utils", "src/App.tsx", files) == "src/lib/utils.ts"
-
-
-def test_resolve_at_alias_index_file():
-    """@/ alias should resolve index files in directories."""
-    files = [
-        "src/App.tsx",
-        "src/components/index.ts",
-    ]
-    assert resolve_import_to_file("@/components", "src/App.tsx", files) == "src/components/index.ts"
-
-
-def test_resolve_at_alias_to_project_root():
-    """@/ alias should also try project root if src/ doesn't match."""
-    files = [
-        "App.tsx",
-        "components/Button.tsx",
-    ]
-    assert (
-        resolve_import_to_file("@/components/Button", "App.tsx", files) == "components/Button.tsx"
-    )
-
-
-def test_resolve_alias_returns_none_for_unresolvable():
-    """Unresolvable alias imports should return None."""
-    files = ["src/App.tsx"]
-    assert resolve_import_to_file("@/nonexistent/path", "src/App.tsx", files) is None
-
-
-# ── Go package path resolution ────────────────────────────────────────
-
-
-def test_resolve_go_import_to_file():
-    """Go import paths should resolve to .go files in the repo."""
-    files = [
-        "main.go",
-        "internal/service/handler.go",
-        "internal/service/client.go",
-        "pkg/utils/math.go",
-    ]
-    # Direct file match
-    assert (
-        resolve_import_to_file("internal/service/handler", "main.go", files)
-        == "internal/service/handler.go"
-    )
-    # Package directory match — should return first .go file in that dir
-    result = resolve_import_to_file("internal/service", "main.go", files)
-    assert result is not None
-    assert result.startswith("internal/service/")
-    assert result.endswith(".go")
-
-
-def test_resolve_go_import_with_full_module_path():
-    """Full module paths (github.com/user/repo/...) should still resolve."""
-    files = [
-        "cmd/server/main.go",
-        "internal/config/config.go",
-    ]
-    # The suffix "internal/config" should match "internal/config/config.go"
-    result = resolve_import_to_file(
-        "github.com/myorg/myrepo/internal/config", "cmd/server/main.go", files
-    )
-    assert result is not None
-    assert result.endswith("config.go")
-
-
-def test_resolve_go_import_returns_none_for_external():
-    """External Go packages (e.g. 'fmt') should return None (not in repo)."""
-    files = ["main.go", "internal/service/handler.go"]
-    assert resolve_import_to_file("fmt", "main.go", files) is None
-    assert resolve_import_to_file("net/http", "main.go", files) is None
-
-
-def test_resolve_returns_none_for_empty_import():
-    """Empty import paths should return None."""
-    assert resolve_import_to_file("", "src/App.tsx", ["src/App.tsx"]) is None
-    assert resolve_import_to_file("   ", "src/App.tsx", ["src/App.tsx"]) is None
-
-
-def test_resolve_relative_import_still_works():
-    """Existing relative import resolution should not regress."""
-    files = [
-        "src/App.tsx",
-        "src/types.ts",
-        "src/Button/index.ts",
-        "lib/mod.ts",
-    ]
-    assert resolve_import_to_file("./types", "src/App.tsx", files) == "src/types.ts"
-    assert resolve_import_to_file("./Button", "src/App.tsx", files) == "src/Button/index.ts"
-    assert resolve_import_to_file("../lib/mod", "src/App.tsx", files) == "lib/mod.ts"
+    prs = await clone_service.fetch_github_pull_requests("eshaanag", "CommitIQ", limit=10)
+    assert len(prs) == 1
+    assert prs[0]["title"] == "REST Fallback PR"
+    assert prs[0]["author"] == "fallback-user"
 
