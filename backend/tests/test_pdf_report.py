@@ -17,12 +17,11 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from backend.database import Base, get_db
+from backend.shared.models import Repo
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
-
-from backend.database import Base
-from backend.shared.models import Repo
 
 pytestmark = pytest.mark.anyio
 
@@ -79,9 +78,11 @@ class TestPdfService:
         """generate_health_report returns bytes starting with %PDF."""
         from backend.features.reports.pdf_service import generate_health_report
 
-        mock_repo = MagicMock(
-            id=1, owner="test", name="repo", github_language="Python"
-        )
+        # NOTE: ``name`` cannot be passed to the MagicMock constructor
+        # because it is reserved by MagicMock itself (used for repr).
+        # It must be set as an attribute after construction.
+        mock_repo = MagicMock(id=1, owner="test", github_language="Python")
+        mock_repo.name = "repo"
         mock_db = AsyncMock()
         mock_db.get = AsyncMock(return_value=mock_repo)
 
@@ -146,9 +147,9 @@ class TestPdfService:
         """PDF content includes key metric section labels."""
         from backend.features.reports.pdf_service import generate_health_report
 
-        mock_repo = MagicMock(
-            id=1, owner="test", name="repo", github_language=None
-        )
+        # ``name`` is reserved by MagicMock - set it after construction.
+        mock_repo = MagicMock(id=1, owner="test", github_language=None)
+        mock_repo.name = "repo"
         mock_db = AsyncMock()
         mock_db.get = AsyncMock(return_value=mock_repo)
 
@@ -214,21 +215,21 @@ class TestReportRouter:
         """GET /api/repos/{repo_id}/report returns 404 for missing repo."""
         from backend.main import app
 
-        with patch(
-            "backend.database.get_db"
-        ):
+        # FastAPI captures the ``get_db`` callable inside ``Depends(...)``
+        # at route-definition time, so patching ``backend.database.get_db``
+        # has no effect on the dependency the router actually invokes.
+        # The supported way to swap a dependency in tests is via
+        # ``app.dependency_overrides``.
+        async def override_get_db():
             mock_db = AsyncMock()
             mock_db.get = AsyncMock(return_value=None)
+            yield mock_db
 
+        app.dependency_overrides[get_db] = override_get_db
+        try:
             client = TestClient(app)
-            # We need to override the dependency.
-            app.dependency_overrides[
-                __import__(
-                    "backend.database", fromlist=["get_db"]
-                ).get_db
-            ] = lambda: mock_db
-
             response = client.get("/api/repos/999/report")
+        finally:
             app.dependency_overrides.clear()
 
         assert response.status_code == 404
@@ -239,9 +240,9 @@ class TestReportRouter:
         """GET /api/repos/{repo_id}/report returns 200 + application/pdf."""
         from backend.main import app
 
-        mock_repo = MagicMock(
-            id=1, owner="test", name="repo", github_language="Python"
-        )
+        # ``name`` is reserved by MagicMock - set it after construction.
+        mock_repo = MagicMock(id=1, owner="test", github_language="Python")
+        mock_repo.name = "repo"
         mock_dora = {
             "dora_score": "High",
             "deployment_frequency": "High",
@@ -264,36 +265,37 @@ class TestReportRouter:
             "avg_files_per_day": 10.0,
         }
 
-        mock_db = AsyncMock()
-        mock_db.get = AsyncMock(return_value=mock_repo)
+        # Use the supported FastAPI dependency-override mechanism
+        # instead of patching ``backend.database.get_db`` (which is
+        # captured by ``Depends(...)`` at route-definition time).
+        async def override_get_db():
+            mock_db = AsyncMock()
+            mock_db.get = AsyncMock(return_value=mock_repo)
 
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = None
-        mock_db.execute = AsyncMock(return_value=mock_result)
+            mock_result = MagicMock()
+            mock_result.scalar_one_or_none.return_value = None
+            mock_db.execute = AsyncMock(return_value=mock_result)
+            yield mock_db
 
-        app.dependency_overrides[
-            __import__(
-                "backend.database", fromlist=["get_db"]
-            ).get_db
-        ] = lambda: mock_db
-
-        with patch(
-            "backend.features.reports.pdf_service.compute_dora_metrics",
-            new_callable=AsyncMock,
-            return_value=mock_dora,
-        ), patch(
-            "backend.features.reports.pdf_service.compute_cycle_time_metrics",
-            new_callable=AsyncMock,
-            return_value=mock_cycle,
-        ), patch(
-            "backend.features.reports.pdf_service.compute_team_health",
-            new_callable=AsyncMock,
-            return_value=mock_health,
-        ):
-            client = TestClient(app)
-            response = client.get("/api/repos/1/report")
-
-        app.dependency_overrides.clear()
+        app.dependency_overrides[get_db] = override_get_db
+        try:
+            with patch(
+                "backend.features.reports.pdf_service.compute_dora_metrics",
+                new_callable=AsyncMock,
+                return_value=mock_dora,
+            ), patch(
+                "backend.features.reports.pdf_service.compute_cycle_time_metrics",
+                new_callable=AsyncMock,
+                return_value=mock_cycle,
+            ), patch(
+                "backend.features.reports.pdf_service.compute_team_health",
+                new_callable=AsyncMock,
+                return_value=mock_health,
+            ):
+                client = TestClient(app)
+                response = client.get("/api/repos/1/report")
+        finally:
+            app.dependency_overrides.clear()
 
         assert response.status_code == 200
         assert response.headers["content-type"] == "application/pdf"
