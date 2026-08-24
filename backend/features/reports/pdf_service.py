@@ -24,28 +24,28 @@ import logging
 from datetime import datetime, timezone
 from typing import Any
 
+from backend.features.metrics.cycle_time import compute_cycle_time_metrics
+from backend.features.metrics.dora import compute_dora_metrics
+from backend.features.metrics.team_health import compute_team_health
+from backend.shared.models import HealthSnapshot, Repo
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import inch
 from reportlab.platypus import (
+    Paragraph,
     SimpleDocTemplate,
     Spacer,
     Table,
     TableStyle,
-    Paragraph,
 )
 from reportlab.platypus.flowables import HRFlowable
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.features.metrics.cycle_time import compute_cycle_time_metrics
-from backend.features.metrics.dora import compute_dora_metrics
-from backend.features.metrics.team_health import compute_team_health
-from backend.shared.models import HealthSnapshot, Repo
-
 logger = logging.getLogger(__name__)
+
 
 # ── Colour helpers ────────────────────────────────────────────────
 
@@ -146,18 +146,12 @@ def _build_summary_table(
         _metric_row("Deployment Frequency", dora.get("deployment_frequency", "N/A"), styles),
         _metric_row("Change Failure Rate", dora.get("change_failure_rate", "N/A"), styles),
         _metric_row("MTTR (hours)", dora.get("mttr_hours", "N/A"), styles),
-        _metric_row(
-            "Avg Cycle Time (hours)", cycle.get("avg_cycle_time_hours", "N/A"), styles
-        ),
+        _metric_row("Avg Cycle Time (hours)", cycle.get("avg_cycle_time_hours", "N/A"), styles),
         _metric_row("PRs Analyzed", cycle.get("total_prs_analyzed", "N/A"), styles),
         _metric_row("Burnout Risk", health.get("burnout_risk_score", "N/A"), styles),
+        _metric_row("Weekend Commits %", health.get("weekend_commits_percent", "N/A"), styles),
         _metric_row(
-            "Weekend Commits %", health.get("weekend_commits_percent", "N/A"), styles
-        ),
-        _metric_row(
-            "After-Hours Commits %",
-            health.get("after_hours_commits_percent", "N/A"),
-            styles,
+            "After-Hours Commits %", health.get("after_hours_commits_percent", "N/A"), styles
         ),
     ]
     tbl = Table(data, colWidths=[2.2 * inch, 2.8 * inch])
@@ -244,10 +238,16 @@ async def generate_health_report(
     latest_snapshot = snap_result.scalar_one_or_none()
 
     # Build the PDF.
+    # ``pageCompression=0`` keeps content streams uncompressed so the
+    # resulting PDF is directly text-searchable (useful for screen
+    # readers, copy/paste, and integration tests that assert on the
+    # PDF's text content).  The size overhead is negligible for the
+    # single-page metric reports produced here.
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
         buffer,
         pagesize=letter,
+        pageCompression=0,
         rightMargin=0.75 * inch,
         leftMargin=0.75 * inch,
         topMargin=0.75 * inch,
@@ -261,11 +261,7 @@ async def generate_health_report(
     story.append(
         Paragraph(
             f"{repo.owner}/{repo.name}"
-            + (
-                f" &middot; {repo.github_language}"
-                if repo.github_language
-                else ""
-            ),
+            + (f" &middot; {repo.github_language}" if repo.github_language else ""),
             styles["subtitle"],
         )
     )
@@ -298,8 +294,7 @@ async def generate_health_report(
     score_color = _score_color(dora_score)
     story.append(
         Paragraph(
-            f"Overall DORA Score: <font color='{score_color.hexval()}'>"
-            f"<b>{dora_score}</b></font>",
+            f"Overall DORA Score: <font color='{score_color.hexval()}'><b>{dora_score}</b></font>",
             styles["body"],
         )
     )
@@ -368,8 +363,7 @@ async def generate_health_report(
     burnout_color = _score_color(burnout)
     story.append(
         Paragraph(
-            f"Burnout Risk: <font color='{burnout_color.hexval()}'>"
-            f"<b>{burnout}</b></font>",
+            f"Burnout Risk: <font color='{burnout_color.hexval()}'><b>{burnout}</b></font>",
             styles["body"],
         )
     )
@@ -384,9 +378,7 @@ async def generate_health_report(
             f"{health.get('after_hours_commits_percent', 0.0):.1f}%",
             styles,
         ),
-        _metric_row(
-            "Context Switching", health.get("context_switching_score", "N/A"), styles
-        ),
+        _metric_row("Context Switching", health.get("context_switching_score", "N/A"), styles),
         _metric_row(
             "Avg Files / Day",
             f"{health.get('avg_files_per_day', 0.0):.1f}",
