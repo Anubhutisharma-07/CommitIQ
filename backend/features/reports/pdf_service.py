@@ -1,6 +1,6 @@
 """
 backend/features/reports/pdf_service.py
-=======================================
+
 Unified PDF report generator for Developer Health metrics (Issue #389).
 
 Aggregates DORA, Cycle Time, and Team Health metrics into a clean
