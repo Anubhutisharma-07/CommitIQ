@@ -1,6 +1,6 @@
 """
 backend/features/reports/router.py
-==================================
+
 FastAPI router for the unified PDF report export (Issue #389).
 
 Endpoint:
@@ -13,13 +13,12 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.responses import StreamingResponse
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from backend.database import get_db
 from backend.features.reports.pdf_service import generate_health_report
 from backend.shared.models import Repo
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import StreamingResponse
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
@@ -48,14 +47,14 @@ async def get_health_report(
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(exc),
+            detail="Repository not found.",
         ) from exc
-    except Exception as exc:
-        logger.exception("Failed to generate PDF report for repo %s", repo_id)
+    except Exception:
+        logger.exception("Failed to generate PDF report")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to generate PDF report.",
-        ) from exc
+        )
 
     headers = {
         "Content-Disposition": f'attachment; filename="{filename}"',
