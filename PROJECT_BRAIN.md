@@ -275,7 +275,7 @@ REFRESH_INTERVAL_HOURS env var (default 24). Set to 0 todisable the scheduler en
 backend/requirements.txt now includes apscheduler>=3.10.0.
 Testing:
 
-backend/tests/test_scheduler.py covers: scheduler lifecycle(start/stop/disabled), repo eligibility (old/recent/null/non-ready),refresh_all_due_repos (empty, DB error, multi-repo refresh),_refresh_single_repo (skip active, launch rescan, exceptionhandling).
+backend/tests/test_scheduler.py covers: scheduler lifecycle(start/stop/disabled), repo eligibility (old/recent/null/non-ready),refresh_all_due_repos (empty, DB error, multi-repo refresh),\_refresh_single_repo (skip active, launch rescan, exceptionhandling).
 The scheduler's internal job calls run_rescan with its own DBsession, so no long-lived transactions are held between ticks.
 Health endpoint:
 
@@ -295,4 +295,3 @@ backend/requirements.txt now includes reportlab>=4.0.0.
 Testing:
 
 backend/tests/test_pdf_report.py covers: service raisesValueError for missing repo, returns valid %PDF bytes, PDFcontent includes section labels, router returns 404 for missing repo,router returns 200 + application/pdf with correct headers for avalid repo.
-
