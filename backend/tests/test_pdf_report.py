@@ -1,6 +1,6 @@
 """
 backend/tests/test_pdf_report.py
-================================
+
 Unit tests for the unified PDF report export (Issue #389).
 
 Tests cover:
