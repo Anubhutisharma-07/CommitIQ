@@ -280,3 +280,19 @@ The scheduler's internal job calls run_rescan with its own DBsession, so no long
 Health endpoint:
 
 GET /health now includes a scheduler key with{ running, enabled, jobs: [{ id, name, next_run_time }] } sooperators can verify the scheduler is active via a single curl.
+
+Unified PDF Report Export (Issue #389)
+A backend service that generates a clean PDF report aggregating DORA,Cycle Time, and Team Health metrics for any repository.
+
+Implementation:
+
+backend/features/reports/pdf_service.py uses ReportLab(SimpleDocTemplate + Table + Paragraph) to build a multi-sectionPDF: Executive Summary, DORA Metrics, Cycle Time Analysis (withbottleneck table), Team Health, and a footer.
+The service fetches live data by calling the existing metriccomputation functions (compute_dora_metrics,compute_cycle_time_metrics, compute_team_health) and queries thelatest HealthSnapshot for the overall score.
+Colour-coded DORA/burnout labels (Elite=green, High=blue,Medium=amber, Low=red) are rendered inline in the PDF text.
+backend/features/reports/router.py exposesGET /api/repos/{repo_id}/report which returns aStreamingResponse with Content-Type: application/pdf and aContent-Disposition: attachment header.
+backend/main.py registers the reports router under /api.
+backend/requirements.txt now includes reportlab>=4.0.0.
+Testing:
+
+backend/tests/test_pdf_report.py covers: service raisesValueError for missing repo, returns valid %PDF bytes, PDFcontent includes section labels, router returns 404 for missing repo,router returns 200 + application/pdf with correct headers for avalid repo.
+
