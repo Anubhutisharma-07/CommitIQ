@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { SWRConfig } from 'swr'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
@@ -431,5 +431,53 @@ describe('DashboardPage', () => {
     await waitFor(() => {
       expect(screen.queryByTestId('export-dropdown-menu')).not.toBeInTheDocument()
     })
+  })
+
+  it('renders metric help tooltips explaining Cyclomatic Complexity, Churn, and Bus Factor', async () => {
+    const user = userEvent.setup()
+    renderDashboard()
+
+    await screen.findByText('Improve ingestion resilience')
+
+    // Find help icon for Cyclomatic Complexity
+    const complexityHelp = screen.getByRole('button', { name: /about cyclomatic complexity/i })
+    expect(complexityHelp).toBeInTheDocument()
+
+    // Open complexity tooltip
+    await user.click(complexityHelp)
+    const complexityTooltip = screen.getByRole('tooltip')
+    expect(complexityTooltip).toBeInTheDocument()
+    expect(within(complexityTooltip).getByText('Cyclomatic Complexity')).toBeInTheDocument()
+    expect(within(complexityTooltip).getByText(/Measures structural code complexity/i)).toBeInTheDocument()
+    expect(within(complexityTooltip).getByText(/M = E - N \+ 2P/i)).toBeInTheDocument()
+    expect(within(complexityTooltip).getByText('25% of Health Score')).toBeInTheDocument()
+
+    // Close by clicking outside
+    await user.click(document.body)
+    await waitFor(() => {
+      expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+    })
+
+    // Check Minimum Bus Factor tooltip
+    const busFactorHelp = screen.getByRole('button', { name: /about minimum bus factor/i })
+    await user.click(busFactorHelp)
+    const busFactorTooltip = screen.getByRole('tooltip')
+    expect(busFactorTooltip).toBeInTheDocument()
+    expect(within(busFactorTooltip).getByText('Minimum Bus Factor')).toBeInTheDocument()
+    expect(within(busFactorTooltip).getByText(/minimum number of key contributors/i)).toBeInTheDocument()
+    expect(within(busFactorTooltip).getByText(/min\(bus_factor_min × 20, 100\)/i)).toBeInTheDocument()
+
+    // Close tooltip
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+
+    // Check Commit Churn Rate tooltip
+    const churnHelp = screen.getByRole('button', { name: /about commit churn rate/i })
+    await user.click(churnHelp)
+    const churnTooltip = screen.getByRole('tooltip')
+    expect(churnTooltip).toBeInTheDocument()
+    expect(within(churnTooltip).getByText('Commit Churn Rate')).toBeInTheDocument()
+    expect(within(churnTooltip).getByText(/Measures code volatility/i)).toBeInTheDocument()
+    expect(within(churnTooltip).getByText(/Churn Rate = \(insertions \+ deletions\) \/ total_loc/i)).toBeInTheDocument()
   })
 })

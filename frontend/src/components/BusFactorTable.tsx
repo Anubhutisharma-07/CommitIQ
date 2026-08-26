@@ -1,5 +1,6 @@
 import type { BusFactorTableProps } from '../types'
 import { Users, AlertTriangle, ShieldCheck, HelpCircle } from 'lucide-react'
+import { MetricTooltip } from './ui/MetricTooltip'
 
 const RISK_COLORS: Record<string, string> = {
   critical: '239, 68, 68',
@@ -26,6 +27,13 @@ export function BusFactorTable({ modules }: BusFactorTableProps) {
             <h2 className="font-head text-[18px] font-semibold text-white tracking-tight">
               Bus Factor Index
             </h2>
+            <MetricTooltip
+              title="Bus Factor Index"
+              description="Evaluates developer concentration per code module to uncover key-person dependencies before knowledge loss impacts the team."
+              formula="Subscore = min(bus_factor_min × 20, 100). Modules with a single owner are flagged as critical single points of failure."
+              weight="20% of Health Score"
+              align="left"
+            />
           </div>
           <p className="text-slate-400 text-xs mt-1">
             Contributor concentration distribution per system module
