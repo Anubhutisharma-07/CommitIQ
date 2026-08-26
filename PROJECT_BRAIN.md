@@ -284,41 +284,48 @@ Health endpoint:
 
 GET /health now includes a scheduler key with{ running, enabled, jobs: [{ id, name, next_run_time }] } sooperators can verify the scheduler is active via a single curl.
 
-<<<<<<< HEAD
 Unified PDF Report Export (Issue #389)
-A backend service that generates a clean PDF report aggregating DORA,Cycle Time, and Team Health metrics for any repository.
+A backend service that generates a clean PDF report aggregating DORA, Cycle Time, and Team Health metrics for any repository.
 
 Implementation:
-
-backend/features/reports/pdf_service.py uses ReportLab(SimpleDocTemplate + Table + Paragraph) to build a multi-sectionPDF: Executive Summary, DORA Metrics, Cycle Time Analysis (withbottleneck table), Team Health, and a footer.
-The service fetches live data by calling the existing metriccomputation functions (compute_dora_metrics,compute_cycle_time_metrics, compute_team_health) and queries thelatest HealthSnapshot for the overall score.
-Colour-coded DORA/burnout labels (Elite=green, High=blue,Medium=amber, Low=red) are rendered inline in the PDF text.
-backend/features/reports/router.py exposesGET /api/repos/{repo_id}/report which returns aStreamingResponse with Content-Type: application/pdf and aContent-Disposition: attachment header.
+backend/features/reports/pdf_service.py uses ReportLab (SimpleDocTemplate + Table + Paragraph) to build a multi-section PDF: Executive Summary, DORA Metrics, Cycle Time Analysis (with bottleneck table), Team Health, and a footer.
+The service fetches live data by calling the existing metric computation functions (compute_dora_metrics, compute_cycle_time_metrics, compute_team_health) and queries the latest HealthSnapshot for the overall score.
+Colour-coded DORA/burnout labels (Elite=green, High=blue, Medium=amber, Low=red) are rendered inline in the PDF text.
+backend/features/reports/router.py exposes GET /api/repos/{repo_id}/report which returns a StreamingResponse with Content-Type: application/pdf and a Content-Disposition: attachment header.
 backend/main.py registers the reports router under /api.
 backend/requirements.txt now includes reportlab>=4.0.0.
-Testing:
 
-backend/tests/test_pdf_report.py covers: service raisesValueError for missing repo, returns valid %PDF bytes, PDFcontent includes section labels, router returns 404 for missing repo,router returns 200 + application/pdf with correct headers for avalid repo.
-=======
+Testing:
+backend/tests/test_pdf_report.py covers: service raises ValueError for missing repo, returns valid %PDF bytes, PDF content includes section labels, router returns 404 for missing repo, router returns 200 + application/pdf with correct headers for a valid repo.
+
 - fix: make the hotspot map and knowledge graph responsive on mobile devices (#377). Made the canvas container, treemap wrapper, sidebars, stats overlay, and playback controls fully responsive across narrow viewports without horizontal overflow.
 - docs: update project brain after mobile responsiveness fix (#377). Recorded responsive layout adjustments for HotspotMap and GraphExplorer, and updated test coverage.
 
 ### Mobile Responsiveness for Hotspot Map & Knowledge Graph (Issue #377)
+
 - **Problem**: On small mobile devices (viewports < 768px down to 320px), the Hotspot Treemap and ForceGraph2D canvas containers caused horizontal page overflow, unconstrained sidebar widths, and clipped overlay badges.
 - **Implementation**:
-  - `HotspotMap.tsx`:
-    - Added responsive bounding classes (`w-full max-w-full overflow-hidden min-w-0`, `p-4 sm:p-5`, `rounded-[24px] sm:rounded-[28px]`).
-    - Made the risk category legend wrap cleanly on narrow screens (`flex-wrap gap-2 sm:gap-3`).
-    - Adjusted `HotspotCell` text scaling (`Math.min(Math.max(width / 8, 8), 11)`) and size gating (`width > 36 && height > 18`) to preserve label visibility without overflow.
-    - Added constrained tooltip max-width on mobile (`max-w-[240px] sm:max-w-[280px] truncate`).
-    - Configured responsive pagination controls with vertical stacking on small screens (`flex-col sm:flex-row`).
-  - `GraphExplorer.tsx`:
-    - Set default initial canvas dimensions to a mobile-safe `{ width: 300, height: 420 }` prior to `ResizeObserver` measurement.
-    - Added `w-full max-w-full overflow-hidden min-w-0` to the knowledge graph wrapper and canvas viewport (`min-h-[420px] sm:min-h-[580px]`).
-    - Made the top floating stats HUD responsive with compact mobile padding, typography, and positioning (`top-3 sm:top-4 right-3 sm:right-4 left-3 sm:left-auto max-w-[calc(100%-24px)] sm:max-w-none`).
-    - Constrained left and right sidebars on small screens (`w-[calc(100%-24px)] max-w-xs sm:w-72` and `w-[calc(100%-24px)] max-w-sm sm:w-80`).
-    - Refactored bottom commit playback bar for responsive column-to-row wrapping (`flex-col lg:flex-row`).
+  - `HotspotMap.tsx`: Responsive bounding classes, legend wrapping, and pagination stacking.
+  - `GraphExplorer.tsx`: Mobile-safe canvas dimensions, responsive stats HUD, and sidebar wrapping.
+- **Testing**: Verified with full test suite (`npm run test`, 17 test files, 83 tests passing).
+
+### Support Time Window Parameters in DORA Metrics (Issue #375)
+
+- **Problem**: `compute_dora_metrics` previously analyzed all historical deployments and merged pull requests, preventing users and teams from viewing DORA performance for specific sprints, quarters, or custom date ranges.
+- **Implementation**:
+  - `backend/features/metrics/dora.py`:
+    - Updated `compute_dora_metrics(db, repo_id, start_date=None, end_date=None)` to accept optional ISO strings or `datetime` objects.
+    - Added helper `_parse_datetime` to handle string/datetime formats and `_seconds_between` to handle naive and timezone-aware datetime subtractions safely.
+    - Filtered `Deployment.deployed_at >= start_date` / `<= end_date` and `PullRequest.merged_at >= start_date` / `<= end_date`.
+    - Computed measurement span dynamically using the specified time window or earliest recorded activity.
+  - `backend/features/metrics/router.py`:
+    - Updated `GET /api/metrics/repos/{repo_id}/dora` to accept `start_date` and `end_date` query parameters.
+  - `frontend/src/lib/api.ts`:
+    - Updated `getDoraMetrics(repoId, startDate, endDate)` to send `start_date` and `end_date` query parameters when provided.
+  - `frontend/src/components/DoraMetricsDashboard.tsx`:
+    - Added `startDate?: string` and `endDate?: string` to `DoraMetricsDashboardProps` and included them in the `useEffect` fetch dependencies.
+  - `frontend/src/pages/DashboardPage.tsx`:
+    - Passed current `startDate` and `endDate` from the dashboard time range filter to `<DoraMetricsDashboard />`.
 - **Testing**:
-  - Expanded `HotspotMap.test.tsx` with unit tests for empty states, risk badges, and pagination under responsive layouts.
-  - Verified with full test suite (`npm run test`, 16 test files, 78 tests passing).
->>>>>>> origin/main
+  - Added `backend/tests/test_dora_metrics.py` testing bounded time windows, empty date ranges, ISO string timestamp parsing, and HTTP endpoint query parameters.
+  - Verified with full test suite (180 backend pytest tests, 83 frontend vitest tests passing).

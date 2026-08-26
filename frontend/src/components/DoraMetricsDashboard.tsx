@@ -5,6 +5,8 @@ import { Activity, Rocket, ShieldAlert, Timer, TrendingUp } from 'lucide-react'
 
 interface DoraMetricsDashboardProps {
   repoId: string | number
+  startDate?: string
+  endDate?: string
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -14,7 +16,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   Low: 'text-rose-400 bg-rose-500/10 border-rose-500/20',
 }
 
-export function DoraMetricsDashboard({ repoId }: DoraMetricsDashboardProps) {
+export function DoraMetricsDashboard({ repoId, startDate, endDate }: DoraMetricsDashboardProps) {
   const [metrics, setMetrics] = useState<DoraMetrics | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -23,7 +25,7 @@ export function DoraMetricsDashboard({ repoId }: DoraMetricsDashboardProps) {
     let active = true
     setLoading(true)
     setError(null)
-    getDoraMetrics(repoId)
+    getDoraMetrics(repoId, startDate, endDate)
       .then((data) => {
         if (active) setMetrics(data)
       })
@@ -36,7 +38,7 @@ export function DoraMetricsDashboard({ repoId }: DoraMetricsDashboardProps) {
     return () => {
       active = false
     }
-  }, [repoId])
+  }, [repoId, startDate, endDate])
 
   if (loading) {
     return (

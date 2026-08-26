@@ -142,8 +142,16 @@ export async function getCycleTime(repoId: string | number): Promise<CycleTimeMe
   return request<CycleTimeMetrics>(client.get(`/metrics/repos/${repoId}/cycle-time`))
 }
 
-export async function getDoraMetrics(repoId: string | number): Promise<DoraMetrics> {
-  return request<DoraMetrics>(client.get(`/metrics/repos/${repoId}/dora`))
+export async function getDoraMetrics(
+  repoId: string | number,
+  startDate?: string,
+  endDate?: string
+): Promise<DoraMetrics> {
+  const params = new URLSearchParams()
+  if (startDate) params.set('start_date', startDate)
+  if (endDate) params.set('end_date', endDate)
+  const qs = params.toString()
+  return request<DoraMetrics>(client.get(`/metrics/repos/${repoId}/dora${qs ? `?${qs}` : ''}`))
 }
 
 export async function getTeamHealthMetrics(repoId: string | number): Promise<TeamHealthMetrics> {

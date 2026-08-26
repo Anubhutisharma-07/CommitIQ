@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException
+from datetime import datetime
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database import get_db
@@ -22,12 +24,19 @@ async def get_cycle_time(repo_id: int, db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/repos/{repo_id}/dora")
-async def get_dora_metrics(repo_id: int, db: AsyncSession = Depends(get_db)):
+async def get_dora_metrics(
+    repo_id: int,
+    start_date: datetime | None = Query(None),
+    end_date: datetime | None = Query(None),
+    db: AsyncSession = Depends(get_db),
+):
     repo = await db.get(Repo, repo_id)
     if not repo:
         raise HTTPException(status_code=404, detail="Repository not found")
 
-    metrics = await compute_dora_metrics(db, repo_id)
+    metrics = await compute_dora_metrics(
+        db, repo_id, start_date=start_date, end_date=end_date
+    )
     return metrics
 
 
