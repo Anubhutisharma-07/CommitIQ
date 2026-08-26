@@ -167,6 +167,8 @@ Missing but obviously needed:
 - 2026-07-25: Implemented custom time range selector for Commit Timeline and Hotspots (#223), allowing users to filter codebase health data by preset intervals (7d, 30d, 1y, All Time) or custom start/end dates.
 - 2026-07-26: Added contributor identity resolution for bus factor calculations. Introduced `ContributorIdentityResolver` with `.mailmap` support and normalized contributor identities before both `git blame` and fallback commit-history aggregation to prevent duplicate contributor aliases from distorting ownership metrics.
 - 2026-07-31: Implemented 3-attempt transaction retry helper (commit_with_retry) and busy timeout connection parameter adjustments (timeout=30, PRAGMA busy_timeout=30000) to resolve transient SQLite lock errors during concurrent ingestion runs (#259).
+- 2026-08-26: Added metric explanation tooltips for Bus Factor, Churn, and Cyclomatic Complexity metrics across dashboard cards (#265).
+- 2026-08-26: Made Hotspot Map and Knowledge Graph Explorer components responsive on mobile viewports (#377).
 - 2026-08-26: Created unified PDF report export for developer health and repository maintainability metrics (#389).
 
 ## Test coverage status
@@ -282,6 +284,7 @@ Health endpoint:
 
 GET /health now includes a scheduler key with{ running, enabled, jobs: [{ id, name, next_run_time }] } sooperators can verify the scheduler is active via a single curl.
 
+<<<<<<< HEAD
 Unified PDF Report Export (Issue #389)
 A backend service that generates a clean PDF report aggregating DORA,Cycle Time, and Team Health metrics for any repository.
 
@@ -296,3 +299,26 @@ backend/requirements.txt now includes reportlab>=4.0.0.
 Testing:
 
 backend/tests/test_pdf_report.py covers: service raisesValueError for missing repo, returns valid %PDF bytes, PDFcontent includes section labels, router returns 404 for missing repo,router returns 200 + application/pdf with correct headers for avalid repo.
+=======
+- fix: make the hotspot map and knowledge graph responsive on mobile devices (#377). Made the canvas container, treemap wrapper, sidebars, stats overlay, and playback controls fully responsive across narrow viewports without horizontal overflow.
+- docs: update project brain after mobile responsiveness fix (#377). Recorded responsive layout adjustments for HotspotMap and GraphExplorer, and updated test coverage.
+
+### Mobile Responsiveness for Hotspot Map & Knowledge Graph (Issue #377)
+- **Problem**: On small mobile devices (viewports < 768px down to 320px), the Hotspot Treemap and ForceGraph2D canvas containers caused horizontal page overflow, unconstrained sidebar widths, and clipped overlay badges.
+- **Implementation**:
+  - `HotspotMap.tsx`:
+    - Added responsive bounding classes (`w-full max-w-full overflow-hidden min-w-0`, `p-4 sm:p-5`, `rounded-[24px] sm:rounded-[28px]`).
+    - Made the risk category legend wrap cleanly on narrow screens (`flex-wrap gap-2 sm:gap-3`).
+    - Adjusted `HotspotCell` text scaling (`Math.min(Math.max(width / 8, 8), 11)`) and size gating (`width > 36 && height > 18`) to preserve label visibility without overflow.
+    - Added constrained tooltip max-width on mobile (`max-w-[240px] sm:max-w-[280px] truncate`).
+    - Configured responsive pagination controls with vertical stacking on small screens (`flex-col sm:flex-row`).
+  - `GraphExplorer.tsx`:
+    - Set default initial canvas dimensions to a mobile-safe `{ width: 300, height: 420 }` prior to `ResizeObserver` measurement.
+    - Added `w-full max-w-full overflow-hidden min-w-0` to the knowledge graph wrapper and canvas viewport (`min-h-[420px] sm:min-h-[580px]`).
+    - Made the top floating stats HUD responsive with compact mobile padding, typography, and positioning (`top-3 sm:top-4 right-3 sm:right-4 left-3 sm:left-auto max-w-[calc(100%-24px)] sm:max-w-none`).
+    - Constrained left and right sidebars on small screens (`w-[calc(100%-24px)] max-w-xs sm:w-72` and `w-[calc(100%-24px)] max-w-sm sm:w-80`).
+    - Refactored bottom commit playback bar for responsive column-to-row wrapping (`flex-col lg:flex-row`).
+- **Testing**:
+  - Expanded `HotspotMap.test.tsx` with unit tests for empty states, risk badges, and pagination under responsive layouts.
+  - Verified with full test suite (`npm run test`, 16 test files, 78 tests passing).
+>>>>>>> origin/main

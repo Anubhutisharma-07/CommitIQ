@@ -26,6 +26,7 @@ import { TimeRangeSelector, type TimeRangePreset } from '../components/TimeRange
 import { HealthBadge } from '../components/ui/HealthBadge'
 import { ThemeToggle } from '../components/ui/ThemeToggle'
 import { ScrollToTop } from '../components/ui/ScrollToTop'
+import { MetricTooltip } from '../components/ui/MetricTooltip'
 import {
   Layers,
   Compass,
@@ -505,18 +506,42 @@ export default function DashboardPage() {
                     unit:
                       selected.avg_complexity === 0 ? 'no code changed' : 'Avg cyclomatic score',
                     icon: <BarChart2 className="w-4.5 h-4.5 text-rose-400" />,
+                    tooltipTitle: 'Cyclomatic Complexity',
+                    tooltipDescription:
+                      'Measures structural code complexity by counting linearly independent execution paths through functions. Lower complexity indicates more readable, testable, and maintainable code.',
+                    tooltipFormula:
+                      'M = E - N + 2P. Subscore = max(0, 100 - min(avg_complexity × 5, 100)), with a 10-point deduction if complexity jumped >20% from the prior commit.',
+                    tooltipWeight: '25% of Health Score',
+                    tooltipThresholds: '≤ 5.0 healthy, 5.1–10.0 moderate, > 10.0 high risk',
+                    tooltipAlign: 'left' as const,
                   },
                   {
                     label: 'Commit Churn',
                     value: `${selectedChurnPct.toFixed(0)}%`,
                     unit: `${selected.num_files_changed} modified components`,
                     icon: <Activity className="w-4.5 h-4.5 text-sky-400" />,
+                    tooltipTitle: 'Commit Churn Rate',
+                    tooltipDescription:
+                      'Measures code volatility by calculating the percentage of modified lines (insertions and deletions) relative to total codebase size. High churn suggests large or volatile modifications.',
+                    tooltipFormula:
+                      'Churn Rate = (insertions + deletions) / total_loc. Subscore = max(0, 100 - (churn_rate × 100)), with a 15-point penalty if changes touch persistent hotspot files.',
+                    tooltipWeight: '20% of Health Score',
+                    tooltipThresholds: '< 25% healthy, 25%–50% moderate, > 50% high volatility',
+                    tooltipAlign: 'center' as const,
                   },
                   {
                     label: 'Minimum Bus Factor',
                     value: String(selected.bus_factor_min),
                     unit: 'Crucial owners limit',
                     icon: <Compass className="w-4.5 h-4.5 text-emerald-400" />,
+                    tooltipTitle: 'Minimum Bus Factor',
+                    tooltipDescription:
+                      'The minimum number of key contributors whose sudden departure would cause critical knowledge loss for a repository module. A bus factor of 1 represents a single point of failure.',
+                    tooltipFormula:
+                      'Subscore = min(bus_factor_min × 20, 100). Minimum bus factor ≤ 1 is critical risk, 2 is high risk, and ≥ 5 is considered resilient.',
+                    tooltipWeight: '20% of Health Score',
+                    tooltipThresholds: '1 critical, 2 high risk, 3–4 moderate, ≥ 5 resilient',
+                    tooltipAlign: 'center' as const,
                   },
                   {
                     label: 'Semantic Drift',
@@ -527,6 +552,14 @@ export default function DashboardPage() {
                         ? 'GraphCodeBERT'
                         : undefined,
                     icon: <Layers className="w-4.5 h-4.5 text-purple-400" />,
+                    tooltipTitle: 'Semantic Drift',
+                    tooltipDescription:
+                      'Measures semantic alignment between the developer\'s commit message intent and the actual code diff modifications using NLP embeddings (e.g. GraphCodeBERT).',
+                    tooltipFormula:
+                      'Subscore = max(0, min(semantic_health_score, 100)) based on cosine similarity and semantic distance between intent and code changes.',
+                    tooltipWeight: '20% of Health Score',
+                    tooltipThresholds: '≥ 80 aligned, 60–79 minor drift, < 60 high semantic drift',
+                    tooltipAlign: 'right' as const,
                   },
                 ].map((metric) => (
                   <div
@@ -534,12 +567,20 @@ export default function DashboardPage() {
                     className="bg-white/5 border border-white/5 hover:border-white/10 rounded-[20px] p-5 transition-all shadow-inner"
                   >
                     <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <span className="font-head text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="font-head text-[10px] text-slate-400 font-semibold uppercase tracking-wider truncate">
                           {metric.label}
                         </span>
+                        <MetricTooltip
+                          title={metric.tooltipTitle}
+                          description={metric.tooltipDescription}
+                          formula={metric.tooltipFormula}
+                          weight={metric.tooltipWeight}
+                          thresholds={metric.tooltipThresholds}
+                          align={metric.tooltipAlign}
+                        />
                         {metric.badge && (
-                          <span className="inline-flex items-center gap-1 text-[8px] px-1.5 py-0.5 rounded-full bg-purple-500/10 text-purple-300 border border-purple-500/20 font-mono uppercase">
+                          <span className="inline-flex items-center gap-1 text-[8px] px-1.5 py-0.5 rounded-full bg-purple-500/10 text-purple-300 border border-purple-500/20 font-mono uppercase flex-shrink-0">
                             <span className="w-1 h-1 rounded-full bg-purple-400" />
                             {metric.badge}
                           </span>

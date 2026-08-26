@@ -4,6 +4,7 @@ import { getCommitDetail, getHealthTimeline, getRepoBySlug } from '../lib/api'
 import { GraphExplorer } from '../components/GraphExplorer'
 import { GraphDiffPanel } from '../components/GraphDiffPanel'
 import { ThemeToggle } from '../components/ui/ThemeToggle'
+import { MetricTooltip } from '../components/ui/MetricTooltip'
 import { NarrativeCard } from '../components/NarrativeCard'
 import { getHealthColor } from '../types'
 import { sanitizeCommitMessage } from '../lib/utils'
@@ -114,24 +115,48 @@ export default function CommitDetailPage() {
               value: snapshot.avg_complexity === 0 ? '-' : snapshot.avg_complexity.toFixed(1),
               unit: snapshot.avg_complexity === 0 ? 'no code files changed' : 'cyclomatic score',
               icon: <Cpu className="w-4 h-4 text-rose-400" />,
+              tooltipTitle: 'Average Cyclomatic Complexity',
+              tooltipDescription:
+                'Average linearly independent execution paths across modified code files. Lower values signify more maintainable logic.',
+              tooltipFormula:
+                'M = E - N + 2P. Subscore = max(0, 100 - min(avg_complexity × 5, 100)).',
+              tooltipWeight: '25% of Health Score',
+              tooltipAlign: 'left' as const,
             },
             {
               label: 'Max Complexity',
               value: snapshot.max_complexity.toFixed(1),
               unit: 'single file limit',
               icon: <Cpu className="w-4 h-4 text-orange-400" />,
+              tooltipTitle: 'Maximum File Complexity',
+              tooltipDescription:
+                'Highest cyclomatic complexity observed in any single modified file within this snapshot.',
+              tooltipFormula: 'max(file_cyclomatic_scores)',
+              tooltipAlign: 'center' as const,
             },
             {
               label: 'Commit Churn',
               value: `${churnPct.toFixed(0)}%`,
               unit: `${snapshot.insertions || 0} + / ${snapshot.deletions || 0} -`,
               icon: <Flame className="w-4 h-4 text-sky-400" />,
+              tooltipTitle: 'Commit Churn Rate',
+              tooltipDescription:
+                'Ratio of total line modifications (additions + deletions) to codebase size.',
+              tooltipFormula: 'Churn Rate = (insertions + deletions) / total_loc',
+              tooltipWeight: '20% of Health Score',
+              tooltipAlign: 'center' as const,
             },
             {
               label: 'Bus Factor',
               value: String(snapshot.bus_factor_min),
               unit: 'contributor pool',
               icon: <Users className="w-4 h-4 text-emerald-400" />,
+              tooltipTitle: 'Bus Factor (Minimum)',
+              tooltipDescription:
+                'Minimum number of vital contributors whose absence threatens module knowledge continuity.',
+              tooltipFormula: 'Subscore = min(bus_factor_min × 20, 100)',
+              tooltipWeight: '20% of Health Score',
+              tooltipAlign: 'center' as const,
             },
             {
               label: 'Semantic Drift',
@@ -141,6 +166,12 @@ export default function CommitDetailPage() {
                   ? 'GraphCodeBERT'
                   : 'offline semantic',
               icon: <Sparkles className="w-4 h-4 text-purple-400" />,
+              tooltipTitle: 'Semantic Drift',
+              tooltipDescription:
+                'Semantic distance between the commit message and actual code diff embeddings.',
+              tooltipFormula: 'Cosine similarity between commit message and diff patch tokens.',
+              tooltipWeight: '20% of Health Score',
+              tooltipAlign: 'right' as const,
             },
           ].map((metric) => (
             <div
@@ -148,9 +179,18 @@ export default function CommitDetailPage() {
               className="glass-panel rounded-[24px] p-5 shadow-2xl border border-white/10 hover:border-white/15 transition-all flex flex-col justify-between"
             >
               <div className="flex items-center justify-between text-slate-400 mb-2">
-                <span className="font-head text-[10px] font-semibold uppercase tracking-wider">
-                  {metric.label}
-                </span>
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="font-head text-[10px] font-semibold uppercase tracking-wider truncate">
+                    {metric.label}
+                  </span>
+                  <MetricTooltip
+                    title={metric.tooltipTitle}
+                    description={metric.tooltipDescription}
+                    formula={metric.tooltipFormula}
+                    weight={metric.tooltipWeight}
+                    align={metric.tooltipAlign}
+                  />
+                </div>
                 {metric.icon}
               </div>
               <div className="font-head text-[32px] font-extralight text-white tracking-tight Outfit my-1">
