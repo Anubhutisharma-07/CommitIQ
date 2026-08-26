@@ -28,19 +28,35 @@ from backend.features.metrics.cycle_time import compute_cycle_time_metrics
 from backend.features.metrics.dora import compute_dora_metrics
 from backend.features.metrics.team_health import compute_team_health
 from backend.shared.models import HealthSnapshot, Repo
-from reportlab.lib import colors
-from reportlab.lib.enums import TA_CENTER
-from reportlab.lib.pagesizes import letter
-from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
-from reportlab.lib.units import inch
-from reportlab.platypus import (
-    Paragraph,
-    SimpleDocTemplate,
-    Spacer,
-    Table,
-    TableStyle,
-)
-from reportlab.platypus.flowables import HRFlowable
+try:
+    from reportlab.lib import colors
+    from reportlab.lib.enums import TA_CENTER
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+    from reportlab.lib.units import inch
+    from reportlab.platypus import (
+        Paragraph,
+        SimpleDocTemplate,
+        Spacer,
+        Table,
+        TableStyle,
+    )
+    from reportlab.platypus.flowables import HRFlowable
+    HAS_REPORTLAB = True
+except ImportError:
+    HAS_REPORTLAB = False
+    colors = None
+    TA_CENTER = None
+    letter = None
+    ParagraphStyle = None
+    getSampleStyleSheet = None
+    inch = None
+    Paragraph = None
+    SimpleDocTemplate = None
+    Spacer = None
+    Table = None
+    TableStyle = None
+    HRFlowable = None
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -49,16 +65,21 @@ logger = logging.getLogger(__name__)
 
 # ── Colour helpers ────────────────────────────────────────────────
 
-_SCORE_COLORS = {
-    "Elite": colors.HexColor("#10b981"),
-    "High": colors.HexColor("#3b82f6"),
-    "Medium": colors.HexColor("#f59e0b"),
-    "Low": colors.HexColor("#ef4444"),
-}
+if HAS_REPORTLAB:
+    _SCORE_COLORS = {
+        "Elite": colors.HexColor("#10b981"),
+        "High": colors.HexColor("#3b82f6"),
+        "Medium": colors.HexColor("#f59e0b"),
+        "Low": colors.HexColor("#ef4444"),
+    }
+else:
+    _SCORE_COLORS = {}
 
 
-def _score_color(score: str) -> colors.Color:
+def _score_color(score: str) -> Any:
     """Return a ReportLab colour for a DORA-style score label."""
+    if not HAS_REPORTLAB:
+        return None
     return _SCORE_COLORS.get(score, colors.HexColor("#6b7280"))
 
 
@@ -219,6 +240,9 @@ async def generate_health_report(
 
     Returns a tuple of ``(pdf_bytes, filename)``.
     """
+    if not HAS_REPORTLAB:
+        raise RuntimeError("ReportLab dependency is not installed")
+
     repo = await db.get(Repo, repo_id)
     if not repo:
         raise ValueError(f"Repository {repo_id} not found")

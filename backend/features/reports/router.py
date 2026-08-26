@@ -49,6 +49,12 @@ async def get_health_report(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Repository not found.",
         ) from exc
+    except RuntimeError as exc:
+        logger.warning("ReportLab dependency missing: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail="PDF generation is unavailable because reportlab is not installed.",
+        ) from exc
     except Exception:
         logger.exception("Failed to generate PDF report")
         raise HTTPException(
