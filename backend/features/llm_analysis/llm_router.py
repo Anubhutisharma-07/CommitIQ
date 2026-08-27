@@ -1,4 +1,5 @@
 """Multi-provider LLM routing for CommitIQ narratives."""
+
 from __future__ import annotations
 
 import asyncio
@@ -12,6 +13,22 @@ logger = logging.getLogger(__name__)
 
 ANTHROPIC_MODEL = "claude-3-5-sonnet-20241022"
 GEMINI_MODEL = "gemini-2.5-flash"
+
+try:
+    import pybreaker
+
+    llm_breaker = pybreaker.CircuitBreaker(fail_max=3, reset_timeout=60)
+    CircuitBreakerError = pybreaker.CircuitBreakerError
+except ImportError:
+    pybreaker = None
+
+    def _dummy_decorator(func):
+        return func
+
+    llm_breaker = _dummy_decorator
+
+    class CircuitBreakerError(Exception):
+        pass
 
 
 class LLMProvider(str, Enum):
@@ -44,41 +61,42 @@ def model_for_provider(provider: LLMProvider | str) -> str:
     return "none"
 
 
-def provider_from_model(model_used: str | None) -> str:
-    model = (model_used or "").lower()
-    if "gemini" in model:
-        return LLMProvider.GEMINI.value
-    if "claude" in model or "anthropic" in model:
-        return LLMProvider.ANTHROPIC.value
-    if "cache" in model:
-        return "cache"
-    return LLMProvider.NONE.value
-
-
 async def stream_narrative(
     prompt: str,
     max_tokens: int = 600,
 ) -> AsyncGenerator[tuple[str, LLMProvider], None]:
     """Stream narrative tokens from Claude first, then Gemini fallback."""
-    if ANTHROPIC_API_KEY:
-        try:
-            async for token in _stream_anthropic(prompt, max_tokens):
-                yield token, LLMProvider.ANTHROPIC
-            return
-        except Exception as exc:
-            logger.warning("Anthropic failed, trying Gemini fallback: %s", exc)
+    try:
+        if ANTHROPIC_API_KEY:
+            try:
+                async for token in _stream_anthropic(prompt, max_tokens):
+                    yield token, LLMProvider.ANTHROPIC
+                return
+            except pybreaker.CircuitBreakerError:
+                raise  # Let the outer try-except handle breaker errors
+            except Exception as exc:
+                logger.warning("Anthropic failed, trying Gemini fallback: %s", exc)
 
-    if GEMINI_API_KEY:
-        try:
-            async for token in _stream_gemini(prompt, max_tokens):
-                yield token, LLMProvider.GEMINI
-            return
-        except Exception as exc:
-            logger.error("Gemini fallback failed: %s", exc)
+        if GEMINI_API_KEY:
+            try:
+                async for token in _stream_gemini(prompt, max_tokens):
+                    yield token, LLMProvider.GEMINI
+                return
+            except pybreaker.CircuitBreakerError:
+                raise
+            except Exception as exc:
+                logger.error("Gemini fallback failed: %s", exc)
 
-    raise RuntimeError("All LLM providers unavailable. Configure ANTHROPIC_API_KEY or GEMINI_API_KEY.")
+        raise RuntimeError(
+            "All LLM providers unavailable. Configure ANTHROPIC_API_KEY or GEMINI_API_KEY."
+        )
+    except pybreaker.CircuitBreakerError:
+        logger.error("LLM circuit breaker open. APIs temporarily degraded.")
+        fallback_msg = "AI services are temporarily degraded due to high failure rates. Please try again later.\n\nRisk level: Unknown"
+        yield fallback_msg, LLMProvider.NONE
 
 
+@llm_breaker
 async def _stream_anthropic(prompt: str, max_tokens: int) -> AsyncGenerator[str, None]:
     import anthropic
 
@@ -93,6 +111,7 @@ async def _stream_anthropic(prompt: str, max_tokens: int) -> AsyncGenerator[str,
             yield text
 
 
+@llm_breaker
 async def _stream_gemini(prompt: str, max_tokens: int) -> AsyncGenerator[str, None]:
     import google.generativeai as genai
 
@@ -127,7 +146,9 @@ async def _stream_gemini(prompt: str, max_tokens: int) -> AsyncGenerator[str, No
             yield text
 
 
-async def get_narrative_non_streaming(prompt: str, max_tokens: int = 600) -> tuple[str, LLMProvider]:
+async def get_narrative_non_streaming(
+    prompt: str, max_tokens: int = 600
+) -> tuple[str, LLMProvider]:
     full_text: list[str] = []
     provider_used = LLMProvider.NONE
     async for token, provider in stream_narrative(prompt, max_tokens):

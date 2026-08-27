@@ -1,6 +1,5 @@
 import axios, { AxiosError } from 'axios'
 import type {
-  ApiError,
   BusFactorWrapper,
   CommitDetailResponse,
   GraphResponse,
@@ -15,6 +14,11 @@ import type {
   PredictRequest,
   Repo,
   TimelineResponse,
+  CycleTimeMetrics,
+  DoraMetrics,
+  TeamHealthMetrics,
+  CodeQualityMetrics,
+  RepoCompareResponse,
 } from '../types'
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '')
@@ -26,13 +30,28 @@ const client = axios.create({
   timeout: 30000,
 })
 
+interface ErrorDetailItem {
+  msg?: string
+  detail?: string
+}
+
 function normalizeError(error: unknown): Error {
   if (axios.isAxiosError(error)) {
-    const axiosError = error as AxiosError<ApiError | string>
+    const axiosError = error as AxiosError<Record<string, unknown>>
     const data = axiosError.response?.data
     if (typeof data === 'string') return new Error(data)
-    if (data?.detail) return new Error(data.detail)
-    if (data?.message) return new Error(data.message)
+    if (data && typeof data === 'object') {
+      if ('detail' in data) {
+        if (typeof data.detail === 'string') return new Error(data.detail)
+        if (Array.isArray(data.detail)) {
+          const msgs = (data.detail as ErrorDetailItem[])
+            .map((d: ErrorDetailItem) => d.msg?.replace(/^Value error,\s*/, '') || d.detail)
+            .filter((val): val is string => Boolean(val))
+          if (msgs.length > 0) return new Error(msgs.join('; '))
+        }
+      }
+      if ('message' in data && typeof data.message === 'string') return new Error(data.message)
+    }
     return new Error(axiosError.message)
   }
   return error instanceof Error ? error : new Error('Unexpected API error')
@@ -47,28 +66,64 @@ async function request<T>(promise: Promise<{ data: T }>): Promise<T> {
   }
 }
 
-export async function ingestRepo(url: string, maxCommits?: number): Promise<IngestResponse> {
+export async function listRepos(slug?: string): Promise<Repo[]> {
+  return request<Repo[]>(client.get('/repos', { params: slug ? { slug } : undefined }))
+}
+
+export async function ingestRepo(
+  url: string,
+  maxCommits?: number,
+  branch?: string
+): Promise<IngestResponse> {
   return request<IngestResponse>(
-    client.post('/repos/ingest', { repo_url: url, max_commits: maxCommits || 500 })
+    client.post('/repos/ingest', { repo_url: url, max_commits: maxCommits || 500, branch })
   )
+}
+
+export async function rescanRepo(repoId: string | number): Promise<IngestResponse> {
+  return request<IngestResponse>(client.post(`/repos/${repoId}/rescan`))
 }
 
 export async function getRepoBySlug(slug: string): Promise<Repo> {
   return request<Repo>(client.get(`/repos/by-slug/${slug}`))
 }
 
+export async function compareRepos(
+  baseSlug: string,
+  headSlug: string
+): Promise<RepoCompareResponse> {
+  return request<RepoCompareResponse>(
+    client.get('/repos/compare', { params: { base: baseSlug, head: headSlug } })
+  )
+}
+
 export async function getRepo(repoId: string | number): Promise<Repo> {
   return request<Repo>(client.get(`/repos/${repoId}`))
 }
 
-export async function getHealthTimeline(repoId: string | number): Promise<HealthSnapshot[]> {
-  const data = await request<TimelineResponse>(client.get(`/repos/${repoId}/timeline`))
+export async function deleteRepo(repoId: string | number): Promise<void> {
+  return request<void>(client.delete(`/repos/${repoId}`))
+}
+
+export async function getHealthTimeline(
+  repoId: string | number,
+  startDate?: string,
+  endDate?: string
+): Promise<HealthSnapshot[]> {
+  const params: Record<string, string> = {}
+  if (startDate) params.start_date = startDate
+  if (endDate) params.end_date = endDate
+  const data = await request<TimelineResponse>(
+    client.get(`/repos/${repoId}/timeline`, {
+      params: Object.keys(params).length ? params : undefined,
+    })
+  )
   return data.commits
 }
 
 export async function getCommitDetail(
   repoId: string | number,
-  sha: string,
+  sha: string
 ): Promise<CommitDetailResponse> {
   return request<CommitDetailResponse>(client.get(`/repos/${repoId}/commit/${sha}`))
 }
@@ -83,10 +138,26 @@ export async function getBusFactor(repoId: string | number): Promise<BusFactorWr
   return request<BusFactorWrapper>(client.get(`/repos/${repoId}/bus-factor`))
 }
 
+export async function getCycleTime(repoId: string | number): Promise<CycleTimeMetrics> {
+  return request<CycleTimeMetrics>(client.get(`/metrics/repos/${repoId}/cycle-time`))
+}
+
+export async function getDoraMetrics(repoId: string | number): Promise<DoraMetrics> {
+  return request<DoraMetrics>(client.get(`/metrics/repos/${repoId}/dora`))
+}
+
+export async function getTeamHealthMetrics(repoId: string | number): Promise<TeamHealthMetrics> {
+  return request<TeamHealthMetrics>(client.get(`/metrics/repos/${repoId}/team-health`))
+}
+
+export async function getCodeQualityMetrics(repoId: string | number): Promise<CodeQualityMetrics> {
+  return request<CodeQualityMetrics>(client.get(`/metrics/repos/${repoId}/code-quality`))
+}
+
 export async function getGraphDiff(
   repoId: string | number,
   shaBefore: string,
-  shaAfter: string,
+  shaAfter: string
 ): Promise<GraphDiffResponse> {
   return request<GraphDiffResponse>(
     client.get(`/repos/${repoId}/graph/diff`, {
@@ -95,9 +166,20 @@ export async function getGraphDiff(
   )
 }
 
-export async function getHotspots(repoId: string | number, sha?: string): Promise<HotspotResponse> {
+export async function getHotspots(
+  repoId: string | number,
+  sha?: string,
+  limit?: number,
+  offset?: number
+): Promise<HotspotResponse> {
+  const params: Record<string, unknown> = {}
+  if (sha) params.sha = sha
+  if (limit !== undefined) params.limit = limit
+  if (offset !== undefined) params.offset = offset
   return request<HotspotResponse>(
-    client.get(`/repos/${repoId}/hotspots`, { params: sha ? { sha } : undefined })
+    client.get(`/repos/${repoId}/hotspots`, {
+      params: Object.keys(params).length > 0 ? params : undefined,
+    })
   )
 }
 
@@ -135,7 +217,7 @@ export async function cancelIngest(repoId: string | number): Promise<IngestStatu
 export async function streamNarrative(
   repoId: string | number,
   sha: string,
-  onChunk: (chunk: NarrativeStreamChunk) => void,
+  onChunk: (chunk: NarrativeStreamChunk) => void
 ): Promise<void> {
   const response = await fetch(`${API_ROOT}/explain/stream`, {
     method: 'POST',
