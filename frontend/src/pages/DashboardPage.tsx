@@ -13,6 +13,8 @@ import { NarrativeCard } from '../components/NarrativeCard'
 import { HealthBadge } from '../components/ui/HealthBadge'
 import { ThemeToggle } from '../components/ui/ThemeToggle'
 import { Layers, Compass, BarChart2, Activity, GitBranch } from 'lucide-react'
+import { ErrorBoundary } from '../components/ErrorBoundary'
+
 
 export default function DashboardPage() {
   const { repoSlug = '' } = useParams<{ repoSlug: string }>()
@@ -155,44 +157,50 @@ export default function DashboardPage() {
           </div>
 
           <div className="p-5 border-b border-white/5 bg-white/[0.01]">
-            <CostMeter usage={usageState.data} loading={usageState.isLoading} error={usageState.error?.message} />
+            <ErrorBoundary>
+              <CostMeter usage={usageState.data} loading={usageState.isLoading} error={usageState.error?.message} />
+            </ErrorBoundary>
           </div>
 
           <div className="flex-grow overflow-hidden pt-5">
-            <CommitList 
-              commits={commits} 
-              repoSlug={repo.repo_slug} 
-              selectedSha={selected?.sha || null} 
-              onSelect={(commit) => {
-                setSelected(commit)
-                setIsSidebarOpen(false)
-              }} 
-            />
+            <ErrorBoundary>
+              <CommitList 
+                commits={commits} 
+                repoSlug={repo.repo_slug} 
+                selectedSha={selected?.sha || null} 
+                onSelect={(commit) => {
+                  setSelected(commit)
+                  setIsSidebarOpen(false)
+                }} 
+              />
+            </ErrorBoundary>
           </div>
         </aside>
 
         <main className="flex-grow overflow-y-auto p-4 sm:p-6 space-y-6 relative z-10">
-          {timelineState.isLoading ? (
-            <div className="glass-panel rounded-[28px] p-6 h-64 flex items-center justify-center text-slate-400 border border-white/10">
-              <Activity className="w-6 h-6 text-purple-400 animate-spin mr-2" />
-              <span className="text-xs font-medium animate-pulse">Loading health timeline...</span>
-            </div>
-          ) : timelineState.error ? (
-            <div className="glass-panel rounded-[28px] p-6 text-rose-300 border border-rose-500/20 bg-rose-500/10">
-              Could not load architectural health timeline datasets.
-            </div>
-          ) : commits.length === 0 ? (
-            <div className="glass-panel rounded-[28px] p-6 text-slate-500">
-              No analyzed commits are currently compiled for this repository workspace.
-            </div>
-          ) : (
-            <HealthTimeline 
-              commits={commits} 
-              repoSlug={repo.repo_slug} 
-              selectedSha={selected?.sha} 
-              onSelectCommit={setSelected} 
-            />
-          )}
+          <ErrorBoundary>
+            {timelineState.isLoading ? (
+              <div className="glass-panel rounded-[28px] p-6 h-64 flex items-center justify-center text-slate-400 border border-white/10">
+                <Activity className="w-6 h-6 text-purple-400 animate-spin mr-2" />
+                <span className="text-xs font-medium animate-pulse">Loading health timeline...</span>
+              </div>
+            ) : timelineState.error ? (
+              <div className="glass-panel rounded-[28px] p-6 text-rose-300 border border-rose-500/20 bg-rose-500/10">
+                Could not load architectural health timeline datasets.
+              </div>
+            ) : commits.length === 0 ? (
+              <div className="glass-panel rounded-[28px] p-6 text-slate-500">
+                No analyzed commits are currently compiled for this repository workspace.
+              </div>
+            ) : (
+              <HealthTimeline 
+                commits={commits} 
+                repoSlug={repo.repo_slug} 
+                selectedSha={selected?.sha} 
+                onSelectCommit={setSelected} 
+              />
+            )}
+          </ErrorBoundary>
 
           {selected && (
             <div className="glass-panel rounded-[28px] p-6 shadow-2xl relative border border-white/10 overflow-hidden">
@@ -321,36 +329,44 @@ export default function DashboardPage() {
                 </div>
               )}
               <div className="mt-4">
-                <NarrativeCard repoId={repoId as number} commitSha={selected.sha} />
+                <ErrorBoundary>
+                  <NarrativeCard repoId={repoId as number} commitSha={selected.sha} />
+                </ErrorBoundary>
               </div>
             </div>
           )}
 
           <div className="w-full">
-            {graphState.error ? (
-              <div className="glass-panel rounded-[28px] p-6 text-rose-300 border border-rose-500/20 bg-rose-500/10">
-                Could not construct software import dependency landscape.
-              </div>
-            ) : (
-              <GraphExplorer 
-                graphData={graphState.data} 
-                selectedSha={selected?.sha || null} 
-                commits={commits}
-                onSelectCommit={setSelected}
-              />
-            )}
+            <ErrorBoundary>
+              {graphState.error ? (
+                <div className="glass-panel rounded-[28px] p-6 text-rose-300 border border-rose-500/20 bg-rose-500/10">
+                  Could not construct software import dependency landscape.
+                </div>
+              ) : (
+                <GraphExplorer 
+                  graphData={graphState.data} 
+                  selectedSha={selected?.sha || null} 
+                  commits={commits}
+                  onSelectCommit={setSelected}
+                />
+              )}
+            </ErrorBoundary>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-            {busState.error ? (
-              <div className="glass-panel rounded-[28px] p-6 text-rose-300 border border-rose-500/20 bg-rose-500/10">
-                Could not retrieve module ownership datasets.
-              </div>
-            ) : (
-              <BusFactorTable modules={busState.data?.modules || []} />
-            )}
+            <ErrorBoundary>
+              {busState.error ? (
+                <div className="glass-panel rounded-[28px] p-6 text-rose-300 border border-rose-500/20 bg-rose-500/10">
+                  Could not retrieve module ownership datasets.
+                </div>
+              ) : (
+                <BusFactorTable modules={busState.data?.modules || []} />
+              )}
+            </ErrorBoundary>
             
-            {repoId && <HotspotMap repoId={repoId} sha={selected?.sha || null} />}
+            <ErrorBoundary>
+              {repoId && <HotspotMap repoId={repoId} sha={selected?.sha || null} />}
+            </ErrorBoundary>
           </div>
         </main>
       </div>
