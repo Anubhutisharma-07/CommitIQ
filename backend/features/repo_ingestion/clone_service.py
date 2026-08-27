@@ -246,7 +246,7 @@ async def fetch_github_metadata(owner: str, repo: str) -> dict:
     if not re.fullmatch(r"^[a-zA-Z0-9_.-]{1,100}$", owner) or not re.fullmatch(
         r"^[a-zA-Z0-9_.-]{1,100}$", repo
     ):
-        return {"github_stars": None, "github_language": None, "github_description": None}
+        return {"github_stars": None, "github_language": None, "github_description": None, "default_branch": "main"}
 
     headers = {"Accept": "application/vnd.github+json"}
     if GITHUB_TOKEN:
@@ -266,10 +266,11 @@ async def fetch_github_metadata(owner: str, repo: str) -> dict:
                     "github_stars": data.get("stargazers_count"),
                     "github_language": data.get("language"),
                     "github_description": data.get("description", "")[:300],
+                    "default_branch": data.get("default_branch", "main"),
                 }
     except Exception as exc:
         logger.debug("Failed to fetch GitHub metadata: %s", exc)
-    return {"github_stars": None, "github_language": None, "github_description": None}
+    return {"github_stars": None, "github_language": None, "github_description": None, "default_branch": "main"}
 
 
 GITHUB_GRAPHQL_URL = "https://api.github.com/graphql"

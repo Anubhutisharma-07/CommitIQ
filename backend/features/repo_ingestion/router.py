@@ -1037,12 +1037,15 @@ async def ingest_repo(
             if not repo:
                 raise
     else:
+        metadata = await fetch_github_metadata(owner, repo_name)
         repo.url = url
         repo.name = f"{owner}/{repo_name}"
         repo.owner = owner
         repo.status = "pending"
         repo.error_message = None
         repo.max_commits_setting = max_c
+        for k, v in metadata.items():
+            setattr(repo, k, v)
 
     job = AnalysisJob(repo_id=repo.id, status="queued", triggered_by="user")
     db.add(job)
