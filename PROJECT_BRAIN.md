@@ -167,6 +167,7 @@ Missing but obviously needed:
 - 2026-07-25: Implemented custom time range selector for Commit Timeline and Hotspots (#223), allowing users to filter codebase health data by preset intervals (7d, 30d, 1y, All Time) or custom start/end dates.
 - 2026-07-26: Added contributor identity resolution for bus factor calculations. Introduced `ContributorIdentityResolver` with `.mailmap` support and normalized contributor identities before both `git blame` and fallback commit-history aggregation to prevent duplicate contributor aliases from distorting ownership metrics.
 - 2026-07-31: Implemented 3-attempt transaction retry helper (commit_with_retry) and busy timeout connection parameter adjustments (timeout=30, PRAGMA busy_timeout=30000) to resolve transient SQLite lock errors during concurrent ingestion runs (#259).
+- 2026-08-28: Added exclude_merges option to commit walker in git metrics extraction (#325).
 - 2026-08-28: Disabled submit button on landing page form when repository URL input is empty or invalid (#326).
 - 2026-08-26: Added metric explanation tooltips for Bus Factor, Churn, and Cyclomatic Complexity metrics across dashboard cards (#265).
 - 2026-08-26: Made Hotspot Map and Knowledge Graph Explorer components responsive on mobile viewports (#377).
@@ -323,6 +324,7 @@ backend/tests/test_pdf_report.py covers: service raisesValueError for missing re
   - Expanded `HotspotMap.test.tsx` with unit tests for empty states, risk badges, and pagination under responsive layouts.
   - Verified with full test suite (`npm run test`, 16 test files, 78 tests passing).
 
+<<<<<<< HEAD
 ### Landing Page Repository Name Validation (Issue #326)
 
 - **Problem**: The "Analyze" submit button on the Landing Page did not properly disable when the repository name input field was empty or consisted solely of spaces.
@@ -332,3 +334,6 @@ backend/tests/test_pdf_report.py covers: service raisesValueError for missing re
     - This ensures users cannot submit a blank repository for ingestion.
 - **Testing**:
   - Prettier formatting applied to ensure adherence to styling rules.
+=======
+> > > > > > > origin/main
+>>>>>>> origin/main
