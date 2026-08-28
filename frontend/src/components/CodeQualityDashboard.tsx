@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react'
 import { getCodeQualityMetrics } from '../lib/api'
 import type { CodeQualityMetrics } from '../types'
-import { Activity, Bot, RefreshCcw, ShieldAlert, Sparkles, Trash2 } from 'lucide-react'
+import { Bot, RefreshCcw, ShieldAlert, Sparkles, Trash2 } from 'lucide-react'
+import { CodeQualitySkeleton } from './CodeQualitySkeleton'
+
+export { CodeQualitySkeleton }
 
 interface CodeQualityDashboardProps {
   repoId: string | number
@@ -38,12 +41,7 @@ export function CodeQualityDashboard({ repoId }: CodeQualityDashboardProps) {
   }, [repoId])
 
   if (loading) {
-    return (
-      <div className="glass-panel rounded-[28px] overflow-hidden shadow-2xl relative border border-white/10 flex flex-col items-center justify-center h-[350px] animate-pulse">
-        <Activity className="w-8 h-8 text-cyan-400 mb-2" />
-        <span className="text-slate-400 text-sm">Analyzing Code Quality...</span>
-      </div>
-    )
+    return <CodeQualitySkeleton />
   }
 
   if (error || !metrics) {
