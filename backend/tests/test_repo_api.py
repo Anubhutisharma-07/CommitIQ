@@ -571,7 +571,7 @@ async def test_ingest_repo_schedules_created_job_by_id(
     job = db_session.session.get(AnalysisJob, response.job_id)
 
     assert scheduled_func is run_ingestion
-    assert args == (response.repo_id, response.job_id, 25, None)
+    assert args == (response.repo_id, response.job_id, 25, None, False)
     assert kwargs == {}
     assert job.status == "queued"
 
@@ -897,7 +897,7 @@ async def test_ingestion_rollback_preserves_old_data_on_mid_ingestion_failure(
     ]
     monkeypatch.setattr(
         "backend.features.repo_ingestion.router.walk_commits",
-        lambda path, max_commits: fake_history,
+        lambda path, max_commits, exclude_merges=False: fake_history,
     )
 
     from concurrent.futures import ThreadPoolExecutor
