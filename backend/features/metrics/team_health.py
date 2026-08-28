@@ -1,24 +1,46 @@
+import json
+import logging
 from collections import defaultdict
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.shared.models import Commit
+from backend.features.llm_analysis.cache import _get_redis
+
+logger = logging.getLogger(__name__)
 
 
 async def compute_team_health(db: AsyncSession, repo_id: int) -> dict:
+    redis_client = _get_redis()
+    cache_key = f"team_health:{repo_id}"
+    if redis_client:
+        try:
+            cached_data = await redis_client.get(cache_key)
+            if cached_data:
+                logger.info("Cache hit for team health repo_id=%s", repo_id)
+                return json.loads(cached_data)
+        except Exception as exc:
+            logger.warning("Failed to fetch cached team health: %s", exc)
+
     stmt = select(Commit).where(Commit.repo_id == repo_id)
     result = await db.execute(stmt)
     commits = result.scalars().all()
 
     if not commits:
-        return {
+        res = {
             "burnout_risk_score": "Low",
             "weekend_commits_percent": 0.0,
             "after_hours_commits_percent": 0.0,
             "context_switching_score": "Low",
             "avg_files_per_day": 0.0,
         }
+        if redis_client:
+            try:
+                await redis_client.set(cache_key, json.dumps(res), ex=3600)
+            except Exception as exc:
+                logger.warning("Failed to cache team health: %s", exc)
+        return res
 
     total_commits = len(commits)
     weekend_commits = 0
@@ -63,10 +85,18 @@ async def compute_team_health(db: AsyncSession, repo_id: int) -> dict:
     elif avg_files > 20:
         context_switch_score = "Medium"
 
-    return {
+    res = {
         "burnout_risk_score": burnout_score,
         "weekend_commits_percent": round(weekend_percent, 1),
         "after_hours_commits_percent": round(after_hours_percent, 1),
         "context_switching_score": context_switch_score,
         "avg_files_per_day": round(avg_files, 1),
     }
+
+    if redis_client:
+        try:
+            await redis_client.set(cache_key, json.dumps(res), ex=3600)
+        except Exception as exc:
+            logger.warning("Failed to cache team health: %s", exc)
+
+    return res

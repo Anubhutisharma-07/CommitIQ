@@ -217,7 +217,7 @@ export default function LandingPage() {
               </div>
               <button
                 onClick={handleSubmit}
-                disabled={loading}
+                disabled={loading || url.trim().length === 0}
                 className="px-6 py-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white font-semibold text-sm transition-all duration-300 disabled:opacity-40 disabled:hover:bg-white/10 disabled:cursor-not-allowed flex items-center gap-2 border border-white/5 active:scale-95"
               >
                 {loading ? (

@@ -31,14 +31,14 @@ _CACHE_DIR = Path(os.getenv("COMMITIQ_CACHE_DIR", "/tmp/commitiq_cache"))
 _CACHE_TTL_SECONDS = 86400  # 24 hours
 
 
-def _cache_path(repo_path: Path, limit: int) -> Path:
+def _cache_path(repo_path: Path, limit: int, exclude_merges: bool = False) -> Path:
     """Return the cache file path for a given repo_path + limit.
 
     The cache key is derived from the absolute repo_path and the commit
     limit so that different repos (or different depth clones of the same
     repo) get separate cache files.
     """
-    key_str = f"{repo_path.resolve()}:{limit}"
+    key_str = f"{repo_path.resolve()}:{limit}:{exclude_merges}"
     key_hash = hashlib.sha256(key_str.encode()).hexdigest()[:16]
     return _CACHE_DIR / f"commits_{key_hash}.json"
 
@@ -216,7 +216,9 @@ def stream_commit_diff_stats(
     return files_changed, total_insertions, total_deletions, rename_map
 
 
-def _walk_commits_uncached(repo_path: Path, limit: int) -> Iterator[dict]:
+def _walk_commits_uncached(
+    repo_path: Path, limit: int, exclude_merges: bool = False
+) -> Iterator[dict]:
     """
     Walk last `limit` commits from shallow clone.
     Yields commit metadata dicts. Does NOT checkout each commit
@@ -224,7 +226,10 @@ def _walk_commits_uncached(repo_path: Path, limit: int) -> Iterator[dict]:
     Metrics are computed from streamed git stats, not file inspection.
     """
     repo = git.Repo(repo_path)
-    commits = list(repo.iter_commits("HEAD", max_count=limit))
+    kwargs = {"max_count": limit}
+    if exclude_merges:
+        kwargs["no_merges"] = True
+    commits = list(repo.iter_commits("HEAD", **kwargs))
     commits.reverse()  # oldest → newest for timeline
 
     total = len(commits)
@@ -303,7 +308,7 @@ def _walk_commits_uncached(repo_path: Path, limit: int) -> Iterator[dict]:
         }
 
 
-def walk_commits(repo_path: Path, limit: int = 150) -> Iterator[dict]:
+def walk_commits(repo_path: Path, limit: int = 150, exclude_merges: bool = False) -> Iterator[dict]:
     """
     Walk last `limit` commits from shallow clone, with on-disk caching
     to avoid re-walking the git commit tree on rescans (issue #263).
@@ -320,7 +325,7 @@ def walk_commits(repo_path: Path, limit: int = 150) -> Iterator[dict]:
     Yields:
         Commit metadata dicts (same format as _walk_commits_uncached).
     """
-    cpath = _cache_path(repo_path, limit)
+    cpath = _cache_path(repo_path, limit, exclude_merges)
 
     # Issue #263: Try to load from cache first
     if _cache_is_valid(cpath):
@@ -330,7 +335,7 @@ def walk_commits(repo_path: Path, limit: int = 150) -> Iterator[dict]:
             return
 
     # Cache miss or invalid — walk the git tree
-    commits = list(_walk_commits_uncached(repo_path, limit))
+    commits = list(_walk_commits_uncached(repo_path, limit, exclude_merges))
 
     # Save to cache for future rescans
     if commits:
