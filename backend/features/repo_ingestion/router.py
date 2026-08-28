@@ -431,7 +431,11 @@ async def _latest_active_job(db: AsyncSession, repo_id: int) -> AnalysisJob | No
 
 
 async def run_ingestion(
-    repo_id: int, job_id: int, max_commits: int, branch: str | None = None
+    repo_id: int,
+    job_id: int,
+    max_commits: int,
+    branch: str | None = None,
+    exclude_merges: bool = False,
 ) -> None:
     from backend.database import AsyncSessionLocal
     from backend.features.repo_ingestion.metrics_extractor import (
@@ -480,7 +484,7 @@ async def run_ingestion(
 
         await _update_job(job_id, status="analyzing", current_stage="Walking commit history")
         await _raise_if_cancelled(job_id)
-        commit_history = list(walk_commits(clone_path, max_commits))
+        commit_history = list(walk_commits(clone_path, max_commits, exclude_merges))
         if not commit_history:
             raise RuntimeError("No commits were found in this repository.")
         await _update_job(job_id, total_commits=len(commit_history))
@@ -739,7 +743,7 @@ async def run_rescan(repo_id: int, job_id: int, max_commits: int) -> None:
 
         await _update_job(job_id, status="analyzing", current_stage="Checking for new commits")
         await _raise_if_cancelled(job_id)
-        commit_history = list(walk_commits(clone_path, max_commits))
+        commit_history = list(walk_commits(clone_path, max_commits, exclude_merges))
         if not commit_history:
             raise RuntimeError("No commits were found in this repository.")
 
@@ -1056,6 +1060,7 @@ async def ingest_repo(
         job.id,
         request.max_commits,
         request.branch,
+        request.exclude_merges,
     )
     return IngestResponse(
         repo_id=repo.id,

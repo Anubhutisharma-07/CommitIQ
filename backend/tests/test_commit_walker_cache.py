@@ -123,7 +123,7 @@ def test_walk_commits_writes_cache_on_first_call(tmp_path, monkeypatch):
     mock_data = _mock_commit_data(3)
 
     # Mock the uncached walk
-    def mock_walk(repo_path, limit):
+    def mock_walk(repo_path, limit, exclude_merges=False):
         yield from mock_data
 
     with patch(
@@ -152,7 +152,7 @@ def test_walk_commits_loads_from_cache_on_second_call(tmp_path, monkeypatch):
 
     walk_call_count = [0]
 
-    def mock_walk(repo_path, limit):
+    def mock_walk(repo_path, limit, exclude_merges=False):
         walk_call_count[0] += 1
         yield from mock_data
 
@@ -180,7 +180,7 @@ def test_walk_commits_rewalks_when_cache_expired(tmp_path, monkeypatch):
 
     walk_call_count = [0]
 
-    def mock_walk(repo_path, limit):
+    def mock_walk(repo_path, limit, exclude_merges=False):
         walk_call_count[0] += 1
         yield from mock_data
 
@@ -195,7 +195,7 @@ def test_walk_commits_rewalks_when_cache_expired(tmp_path, monkeypatch):
         # Expire the cache by setting mtime to past TTL
         import hashlib
 
-        key_str = f"{(tmp_path / 'fake_repo').resolve()}:150"
+        key_str = f"{(tmp_path / 'fake_repo').resolve()}:150:False"
         key_hash = hashlib.sha256(key_str.encode()).hexdigest()[:16]
         cache_file = tmp_path / f"commits_{key_hash}.json"
         old_time = time.time() - (_CACHE_TTL_SECONDS + 3600)
@@ -212,7 +212,7 @@ def test_walk_commits_different_limits_use_separate_caches(tmp_path, monkeypatch
 
     walk_call_count = [0]
 
-    def mock_walk(repo_path, limit):
+    def mock_walk(repo_path, limit, exclude_merges=False):
         walk_call_count[0] += 1
         yield from _mock_commit_data(limit)
 
