@@ -28,7 +28,6 @@ import { ThemeToggle } from '../components/ui/ThemeToggle'
 import { Layers, Compass, BarChart2, Activity, GitBranch } from 'lucide-react'
 import { ErrorBoundary } from '../components/ErrorBoundary'
 
-
 export default function DashboardPage() {
   const { repoSlug = '' } = useParams<{ repoSlug: string }>()
   const navigate = useNavigate()
@@ -397,20 +396,24 @@ export default function DashboardPage() {
 
           <div className="p-5 border-b border-white/5 bg-white/[0.01]">
             <ErrorBoundary>
-              <CostMeter usage={usageState.data} loading={usageState.isLoading} error={usageState.error?.message} />
+              <CostMeter
+                usage={usageState.data}
+                loading={usageState.isLoading}
+                error={usageState.error?.message}
+              />
             </ErrorBoundary>
           </div>
 
           <div className="flex-grow overflow-hidden pt-5">
             <ErrorBoundary>
-              <CommitList 
-                commits={commits} 
-                repoSlug={repo.repo_slug} 
-                selectedSha={selected?.sha || null} 
+              <CommitList
+                commits={commits}
+                repoSlug={repo.repo_slug}
+                selectedSha={selected?.sha || null}
                 onSelect={(commit) => {
                   setSelected(commit)
                   setIsSidebarOpen(false)
-                }} 
+                }}
               />
             </ErrorBoundary>
           </div>
@@ -421,7 +424,9 @@ export default function DashboardPage() {
             {timelineState.isLoading ? (
               <div className="glass-panel rounded-[28px] p-6 h-64 flex items-center justify-center text-slate-400 border border-white/10">
                 <Activity className="w-6 h-6 text-purple-400 animate-spin mr-2" />
-                <span className="text-xs font-medium animate-pulse">Loading health timeline...</span>
+                <span className="text-xs font-medium animate-pulse">
+                  Loading health timeline...
+                </span>
               </div>
             ) : timelineState.error ? (
               <div className="glass-panel rounded-[28px] p-6 text-rose-300 border border-rose-500/20 bg-rose-500/10">
@@ -432,11 +437,11 @@ export default function DashboardPage() {
                 No analyzed commits are currently compiled for this repository workspace.
               </div>
             ) : (
-              <HealthTimeline 
-                commits={commits} 
-                repoSlug={repo.repo_slug} 
-                selectedSha={selected?.sha} 
-                onSelectCommit={setSelected} 
+              <HealthTimeline
+                commits={commits}
+                repoSlug={repo.repo_slug}
+                selectedSha={selected?.sha}
+                onSelectCommit={setSelected}
               />
             )}
           </ErrorBoundary>
@@ -517,7 +522,7 @@ export default function DashboardPage() {
                     icon: <Layers className="w-4.5 h-4.5 text-purple-400" />,
                     tooltipTitle: 'Semantic Drift',
                     tooltipDescription:
-                      'Measures semantic alignment between the developer\'s commit message intent and the actual code diff modifications using NLP embeddings (e.g. GraphCodeBERT).',
+                      "Measures semantic alignment between the developer's commit message intent and the actual code diff modifications using NLP embeddings (e.g. GraphCodeBERT).",
                     tooltipFormula:
                       'Subscore = max(0, min(semantic_health_score, 100)) based on cosine similarity and semantic distance between intent and code changes.',
                     tooltipWeight: '20% of Health Score',
@@ -639,9 +644,9 @@ export default function DashboardPage() {
                   Could not construct software import dependency landscape.
                 </div>
               ) : (
-                <GraphExplorer 
-                  graphData={graphState.data} 
-                  selectedSha={selected?.sha || null} 
+                <GraphExplorer
+                  graphData={graphState.data}
+                  selectedSha={selected?.sha || null}
                   commits={commits}
                   onSelectCommit={setSelected}
                 />
@@ -659,7 +664,7 @@ export default function DashboardPage() {
                 <BusFactorTable modules={busState.data?.modules || []} />
               )}
             </ErrorBoundary>
-            
+
             <ErrorBoundary>
               {repoId && <HotspotMap repoId={repoId} sha={selected?.sha || null} />}
             </ErrorBoundary>
