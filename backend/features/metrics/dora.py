@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.shared.models import Deployment, PullRequest
+from backend.shared.models import Deployment, PullRequest, Repo
 
 
 def _parse_datetime(dt: datetime | str | None) -> datetime | None:
@@ -34,11 +34,15 @@ async def compute_dora_metrics(
     start_date: datetime | str | None = None,
     end_date: datetime | str | None = None,
 ) -> dict:
+    repo = await db.get(Repo, repo_id)
+    default_branch = repo.default_branch if repo else "main"
     parsed_start = _parse_datetime(start_date)
     parsed_end = _parse_datetime(end_date)
 
     deploy_stmt = select(Deployment).where(
-        Deployment.repo_id == repo_id, Deployment.status == "success"
+        Deployment.repo_id == repo_id,
+        Deployment.status == "success",
+        (Deployment.ref == default_branch) | (Deployment.ref == f"refs/heads/{default_branch}") | (Deployment.ref.is_(None))
     )
     if parsed_start is not None:
         deploy_stmt = deploy_stmt.where(Deployment.deployed_at >= parsed_start)

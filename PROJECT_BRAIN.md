@@ -167,6 +167,12 @@ Missing but obviously needed:
 - 2026-07-25: Implemented custom time range selector for Commit Timeline and Hotspots (#223), allowing users to filter codebase health data by preset intervals (7d, 30d, 1y, All Time) or custom start/end dates.
 - 2026-07-26: Added contributor identity resolution for bus factor calculations. Introduced `ContributorIdentityResolver` with `.mailmap` support and normalized contributor identities before both `git blame` and fallback commit-history aggregation to prevent duplicate contributor aliases from distorting ownership metrics.
 - 2026-07-31: Implemented 3-attempt transaction retry helper (commit_with_retry) and busy timeout connection parameter adjustments (timeout=30, PRAGMA busy_timeout=30000) to resolve transient SQLite lock errors during concurrent ingestion runs (#259).
+- 2026-08-28: Added exclude_merges option to commit walker in git metrics extraction (#325).
+- 2026-08-28: Disabled submit button on landing page form when repository URL input is empty or invalid (#326).
+- 2026-08-28: Added skeleton loader components for dashboard metric cards during data fetch (#378).
+- 2026-08-28: Added custom default branch name support in repository ingestion and clone analysis (#381).
+- 2026-08-28: Implemented in-memory caching for Team Health calculations to improve dashboard response times (#376).
+- 2026-08-28: Integrated React Error Boundary around Code Quality Dashboard component (#380).
 - 2026-08-28: Added start_date and end_date filtering options to DORA metrics calculation API (#375).
 - 2026-08-26: Added metric explanation tooltips for Bus Factor, Churn, and Cyclomatic Complexity metrics across dashboard cards (#265).
 - 2026-08-26: Made Hotspot Map and Knowledge Graph Explorer components responsive on mobile viewports (#377).
@@ -296,8 +302,32 @@ backend/features/reports/router.py exposes GET /api/repos/{repo_id}/report which
 backend/main.py registers the reports router under /api.
 backend/requirements.txt now includes reportlab>=4.0.0.
 
+<<<<<<< HEAD
 Testing:
 backend/tests/test_pdf_report.py covers: service raises ValueError for missing repo, returns valid %PDF bytes, PDF content includes section labels, router returns 404 for missing repo, router returns 200 + application/pdf with correct headers for a valid repo.
+=======
+
+<<<<<<< HEAD
+Testing:
+backend/tests/test_pdf_report.py covers: service raises ValueError for missing repo, returns valid %PDF bytes, PDF content includes section labels, router returns 404 for missing repo, router returns 200 + application/pdf with correct headers for a valid repo.
+=======
+
+<<<<<<< HEAD
+=======
+
+<<<<<<< HEAD
+=======
+
+<<<<<<< HEAD
+=======
+
+backend/tests/test_pdf_report.py covers: service raisesValueError for missing repo, returns valid %PDF bytes, PDFcontent includes section labels, router returns 404 for missing repo,router returns 200 + application/pdf with correct headers for avalid repo.
+
+> > > > > > > origin/main
+> > > > > > > origin/main
+> > > > > > > origin/main
+> > > > > > > origin/main
+> > > > > > > origin/main
 
 - fix: make the hotspot map and knowledge graph responsive on mobile devices (#377). Made the canvas container, treemap wrapper, sidebars, stats overlay, and playback controls fully responsive across narrow viewports without horizontal overflow.
 - docs: update project brain after mobile responsiveness fix (#377). Recorded responsive layout adjustments for HotspotMap and GraphExplorer, and updated test coverage.
@@ -309,6 +339,8 @@ backend/tests/test_pdf_report.py covers: service raises ValueError for missing r
   - `HotspotMap.tsx`: Responsive bounding classes, legend wrapping, and pagination stacking.
   - `GraphExplorer.tsx`: Mobile-safe canvas dimensions, responsive stats HUD, and sidebar wrapping.
 - **Testing**: Verified with full test suite (`npm run test`, 17 test files, 83 tests passing).
+
+<<<<<<< HEAD
 
 ### Support Time Window Parameters in DORA Metrics (Issue #375)
 
@@ -330,3 +362,59 @@ backend/tests/test_pdf_report.py covers: service raises ValueError for missing r
 - **Testing**:
   - Added `backend/tests/test_dora_metrics.py` testing bounded time windows, empty date ranges, ISO string timestamp parsing, and HTTP endpoint query parameters.
   - Verified with full test suite (180 backend pytest tests, 83 frontend vitest tests passing).
+    \=======
+
+### Layout-Specific Skeleton Loaders for DORA & Code Quality Dashboards (Issue #378)
+
+- **Problem**: `DoraMetricsDashboard` and `CodeQualityDashboard` previously displayed generic centered pulsing loading spinners (`Activity` icon + text) that lacked visual resemblance to the final cards and caused layout shifting upon data resolution.
+- **Implementation**:
+  - `DoraMetricsSkeleton.tsx`:
+    - Glass-panel container matching `DoraMetricsDashboard` dimensions and blur effects.
+    - Header skeleton with icon, title, and performer badge placeholder.
+    - 3-card metric grid skeleton matching Deployment Frequency, Change Failure Rate, and MTTR layouts with animated pulse lines, values, and badges.
+    - Accessible `role="status"` and `aria-label="Loading DORA metrics"`.
+  - `CodeQualitySkeleton.tsx`:
+    - Glass-panel container matching `CodeQualityDashboard`.
+    - Header skeleton with Sparkles icon and title.
+    - 2-card grid skeleton matching Code Churn and AI Impact cards with headers, large metric placeholders, and description line skeletons.
+    - Accessible `role="status"` and `aria-label="Loading code quality metrics"`.
+  - `DoraMetricsDashboard.tsx` & `CodeQualityDashboard.tsx`:
+    - Replaced the generic loading block with `<DoraMetricsSkeleton />` and `<CodeQualitySkeleton />`.
+- **Testing**:
+  <<<<<<< HEAD
+  - Added unit test suites `DoraMetricsSkeleton.test.tsx`, `CodeQualitySkeleton.test.tsx`, `DoraMetricsDashboard.test.tsx`, and `CodeQualityDashboard.test.tsx`.
+  - Verified with full frontend suite (21 test files, 91 tests passing) and production build.
+    \=======
+  - Expanded `HotspotMap.test.tsx` with unit tests for empty states, risk badges, and pagination under responsive layouts.
+  - Verified with full test suite (`npm run test`, 16 test files, 78 tests passing).
+
+<<<<<<< HEAD
+
+> > > > > > > origin/main
+> > > > > > > \=======
+> > > > > > > <<<<<<< HEAD
+> > > > > > > origin/main
+> > > > > > > \=======
+> > > > > > > <<<<<<< HEAD
+> > > > > > > origin/main
+> > > > > > > \=======
+> > > > > > > <<<<<<< HEAD
+
+### Landing Page Repository Name Validation (Issue #326)
+
+- **Problem**: The "Analyze" submit button on the Landing Page did not properly disable when the repository name input field was empty or consisted solely of spaces.
+- **Implementation**:
+  - `LandingPage.tsx`:
+    - Bound the submit button's `disabled` attribute directly to the text field state (`url.trim().length === 0`).
+    - This ensures users cannot submit a blank repository for ingestion.
+- **Testing**:
+  - Prettier formatting applied to ensure adherence to styling rules.
+    \=======
+
+> > > > > > > origin/main
+> > > > > > > origin/main
+> > > > > > > origin/main
+> > > > > > > origin/main
+> > > > > > > origin/main
+> > > > > > > origin/main
+> > > > > > > origin/main

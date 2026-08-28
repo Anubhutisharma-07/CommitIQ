@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react'
 import { getDoraMetrics } from '../lib/api'
 import type { DoraMetrics } from '../types'
-import { Activity, Rocket, ShieldAlert, Timer, TrendingUp } from 'lucide-react'
+import { Rocket, ShieldAlert, Timer, TrendingUp } from 'lucide-react'
+import { DoraMetricsSkeleton } from './DoraMetricsSkeleton'
+
+export { DoraMetricsSkeleton }
 
 interface DoraMetricsDashboardProps {
   repoId: string | number
@@ -41,12 +44,7 @@ export function DoraMetricsDashboard({ repoId, startDate, endDate }: DoraMetrics
   }, [repoId, startDate, endDate])
 
   if (loading) {
-    return (
-      <div className="glass-panel rounded-[28px] overflow-hidden shadow-2xl relative border border-white/10 flex flex-col items-center justify-center h-[350px] animate-pulse">
-        <Activity className="w-8 h-8 text-indigo-400 mb-2" />
-        <span className="text-slate-400 text-sm">Computing DORA Metrics...</span>
-      </div>
-    )
+    return <DoraMetricsSkeleton />
   }
 
   if (error || !metrics) {
