@@ -167,6 +167,7 @@ Missing but obviously needed:
 - 2026-07-25: Implemented custom time range selector for Commit Timeline and Hotspots (#223), allowing users to filter codebase health data by preset intervals (7d, 30d, 1y, All Time) or custom start/end dates.
 - 2026-07-26: Added contributor identity resolution for bus factor calculations. Introduced `ContributorIdentityResolver` with `.mailmap` support and normalized contributor identities before both `git blame` and fallback commit-history aggregation to prevent duplicate contributor aliases from distorting ownership metrics.
 - 2026-07-31: Implemented 3-attempt transaction retry helper (commit_with_retry) and busy timeout connection parameter adjustments (timeout=30, PRAGMA busy_timeout=30000) to resolve transient SQLite lock errors during concurrent ingestion runs (#259).
+- 2026-08-28: Added custom default branch name support in repository ingestion and clone analysis (#381).
 - 2026-08-26: Added metric explanation tooltips for Bus Factor, Churn, and Cyclomatic Complexity metrics across dashboard cards (#265).
 - 2026-08-26: Made Hotspot Map and Knowledge Graph Explorer components responsive on mobile viewports (#377).
 - 2026-08-26: Created unified PDF report export for developer health and repository maintainability metrics (#389).
@@ -300,10 +301,12 @@ Testing:
 
 backend/tests/test_pdf_report.py covers: service raisesValueError for missing repo, returns valid %PDF bytes, PDFcontent includes section labels, router returns 404 for missing repo,router returns 200 + application/pdf with correct headers for avalid repo.
 =======
+
 - fix: make the hotspot map and knowledge graph responsive on mobile devices (#377). Made the canvas container, treemap wrapper, sidebars, stats overlay, and playback controls fully responsive across narrow viewports without horizontal overflow.
 - docs: update project brain after mobile responsiveness fix (#377). Recorded responsive layout adjustments for HotspotMap and GraphExplorer, and updated test coverage.
 
 ### Mobile Responsiveness for Hotspot Map & Knowledge Graph (Issue #377)
+
 - **Problem**: On small mobile devices (viewports < 768px down to 320px), the Hotspot Treemap and ForceGraph2D canvas containers caused horizontal page overflow, unconstrained sidebar widths, and clipped overlay badges.
 - **Implementation**:
   - `HotspotMap.tsx`:
@@ -321,4 +324,5 @@ backend/tests/test_pdf_report.py covers: service raisesValueError for missing re
 - **Testing**:
   - Expanded `HotspotMap.test.tsx` with unit tests for empty states, risk badges, and pagination under responsive layouts.
   - Verified with full test suite (`npm run test`, 16 test files, 78 tests passing).
->>>>>>> origin/main
+
+> > > > > > > origin/main
