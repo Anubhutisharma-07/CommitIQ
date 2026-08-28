@@ -16,7 +16,6 @@ import { CommitList } from '../components/CommitList'
 import { CostMeter } from '../components/CostMeter'
 import { GraphExplorer } from '../components/GraphExplorer'
 import { HealthTimeline } from '../components/HealthTimeline'
-import { HealthTimelineSkeleton } from '../components/HealthTimelineSkeleton'
 import { HotspotMap } from '../components/HotspotMap'
 import { NarrativeCard } from '../components/NarrativeCard'
 import { CycleTimeDashboard } from '../components/CycleTimeDashboard'
@@ -112,12 +111,6 @@ export default function DashboardPage() {
   const handleExportBusFactor = () => {
     exportBusFactorJson(busState.data)
     setIsExportMenuOpen(false)
-  }
-
-  const handleResetTimeRange = () => {
-    setTimeRangePreset('all')
-    setCustomStartDate('')
-    setCustomEndDate('')
   }
 
   const repoState = useSWR(repoSlug ? ['repo', repoSlug] : null, () => getRepoBySlug(repoSlug))
@@ -437,6 +430,17 @@ export default function DashboardPage() {
         </aside>
 
         <main className="flex-grow overflow-y-auto p-4 sm:p-6 space-y-6 relative z-10">
+          {rescanError && (
+            <div className="glass-panel rounded-[20px] p-4 text-rose-300 border border-rose-500/30 bg-rose-500/10 flex items-center justify-between text-xs">
+              <span>{rescanError}</span>
+              <button
+                onClick={() => setRescanError(null)}
+                className="text-rose-400 hover:text-white font-bold ml-4"
+              >
+                ✕
+              </button>
+            </div>
+          )}
           <ErrorBoundary>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 glass-panel rounded-[28px] p-4 border border-white/10">
               <TimeRangeSelector
