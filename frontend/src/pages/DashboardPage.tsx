@@ -25,7 +25,24 @@ import { TeamHealthDashboard } from '../components/TeamHealthDashboard'
 import { TimeRangeSelector, type TimeRangePreset } from '../components/TimeRangeSelector'
 import { HealthBadge } from '../components/ui/HealthBadge'
 import { ThemeToggle } from '../components/ui/ThemeToggle'
-import { Layers, Compass, BarChart2, Activity, GitBranch } from 'lucide-react'
+import { ScrollToTop } from '../components/ui/ScrollToTop'
+import { MetricTooltip } from '../components/ui/MetricTooltip'
+import { sanitizeCommitMessage } from '../lib/utils'
+import { exportTimelineCsv, exportBusFactorJson } from '../lib/exportUtils'
+import {
+  Layers,
+  Compass,
+  BarChart2,
+  Activity,
+  GitBranch,
+  ArrowLeftRight,
+  RefreshCw,
+  Download,
+  ChevronDown,
+  FileText,
+  FileJson,
+  AlertTriangle,
+} from 'lucide-react'
 import { ErrorBoundary } from '../components/ErrorBoundary'
 
 export default function DashboardPage() {
@@ -421,6 +438,25 @@ export default function DashboardPage() {
 
         <main className="flex-grow overflow-y-auto p-4 sm:p-6 space-y-6 relative z-10">
           <ErrorBoundary>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 glass-panel rounded-[28px] p-4 border border-white/10">
+              <TimeRangeSelector
+                selectedPreset={timeRangePreset}
+                onSelectPreset={setTimeRangePreset}
+                customStartDate={customStartDate}
+                customEndDate={customEndDate}
+                onCustomDateChange={(start, end) => {
+                  setCustomStartDate(start)
+                  setCustomEndDate(end)
+                }}
+                onReset={() => {
+                  setTimeRangePreset('all')
+                  setCustomStartDate('')
+                  setCustomEndDate('')
+                }}
+              />
+            </div>
+          </ErrorBoundary>
+          <ErrorBoundary>
             {timelineState.isLoading ? (
               <div className="glass-panel rounded-[28px] p-6 h-64 flex items-center justify-center text-slate-400 border border-white/10">
                 <Activity className="w-6 h-6 text-purple-400 animate-spin mr-2" />
@@ -661,21 +697,7 @@ export default function DashboardPage() {
             )}
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-            <ErrorBoundary>
-              {busState.error ? (
-                <div className="glass-panel rounded-[28px] p-6 text-rose-300 border border-rose-500/20 bg-rose-500/10">
-                  Could not retrieve module ownership datasets.
-                </div>
-              ) : (
-                <BusFactorTable modules={busState.data?.modules || []} />
-              )}
-            </ErrorBoundary>
 
-            <ErrorBoundary>
-              {repoId && <HotspotMap repoId={repoId} sha={selected?.sha || null} />}
-            </ErrorBoundary>
-          </div>
 
           {repoId && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
