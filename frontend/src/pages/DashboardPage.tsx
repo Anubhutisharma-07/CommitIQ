@@ -23,6 +23,7 @@ import { DoraMetricsDashboard } from '../components/DoraMetricsDashboard'
 import { TeamHealthDashboard } from '../components/TeamHealthDashboard'
 import { ScheduledReportsDashboard } from '../components/ScheduledReportsDashboard'
 import { WeeklyDigestCard } from '../components/WeeklyDigestCard'
+import { RecommendationsCard } from '../components/RecommendationsCard'
 import { TimeRangeSelector, type TimeRangePreset } from '../components/TimeRangeSelector'
 import { HealthBadge } from '../components/ui/HealthBadge'
 import { ThemeToggle } from '../components/ui/ThemeToggle'
@@ -736,6 +737,8 @@ export default function DashboardPage() {
               </div>
             </div>
           )}
+
+          {repoId && <RecommendationsCard repoId={repoId} />}
 
           {repoId && <ScheduledReportsDashboard repoId={repoId} />}
 

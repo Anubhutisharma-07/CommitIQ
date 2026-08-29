@@ -31,6 +31,7 @@ import type {
   ReportScheduleListResponse,
   ReportPreview,
   WeeklyDigest,
+  RecommendationsResponse,
 } from '../types'
 
 export type { NarrativeStreamChunk } from '../types'
@@ -318,6 +319,12 @@ export async function getWeeklyDigest(
 ): Promise<WeeklyDigest> {
   const params = weeks && weeks !== 1 ? { weeks } : undefined
   return request<WeeklyDigest>(client.get(`/repos/${repoId}/digest`, { params }))
+}
+
+export async function getRecommendations(
+  repoId: string | number
+): Promise<RecommendationsResponse> {
+  return request<RecommendationsResponse>(client.get(`/repos/${repoId}/recommendations`))
 }
 
 export interface NarrativeResponse {
