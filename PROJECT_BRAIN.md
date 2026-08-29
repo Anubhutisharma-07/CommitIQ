@@ -175,6 +175,8 @@ Missing but obviously needed:
 - 2026-08-28: Implemented in-memory caching for Team Health calculations to improve dashboard response times (#376).
 - 2026-08-28: Integrated React Error Boundary around Code Quality Dashboard component (#380).
 - 2026-08-28: Added start_date and end_date filtering options to DORA metrics calculation API (#375).
+- 2026-08-29: Added backend setup and startup guide in backend/README.md (#374, #453).
+- 2026-08-29: Bounded Graph Explorer node labels to prevent clipping on canvas (#316, #451).
 - 2026-08-29: Added Release Impact Analyzer dashboard and `/releases` route (#446).
 - 2026-08-29: Added Team Collaboration Hub analytics and `/team` route (#444).
 - 2026-08-29: Added Commit Health Radar multi-dimensional visualization and `/health` route (#442).
