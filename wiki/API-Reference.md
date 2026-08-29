@@ -6,15 +6,16 @@ CommitIQ exposes a RESTful API built on FastAPI with asynchronous database execu
 
 ## Service Endpoints & Interactive Documentation
 
-* **Base API URL**: `http://localhost:8000/api`
-* **OpenAPI / Swagger UI**: `http://localhost:8000/docs`
-* **ReDoc Interface**: `http://localhost:8000/redoc`
+- **Base API URL**: `http://localhost:8000/api`
+- **OpenAPI / Swagger UI**: `http://localhost:8000/docs`
+- **ReDoc Interface**: `http://localhost:8000/redoc`
 
 ---
 
 ## Repositories API
 
 ### 1. Ingest Repository
+
 Initiates asynchronous repository cloning, commit traversal, code complexity analysis, and graph indexing.
 
 ```http
@@ -30,6 +31,7 @@ Content-Type: application/json
 ```
 
 #### Response (`202 Accepted`)
+
 ```json
 {
   "id": 1,
@@ -44,6 +46,7 @@ Content-Type: application/json
 ---
 
 ### 2. Stream Ingestion Progress (SSE)
+
 Real-time Server-Sent Events (SSE) stream delivering progress status during background ingestion.
 
 ```http
@@ -52,6 +55,7 @@ Accept: text/event-stream
 ```
 
 #### Stream Event Payloads
+
 ```json
 data: {"status": "cloning", "progress": 25, "message": "Cloning git repository..."}
 data: {"status": "analyzing", "progress": 60, "message": "Computing cyclomatic complexity..."}
@@ -61,6 +65,7 @@ data: {"status": "ready", "progress": 100, "message": "Analysis complete."}
 ---
 
 ### 3. Get Health Timeline
+
 Retrieves chronological commit records with composite health scores, churn metrics, and risk factors.
 
 ```http
@@ -68,6 +73,7 @@ GET /api/repos/{repo_id}/timeline?start_date=2026-08-01T00:00:00Z&end_date=2026-
 ```
 
 #### Response (`200 OK`)
+
 ```json
 [
   {
@@ -90,6 +96,7 @@ GET /api/repos/{repo_id}/timeline?start_date=2026-08-01T00:00:00Z&end_date=2026-
 ---
 
 ### 4. Get Dependency Graph
+
 Returns module nodes, imports, and co-change coupling edges computed across the repository tree.
 
 ```http
@@ -97,6 +104,7 @@ GET /api/repos/{repo_id}/graph
 ```
 
 #### Response (`200 OK`)
+
 ```json
 {
   "nodes": [
@@ -122,6 +130,7 @@ GET /api/repos/{repo_id}/graph
 ---
 
 ### 5. Get Hotspots Matrix
+
 Identifies high-complexity, high-churn files that represent architectural risk areas.
 
 ```http
@@ -129,6 +138,7 @@ GET /api/repos/{repo_id}/hotspots?limit=20&offset=0
 ```
 
 #### Response (`200 OK`)
+
 ```json
 {
   "total": 1,
@@ -149,6 +159,7 @@ GET /api/repos/{repo_id}/hotspots?limit=20&offset=0
 ---
 
 ### 6. Get Bus Factor & Ownership
+
 Returns ownership distribution and flags single-contributor dependency files.
 
 ```http
@@ -158,6 +169,7 @@ GET /api/repos/{repo_id}/bus-factor
 ---
 
 ### 7. Export Unified Health Report (PDF)
+
 Generates an executive PDF report containing DORA metrics, Cycle Time charts, Hotspots, and Team Health signals.
 
 ```http
@@ -168,6 +180,7 @@ Accept: application/pdf
 ---
 
 ### 8. Repository Comparison
+
 Compares maintainability, complexity, and churn signals across two distinct repositories.
 
 ```http
@@ -177,6 +190,7 @@ GET /api/compare?base_slug=owner/repo1&target_slug=owner/repo2
 ---
 
 ### 9. AI Commit Narrative
+
 Generates plain-English summaries of codebase changes via Anthropic Claude or Google Gemini fallback.
 
 ```http

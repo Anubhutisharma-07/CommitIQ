@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import {
   Activity,
   AlertTriangle,
@@ -25,7 +25,7 @@ interface HealthDimension {
   id: string
   label: string
   score: number // 0-100
-  icon: React.ReactNode
+  icon: ReactNode
   color: string
   description: string
   details: string[]
@@ -58,13 +58,61 @@ interface CommitHealthRadarProps {
 /* ─── Helpers ───────────────────────────────────────────────────────── */
 
 function getGrade(score: number): HealthGrade {
-  if (score >= 90) return { grade: 'A+', label: 'Exceptional', color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/30', description: 'Your repo is in outstanding health.' }
-  if (score >= 80) return { grade: 'A', label: 'Excellent', color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/20', description: 'Excellent health with minor room for improvement.' }
-  if (score >= 70) return { grade: 'B+', label: 'Good', color: 'text-blue-400', bg: 'bg-blue-500/10 border-blue-500/20', description: 'Good health overall. Some areas could use attention.' }
-  if (score >= 60) return { grade: 'B', label: 'Above Average', color: 'text-blue-400', bg: 'bg-blue-500/10 border-blue-500/20', description: 'Above average health. Consider addressing flagged areas.' }
-  if (score >= 50) return { grade: 'C', label: 'Average', color: 'text-amber-400', bg: 'bg-amber-500/10 border-amber-500/20', description: 'Average health. Several areas need improvement.' }
-  if (score >= 35) return { grade: 'D', label: 'Below Average', color: 'text-orange-400', bg: 'bg-orange-500/10 border-orange-500/20', description: 'Below average. Significant improvements needed.' }
-  return { grade: 'F', label: 'Critical', color: 'text-red-400', bg: 'bg-red-500/10 border-red-500/20', description: 'Critical health issues require immediate attention.' }
+  if (score >= 90)
+    return {
+      grade: 'A+',
+      label: 'Exceptional',
+      color: 'text-emerald-400',
+      bg: 'bg-emerald-500/10 border-emerald-500/30',
+      description: 'Your repo is in outstanding health.',
+    }
+  if (score >= 80)
+    return {
+      grade: 'A',
+      label: 'Excellent',
+      color: 'text-emerald-400',
+      bg: 'bg-emerald-500/10 border-emerald-500/20',
+      description: 'Excellent health with minor room for improvement.',
+    }
+  if (score >= 70)
+    return {
+      grade: 'B+',
+      label: 'Good',
+      color: 'text-blue-400',
+      bg: 'bg-blue-500/10 border-blue-500/20',
+      description: 'Good health overall. Some areas could use attention.',
+    }
+  if (score >= 60)
+    return {
+      grade: 'B',
+      label: 'Above Average',
+      color: 'text-blue-400',
+      bg: 'bg-blue-500/10 border-blue-500/20',
+      description: 'Above average health. Consider addressing flagged areas.',
+    }
+  if (score >= 50)
+    return {
+      grade: 'C',
+      label: 'Average',
+      color: 'text-amber-400',
+      bg: 'bg-amber-500/10 border-amber-500/20',
+      description: 'Average health. Several areas need improvement.',
+    }
+  if (score >= 35)
+    return {
+      grade: 'D',
+      label: 'Below Average',
+      color: 'text-orange-400',
+      bg: 'bg-orange-500/10 border-orange-500/20',
+      description: 'Below average. Significant improvements needed.',
+    }
+  return {
+    grade: 'F',
+    label: 'Critical',
+    color: 'text-red-400',
+    bg: 'bg-red-500/10 border-red-500/20',
+    description: 'Critical health issues require immediate attention.',
+  }
 }
 
 function polarToCartesian(cx: number, cy: number, r: number, angleDeg: number) {
@@ -238,7 +286,7 @@ function generateRecommendations(dimensions: HealthDimension[]): HealthRecommend
 function RadarChart({ dimensions, size = 280 }: { dimensions: HealthDimension[]; size?: number }) {
   const cx = size / 2
   const cy = size / 2
-  const maxR = (size / 2) - 30
+  const maxR = size / 2 - 30
   const levels = 5
   const n = dimensions.length
   const angleStep = 360 / n
@@ -291,7 +339,15 @@ function RadarChart({ dimensions, size = 280 }: { dimensions: HealthDimension[];
 
       {/* Axis lines */}
       {axes.map((a, i) => (
-        <line key={i} x1={a.x1} y1={a.y1} x2={a.x2} y2={a.y2} stroke="rgba(148,163,184,0.15)" strokeWidth={1} />
+        <line
+          key={i}
+          x1={a.x1}
+          y1={a.y1}
+          x2={a.x2}
+          y2={a.y2}
+          stroke="rgba(148,163,184,0.15)"
+          strokeWidth={1}
+        />
       ))}
 
       {/* Data polygon */}
@@ -299,7 +355,15 @@ function RadarChart({ dimensions, size = 280 }: { dimensions: HealthDimension[];
 
       {/* Data points */}
       {dataPoints.map((p, i) => (
-        <circle key={i} cx={p.x} cy={p.y} r={4} fill={dimensions[i].color} stroke="white" strokeWidth={1.5} />
+        <circle
+          key={i}
+          cx={p.x}
+          cy={p.y}
+          r={4}
+          fill={dimensions[i].color}
+          stroke="white"
+          strokeWidth={1.5}
+        />
       ))}
 
       {/* Labels */}
@@ -341,7 +405,12 @@ function DimensionCard({
   onToggle: () => void
 }) {
   const TrendIcon = dim.trend === 'up' ? TrendingUp : dim.trend === 'down' ? TrendingDown : Activity
-  const trendColor = dim.trend === 'up' ? 'text-emerald-400' : dim.trend === 'down' ? 'text-red-400' : 'text-slate-400'
+  const trendColor =
+    dim.trend === 'up'
+      ? 'text-emerald-400'
+      : dim.trend === 'down'
+        ? 'text-red-400'
+        : 'text-slate-400'
   const scoreColor =
     dim.score >= 80 ? 'text-emerald-400' : dim.score >= 60 ? 'text-amber-400' : 'text-red-400'
 
@@ -351,7 +420,10 @@ function DimensionCard({
         onClick={onToggle}
         className="w-full flex items-center gap-3 p-4 hover:bg-white/5 transition-colors text-left"
       >
-        <div className="p-2 rounded-xl" style={{ backgroundColor: `${dim.color}15`, border: `1px solid ${dim.color}30` }}>
+        <div
+          className="p-2 rounded-xl"
+          style={{ backgroundColor: `${dim.color}15`, border: `1px solid ${dim.color}30` }}
+        >
           {dim.icon}
         </div>
         <div className="flex-1 min-w-0">
@@ -369,7 +441,10 @@ function DimensionCard({
         </div>
         <div className={`flex items-center gap-1 text-xs ${trendColor}`}>
           <TrendIcon className="w-3.5 h-3.5" />
-          <span>{dim.trendDelta > 0 ? '+' : ''}{dim.trendDelta}</span>
+          <span>
+            {dim.trendDelta > 0 ? '+' : ''}
+            {dim.trendDelta}
+          </span>
         </div>
         {expanded ? (
           <ChevronUp className="w-4 h-4 text-slate-400" />
@@ -384,7 +459,10 @@ function DimensionCard({
           <ul className="space-y-1.5">
             {dim.details.map((d, i) => (
               <li key={i} className="flex items-start gap-2 text-xs text-slate-300">
-                <span className="mt-0.5 w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: dim.color }} />
+                <span
+                  className="mt-0.5 w-1.5 h-1.5 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: dim.color }}
+                />
                 {d}
               </li>
             ))}
@@ -399,9 +477,24 @@ function DimensionCard({
 
 function RecommendationCard({ rec }: { rec: HealthRecommendation }) {
   const severityConfig = {
-    critical: { icon: <AlertTriangle className="w-4 h-4" />, color: 'text-red-400', bg: 'bg-red-500/10 border-red-500/20', dot: 'bg-red-400' },
-    warning: { icon: <Info className="w-4 h-4" />, color: 'text-amber-400', bg: 'bg-amber-500/10 border-amber-500/20', dot: 'bg-amber-400' },
-    info: { icon: <Lightbulb className="w-4 h-4" />, color: 'text-blue-400', bg: 'bg-blue-500/10 border-blue-500/20', dot: 'bg-blue-400' },
+    critical: {
+      icon: <AlertTriangle className="w-4 h-4" />,
+      color: 'text-red-400',
+      bg: 'bg-red-500/10 border-red-500/20',
+      dot: 'bg-red-400',
+    },
+    warning: {
+      icon: <Info className="w-4 h-4" />,
+      color: 'text-amber-400',
+      bg: 'bg-amber-500/10 border-amber-500/20',
+      dot: 'bg-amber-400',
+    },
+    info: {
+      icon: <Lightbulb className="w-4 h-4" />,
+      color: 'text-blue-400',
+      bg: 'bg-blue-500/10 border-blue-500/20',
+      dot: 'bg-blue-400',
+    },
   }
   const config = severityConfig[rec.severity]
 
@@ -426,14 +519,17 @@ function RecommendationCard({ rec }: { rec: HealthRecommendation }) {
 
 /* ─── Main Component ────────────────────────────────────────────────── */
 
-export default function CommitHealthRadar({ repoName = 'your-repo', timeRange = '30d' }: CommitHealthRadarProps) {
+export function CommitHealthRadar({
+  repoName = 'your-repo',
+  timeRange = '30d',
+}: CommitHealthRadarProps) {
   const [expandedDim, setExpandedDim] = useState<string | null>(null)
   const [showRecommendations, setShowRecommendations] = useState(true)
 
   const dimensions = useMemo(() => generateDimensions(), [])
   const overallScore = useMemo(
     () => Math.round(dimensions.reduce((acc, d) => acc + d.score, 0) / dimensions.length),
-    [dimensions],
+    [dimensions]
   )
   const grade = useMemo(() => getGrade(overallScore), [overallScore])
   const recommendations = useMemo(() => generateRecommendations(dimensions), [dimensions])
@@ -453,7 +549,8 @@ export default function CommitHealthRadar({ repoName = 'your-repo', timeRange = 
             Commit Health Radar
           </h2>
           <p className="text-sm text-slate-400 mt-1">
-            Multi-dimensional health analysis for <span className="text-slate-300 font-medium">{repoName}</span> · {timeRange}
+            Multi-dimensional health analysis for{' '}
+            <span className="text-slate-300 font-medium">{repoName}</span> · {timeRange}
           </p>
         </div>
         <div className={`flex items-center gap-3 px-5 py-3 rounded-2xl border ${grade.bg}`}>
@@ -468,10 +565,30 @@ export default function CommitHealthRadar({ repoName = 'your-repo', timeRange = 
       {/* Summary Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: 'Dimensions', value: dimensions.length, icon: <Target className="w-4 h-4" />, color: 'text-purple-400' },
-          { label: 'Improving', value: improving, icon: <TrendingUp className="w-4 h-4" />, color: 'text-emerald-400' },
-          { label: 'Declining', value: declining, icon: <TrendingDown className="w-4 h-4" />, color: 'text-red-400' },
-          { label: 'Issues', value: criticalCount + warningCount, icon: <AlertTriangle className="w-4 h-4" />, color: 'text-amber-400' },
+          {
+            label: 'Dimensions',
+            value: dimensions.length,
+            icon: <Target className="w-4 h-4" />,
+            color: 'text-purple-400',
+          },
+          {
+            label: 'Improving',
+            value: improving,
+            icon: <TrendingUp className="w-4 h-4" />,
+            color: 'text-emerald-400',
+          },
+          {
+            label: 'Declining',
+            value: declining,
+            icon: <TrendingDown className="w-4 h-4" />,
+            color: 'text-red-400',
+          },
+          {
+            label: 'Issues',
+            value: criticalCount + warningCount,
+            icon: <AlertTriangle className="w-4 h-4" />,
+            color: 'text-amber-400',
+          },
         ].map((stat) => (
           <div
             key={stat.label}
@@ -530,7 +647,11 @@ export default function CommitHealthRadar({ repoName = 'your-repo', timeRange = 
         >
           <Lightbulb className="w-4 h-4 text-amber-400" />
           Recommendations ({recommendations.length})
-          {showRecommendations ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          {showRecommendations ? (
+            <ChevronUp className="w-4 h-4" />
+          ) : (
+            <ChevronDown className="w-4 h-4" />
+          )}
         </button>
         {showRecommendations && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -556,9 +677,7 @@ export default function CommitHealthRadar({ repoName = 'your-repo', timeRange = 
 /* ─── Mini Trend Sparkline ──────────────────────────────────────────── */
 
 function TrendSparkline() {
-  const weeks = [
-    62, 64, 63, 67, 69, 68, 71, 73, 72, 75, 76, 78,
-  ]
+  const weeks = [62, 64, 63, 67, 69, 68, 71, 73, 72, 75, 76, 78]
   const w = 600
   const h = 80
   const padding = 10
@@ -572,7 +691,8 @@ function TrendSparkline() {
   }))
 
   const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ')
-  const areaPath = linePath + ` L${points[points.length - 1].x},${h - padding} L${points[0].x},${h - padding} Z`
+  const areaPath =
+    linePath + ` L${points[points.length - 1].x},${h - padding} L${points[0].x},${h - padding} Z`
 
   const labels = ['W1', 'W2', 'W3', 'W4', 'W5', 'W6', 'W7', 'W8', 'W9', 'W10', 'W11', 'W12']
 
@@ -603,7 +723,14 @@ function TrendSparkline() {
       </defs>
 
       {/* Line */}
-      <path d={linePath} fill="none" stroke="#a78bfa" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
+      <path
+        d={linePath}
+        fill="none"
+        stroke="#a78bfa"
+        strokeWidth={2.5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
 
       {/* Data points */}
       {points.map((p, i) => (
@@ -624,12 +751,24 @@ function TrendSparkline() {
       ))}
 
       {/* Start/End values */}
-      <text x={points[0].x} y={points[0].y - 8} textAnchor="middle" className="fill-slate-400 text-[10px] font-medium">
+      <text
+        x={points[0].x}
+        y={points[0].y - 8}
+        textAnchor="middle"
+        className="fill-slate-400 text-[10px] font-medium"
+      >
         {weeks[0]}
       </text>
-      <text x={points[points.length - 1].x} y={points[points.length - 1].y - 8} textAnchor="middle" className="fill-purple-400 text-[10px] font-bold">
+      <text
+        x={points[points.length - 1].x}
+        y={points[points.length - 1].y - 8}
+        textAnchor="middle"
+        className="fill-purple-400 text-[10px] font-bold"
+      >
         {weeks[weeks.length - 1]}
       </text>
     </svg>
   )
 }
+
+export default CommitHealthRadar

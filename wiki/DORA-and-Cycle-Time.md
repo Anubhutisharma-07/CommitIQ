@@ -19,24 +19,28 @@ graph TD
 ```
 
 ### 1. Deployment Frequency
+
 Measures the frequency of successful code deployments to production or merges to the default branch.
 
-* **Elite**: Multiple deployments per day
-* **High**: Between once per day and once per week
-* **Medium**: Between once per week and once per month
-* **Low**: Fewer than once per month
+- **Elite**: Multiple deployments per day
+- **High**: Between once per day and once per week
+- **Medium**: Between once per week and once per month
+- **Low**: Fewer than once per month
 
 ### 2. Lead Time for Changes
+
 Measures the elapsed duration from the initial commit authored in a branch to the point where that change is deployed to production.
 
 $$\text{Lead Time} = T_{\text{deploy}} - T_{\text{first commit}}$$
 
 ### 3. Change Failure Rate (CFR)
+
 The percentage of production releases resulting in service degradation, rollbacks, or immediate remediations.
 
 $$\text{CFR} = \left(\frac{N_{\text{failed deployments}}}{N_{\text{total deployments}}}\right) \times 100\%$$
 
 ### 4. Mean Time to Restore Service (MTTR)
+
 The average duration required to restore full service availability following an unplanned outage or production regression.
 
 ---
@@ -60,12 +64,12 @@ journey
 
 ### Phase Definitions
 
-| Phase | Measurement Boundary | Optimization Strategy |
-| :--- | :--- | :--- |
-| **Coding Time** | First commit created $\rightarrow$ Pull request opened | Break features into smaller, atomic increments. |
+| Phase           | Measurement Boundary                                         | Optimization Strategy                                     |
+| :-------------- | :----------------------------------------------------------- | :-------------------------------------------------------- |
+| **Coding Time** | First commit created $\rightarrow$ Pull request opened       | Break features into smaller, atomic increments.           |
 | **Pickup Time** | Pull request opened $\rightarrow$ First reviewer interaction | Establish team review rotations and triage notifications. |
-| **Review Time** | First review $\rightarrow$ Pull request approved and merged | Minimize asynchronous discussion rounds. |
-| **Deploy Time** | Pull request merged $\rightarrow$ Successful deployment | Automate CI/CD validation and staging pipelines. |
+| **Review Time** | First review $\rightarrow$ Pull request approved and merged  | Minimize asynchronous discussion rounds.                  |
+| **Deploy Time** | Pull request merged $\rightarrow$ Successful deployment      | Automate CI/CD validation and staging pipelines.          |
 
 ---
 

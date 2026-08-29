@@ -15,11 +15,13 @@ This guide covers environment setup, architecture principles, testing requiremen
 ## Local Environment Setup
 
 ### Prerequisites
-* Python 3.11+
-* Node.js 20+ and `npm`
-* Git
+
+- Python 3.11+
+- Node.js 20+ and `npm`
+- Git
 
 ### 1. Backend Setup
+
 ```bash
 # Create and activate virtual environment:
 python -m venv .venv
@@ -31,6 +33,7 @@ uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ### 2. Frontend Setup
+
 ```bash
 cd frontend
 npm install
@@ -44,18 +47,21 @@ npm run dev
 Execute the following verification steps locally before submitting changes:
 
 ### 1. Backend Test Suite & Coverage
+
 ```bash
 cd backend
 python -m pytest --cov=backend
 ```
 
 ### 2. Frontend Test Suite
+
 ```bash
 cd frontend
 npm run test
 ```
 
 ### 3. Frontend Linting & Production Build
+
 ```bash
 cd frontend
 npm run lint
@@ -63,6 +69,7 @@ npm run build
 ```
 
 ### 4. Code Formatting
+
 ```bash
 npx prettier --check .
 npx prettier --write .
@@ -74,13 +81,13 @@ npx prettier --write .
 
 Commit messages must conform to standard Conventional Commits:
 
-* `feat(...)`: New user-facing features or metric calculations
-* `fix(...)`: Bug fixes and regression repairs
-* `perf(...)`: Performance optimizations and caching
-* `docs(...)`: Documentation and guide updates
-* `refactor(...)`: Code modifications that neither fix bugs nor add features
-* `test(...)`: Adding or updating test suites
-* `chore(...)`: Routine tooling, dependency, and CI configuration updates
+- `feat(...)`: New user-facing features or metric calculations
+- `fix(...)`: Bug fixes and regression repairs
+- `perf(...)`: Performance optimizations and caching
+- `docs(...)`: Documentation and guide updates
+- `refactor(...)`: Code modifications that neither fix bugs nor add features
+- `test(...)`: Adding or updating test suites
+- `chore(...)`: Routine tooling, dependency, and CI configuration updates
 
 ---
 

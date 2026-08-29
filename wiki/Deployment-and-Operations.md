@@ -15,7 +15,7 @@ graph LR
         B --> C[(PostgreSQL Database)]
         B --> D[(Redis Cache)]
     end
-    
+
     subgraph Self-Hosted Setup
         E[Docker Compose Stack] --> F[Local SQLite DB]
     end
@@ -33,6 +33,7 @@ npx vercel --prod
 ```
 
 ### Routing Rules (`frontend/vercel.json`)
+
 ```json
 {
   "rewrites": [
@@ -59,22 +60,23 @@ docker compose up --build -d
 ```
 
 ### Services:
-* `backend`: FastAPI async service listening on port `8000`.
-* `frontend`: Production bundle served via Nginx on port `5173`.
-* `db`: Optional PostgreSQL database container.
+
+- `backend`: FastAPI async service listening on port `8000`.
+- `frontend`: Production bundle served via Nginx on port `5173`.
+- `db`: Optional PostgreSQL database container.
 
 ---
 
 ## Environment Configuration
 
-| Variable | Description | Default | Required in Production |
-| :--- | :--- | :--- | :---: |
-| `DATABASE_URL` | SQLAlchemy async connection string | `sqlite+aiosqlite:///./data/commitiq.db` | Optional |
-| `GEMINI_API_KEY` | Google Gemini API key for narrative generation | `None` (Falls back to deterministic template) | Recommended |
-| `ANTHROPIC_API_KEY` | Anthropic Claude API key | `None` | Optional |
-| `REDIS_URL` | Redis connection URL for narrative caching | `None` (Falls back to in-memory TTL cache) | Optional |
-| `CORS_ORIGINS` | Comma-separated list of allowed origins | `http://localhost:5173` | Yes |
-| `LOG_LEVEL` | Application logging verbosity | `INFO` | No |
+| Variable            | Description                                    | Default                                       | Required in Production |
+| :------------------ | :--------------------------------------------- | :-------------------------------------------- | :--------------------: |
+| `DATABASE_URL`      | SQLAlchemy async connection string             | `sqlite+aiosqlite:///./data/commitiq.db`      |        Optional        |
+| `GEMINI_API_KEY`    | Google Gemini API key for narrative generation | `None` (Falls back to deterministic template) |      Recommended       |
+| `ANTHROPIC_API_KEY` | Anthropic Claude API key                       | `None`                                        |        Optional        |
+| `REDIS_URL`         | Redis connection URL for narrative caching     | `None` (Falls back to in-memory TTL cache)    |        Optional        |
+| `CORS_ORIGINS`      | Comma-separated list of allowed origins        | `http://localhost:5173`                       |          Yes           |
+| `LOG_LEVEL`         | Application logging verbosity                  | `INFO`                                        |           No           |
 
 ---
 
@@ -82,6 +84,6 @@ docker compose up --build -d
 
 CommitIQ runs a non-blocking background job every 24 hours using `AsyncIOScheduler`:
 
-* Periodically reviews registered repositories for commit updates.
-* Refreshes complexity, churn, and DORA metrics without degrading interactive API responsiveness.
-* Automatically marks stale, orphaned ingestion runs as failed on application reboot.
+- Periodically reviews registered repositories for commit updates.
+- Refreshes complexity, churn, and DORA metrics without degrading interactive API responsiveness.
+- Automatically marks stale, orphaned ingestion runs as failed on application reboot.
