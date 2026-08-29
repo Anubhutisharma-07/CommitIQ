@@ -9,11 +9,10 @@ const RISK_COLORS: Record<string, string> = {
   low: '52, 211, 153',
 }
 
-const RISK_ORDER = { critical: 0, high: 1, medium: 2, low: 3 }
 
 export function BusFactorTable({ modules }: BusFactorTableProps) {
   const sorted = [...modules]
-    .sort((a, b) => RISK_ORDER[a.risk_level] - RISK_ORDER[b.risk_level])
+    .sort((a, b) => b.top_contributor_pct - a.top_contributor_pct)
     .slice(0, 20)
 
   return (
