@@ -174,6 +174,7 @@ Missing but obviously needed:
 - 2026-08-28: Implemented in-memory caching for Team Health calculations to improve dashboard response times (#376).
 - 2026-08-28: Integrated React Error Boundary around Code Quality Dashboard component (#380).
 - 2026-08-28: Added start_date and end_date filtering options to DORA metrics calculation API (#375).
+- 2026-08-29: Created complete Wiki documentation system (Architecture, DORA & Cycle Time, REST API Reference, Developer Guide, Deployment & Operations, Troubleshooting & FAQ) in /wiki and expanded MkDocs documentation in /docs.
 - 2026-08-26: Added metric explanation tooltips for Bus Factor, Churn, and Cyclomatic Complexity metrics across dashboard cards (#265).
 - 2026-08-26: Made Hotspot Map and Knowledge Graph Explorer components responsive on mobile viewports (#377).
 - 2026-08-26: Created unified PDF report export for developer health and repository maintainability metrics (#389).
