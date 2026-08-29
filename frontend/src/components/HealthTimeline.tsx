@@ -216,7 +216,10 @@ export function HealthTimeline({
         </div>
       </div>
 
-      <div className={`w-full relative z-10 ${styles.timelineScrollContainer}`} style={{ height: 280 }}>
+      <div
+        className={`w-full relative z-10 ${styles.timelineScrollContainer}`}
+        style={{ height: 280 }}
+      >
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={commits} onClick={handleClick} style={{ cursor: 'pointer' }}>
             <defs>

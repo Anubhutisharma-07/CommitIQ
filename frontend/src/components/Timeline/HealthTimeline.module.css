@@ -3,7 +3,7 @@
   overflow-x: auto;
   overflow-y: hidden;
   padding-bottom: 0.75rem;
-  
+
   /* Modern standard property integration for Firefox support */
   scrollbar-width: thin;
   scrollbar-color: #334155 #0f172a;
