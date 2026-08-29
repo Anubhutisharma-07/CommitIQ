@@ -22,6 +22,7 @@ import { CycleTimeDashboard } from '../components/CycleTimeDashboard'
 import { DoraMetricsDashboard } from '../components/DoraMetricsDashboard'
 import { TeamHealthDashboard } from '../components/TeamHealthDashboard'
 import { ScheduledReportsDashboard } from '../components/ScheduledReportsDashboard'
+import { WeeklyDigestCard } from '../components/WeeklyDigestCard'
 import { TimeRangeSelector, type TimeRangePreset } from '../components/TimeRangeSelector'
 import { HealthBadge } from '../components/ui/HealthBadge'
 import { ThemeToggle } from '../components/ui/ThemeToggle'
@@ -694,6 +695,8 @@ export default function DashboardPage() {
               )}
             </ErrorBoundary>
           </div>
+
+          {repoId && <WeeklyDigestCard repoId={repoId} />}
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
             {repoId && <CycleTimeDashboard repoId={repoId} />}

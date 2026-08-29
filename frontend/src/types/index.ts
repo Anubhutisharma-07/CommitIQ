@@ -560,6 +560,63 @@ export interface ReportPreview {
   }
 }
 
+export interface WeeklyDigestAlert {
+  severity: string
+  metric: string
+  message: string
+}
+
+export interface WeeklyDigest {
+  repo_name: string
+  repo_slug: string
+  generated_at: string
+  window_weeks: number
+  summary: {
+    total_commits: number
+    total_insertions: number
+    total_deletions: number
+    total_files_changed: number
+    unique_contributors: number
+  }
+  health: {
+    current_avg_score: number
+    previous_avg_score: number
+    trend: number
+    trend_direction: 'up' | 'down' | 'flat'
+  }
+  complexity: {
+    current_avg: number
+    previous_avg: number
+    trend: number
+  }
+  churn: {
+    current_avg_rate: number
+    previous_avg_rate: number
+    trend: number
+  }
+  bus_factor: {
+    total_modules: number
+    critical_risk_count: number
+    high_risk_count: number
+    top_risk_modules: Array<{
+      module: string
+      risk_level: string
+      top_contributor: string | null
+      top_contributor_pct: number
+      contributor_count: number
+    }>
+  }
+  top_contributors: Array<{
+    author: string
+    commits: number
+    insertions: number
+    deletions: number
+    files_changed: number
+  }>
+  persistent_hotspots: Array<{ path: string; snapshot_count: number }>
+  alerts: WeeklyDigestAlert[]
+}
+
 export interface RepoCompareResponse {
   base: RepoCompareItem
   head: RepoCompareItem

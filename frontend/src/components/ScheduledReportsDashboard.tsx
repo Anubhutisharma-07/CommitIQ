@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, forwardRef, type FormEvent } from 'react'
+import { useCallback, useRef, useState, forwardRef, type FormEvent } from 'react'
 import useSWR from 'swr'
 import {
   Clock,
@@ -797,9 +797,6 @@ function InfoCell({
 /* ---------------------------------------------------------------------- */
 
 function DeliveryRow({ delivery }: { delivery: ReportDelivery }) {
-  const statusColor =
-    delivery.status === 'success' ? 'emerald' : delivery.status === 'failed' ? 'rose' : 'slate'
-
   return (
     <div className="flex items-center justify-between gap-3 bg-white/[0.03] rounded-lg px-3 py-2 border border-white/5">
       <div className="flex items-center gap-3 min-w-0">

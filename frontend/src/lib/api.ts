@@ -30,7 +30,10 @@ import type {
   ReportSchedule,
   ReportScheduleListResponse,
   ReportPreview,
+  WeeklyDigest,
 } from '../types'
+
+export type { NarrativeStreamChunk } from '../types'
 
 export const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '')
 export const API_ROOT = `${API_BASE}/api`
@@ -307,6 +310,14 @@ export async function previewReport(
 ): Promise<ReportPreview> {
   const params = reportType ? { report_type: reportType } : undefined
   return request<ReportPreview>(client.get(`/repos/${repoId}/reports/preview`, { params }))
+}
+
+export async function getWeeklyDigest(
+  repoId: string | number,
+  weeks?: number
+): Promise<WeeklyDigest> {
+  const params = weeks && weeks !== 1 ? { weeks } : undefined
+  return request<WeeklyDigest>(client.get(`/repos/${repoId}/digest`, { params }))
 }
 
 export interface NarrativeResponse {
