@@ -1,4 +1,9 @@
-"""Multi-provider LLM routing for CommitIQ narratives."""
+"""Multi-provider LLM routing for CommitIQ narratives.
+
+Streams tokens from Claude (primary) with Gemini fallback, behind a
+pybreaker circuit breaker. Used by the SSE streaming endpoint in
+``router.py``.
+"""
 
 from __future__ import annotations
 
@@ -19,7 +24,7 @@ try:
 
     llm_breaker = pybreaker.CircuitBreaker(fail_max=3, reset_timeout=60)
     CircuitBreakerError = pybreaker.CircuitBreakerError
-except ImportError:
+except ImportError:  # pragma: no cover - pybreaker is a hard dep in requirements.txt
     pybreaker = None
 
     def _dummy_decorator(func):
@@ -28,10 +33,12 @@ except ImportError:
     llm_breaker = _dummy_decorator
 
     class CircuitBreakerError(Exception):
-        pass
+        """Raised when the circuit breaker is open (fallback when pybreaker is missing)."""
 
 
 class LLMProvider(str, Enum):
+    """Identifies which LLM produced a given chunk of text."""
+
     ANTHROPIC = "anthropic"
     GEMINI = "gemini"
     NONE = "none"
@@ -53,6 +60,7 @@ Rules:
 
 
 def model_for_provider(provider: LLMProvider | str) -> str:
+    """Return the canonical model identifier for a given provider."""
     provider_value = provider.value if isinstance(provider, LLMProvider) else provider
     if provider_value == LLMProvider.ANTHROPIC.value:
         return ANTHROPIC_MODEL
@@ -65,15 +73,20 @@ async def stream_narrative(
     prompt: str,
     max_tokens: int = 600,
 ) -> AsyncGenerator[tuple[str, LLMProvider], None]:
-    """Stream narrative tokens from Claude first, then Gemini fallback."""
+    """Stream narrative tokens from Claude first, then Gemini fallback.
+
+    Yields ``(token_text, provider)`` tuples. If both providers are
+    unavailable (no API keys, network failure, or circuit breaker open)
+    yields a single degraded message with :class:`LLMProvider.NONE`.
+    """
     try:
         if ANTHROPIC_API_KEY:
             try:
                 async for token in _stream_anthropic(prompt, max_tokens):
                     yield token, LLMProvider.ANTHROPIC
                 return
-            except pybreaker.CircuitBreakerError:
-                raise  # Let the outer try-except handle breaker errors
+            except CircuitBreakerError:
+                raise
             except Exception as exc:
                 logger.warning("Anthropic failed, trying Gemini fallback: %s", exc)
 
@@ -82,22 +95,31 @@ async def stream_narrative(
                 async for token in _stream_gemini(prompt, max_tokens):
                     yield token, LLMProvider.GEMINI
                 return
-            except pybreaker.CircuitBreakerError:
+            except CircuitBreakerError:
                 raise
             except Exception as exc:
                 logger.error("Gemini fallback failed: %s", exc)
 
+        # No API keys configured OR all providers raised. Yield a single
+        # degraded message rather than raising so the SSE endpoint can
+        # still emit a terminal event for the frontend to render.
         raise RuntimeError(
             "All LLM providers unavailable. Configure ANTHROPIC_API_KEY or GEMINI_API_KEY."
         )
-    except pybreaker.CircuitBreakerError:
-        logger.error("LLM circuit breaker open. APIs temporarily degraded.")
-        fallback_msg = "AI services are temporarily degraded due to high failure rates. Please try again later.\n\nRisk level: Unknown"
+    except (CircuitBreakerError, RuntimeError):
+        logger.error("LLM providers unavailable. Emitting degraded fallback message.")
+        fallback_msg = (
+            "AI services are temporarily unavailable - either no provider API keys "
+            "are configured or the circuit breaker is open. "
+            "Configure ANTHROPIC_API_KEY or GEMINI_API_KEY in your .env file.\n\n"
+            "Risk level: Unknown"
+        )
         yield fallback_msg, LLMProvider.NONE
 
 
 @llm_breaker
 async def _stream_anthropic(prompt: str, max_tokens: int) -> AsyncGenerator[str, None]:
+    """Stream text chunks from Anthropic Claude via the async SDK."""
     import anthropic
 
     client = anthropic.AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
@@ -113,6 +135,7 @@ async def _stream_anthropic(prompt: str, max_tokens: int) -> AsyncGenerator[str,
 
 @llm_breaker
 async def _stream_gemini(prompt: str, max_tokens: int) -> AsyncGenerator[str, None]:
+    """Stream text chunks from Google Gemini (run in a thread executor)."""
     import google.generativeai as genai
 
     genai.configure(api_key=GEMINI_API_KEY)
@@ -149,6 +172,7 @@ async def _stream_gemini(prompt: str, max_tokens: int) -> AsyncGenerator[str, No
 async def get_narrative_non_streaming(
     prompt: str, max_tokens: int = 600
 ) -> tuple[str, LLMProvider]:
+    """Consume :func:`stream_narrative` and return the joined text + provider used."""
     full_text: list[str] = []
     provider_used = LLMProvider.NONE
     async for token, provider in stream_narrative(prompt, max_tokens):
