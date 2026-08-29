@@ -19,6 +19,9 @@ import type {
   TeamHealthMetrics,
   CodeQualityMetrics,
   RepoCompareResponse,
+  ReportSchedule,
+  ReportScheduleListResponse,
+  ReportPreview,
 } from '../types'
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '')
@@ -220,6 +223,82 @@ export function getIngestProgress(repoId: string | number): EventSource {
 
 export async function cancelIngest(repoId: string | number): Promise<IngestStatus> {
   return request<IngestStatus>(client.post(`/repos/ingest/cancel/${repoId}`))
+}
+
+// --- Report Schedules ---
+
+export async function listReportSchedules(repoId: string | number): Promise<ReportSchedule[]> {
+  return request<ReportSchedule[]>(client.get(`/repos/${repoId}/schedules`))
+}
+
+export async function createReportSchedule(
+  repoId: string | number,
+  data: {
+    name: string
+    description?: string
+    cron_expression: string
+    timezone?: string
+    report_type?: string
+    webhook_url?: string
+    webhook_secret?: string
+    notification_email?: string
+    include_narrative?: boolean
+  }
+): Promise<ReportSchedule> {
+  return request<ReportSchedule>(client.post(`/repos/${repoId}/schedules`, data))
+}
+
+export async function updateReportSchedule(
+  repoId: string | number,
+  scheduleId: number,
+  data: Partial<ReportSchedule>
+): Promise<ReportSchedule> {
+  return request<ReportSchedule>(client.patch(`/repos/${repoId}/schedules/${scheduleId}`, data))
+}
+
+export async function deleteReportSchedule(
+  repoId: string | number,
+  scheduleId: number
+): Promise<void> {
+  return request<void>(client.delete(`/repos/${repoId}/schedules/${scheduleId}`))
+}
+
+export async function toggleReportSchedule(
+  repoId: string | number,
+  scheduleId: number
+): Promise<ReportSchedule> {
+  return request<ReportSchedule>(client.post(`/repos/${repoId}/schedules/${scheduleId}/toggle`))
+}
+
+export async function triggerReportSchedule(
+  repoId: string | number,
+  scheduleId: number
+): Promise<{ delivery_id: number; status: string; message: string }> {
+  return request(client.post(`/repos/${repoId}/schedules/${scheduleId}/trigger`))
+}
+
+export async function getReportDeliveries(
+  repoId: string | number,
+  scheduleId: number,
+  limit?: number,
+  offset?: number
+): Promise<ReportScheduleListResponse> {
+  const params: Record<string, unknown> = {}
+  if (limit !== undefined) params.limit = limit
+  if (offset !== undefined) params.offset = offset
+  return request<ReportScheduleListResponse>(
+    client.get(`/repos/${repoId}/schedules/${scheduleId}/deliveries`, {
+      params: Object.keys(params).length ? params : undefined,
+    })
+  )
+}
+
+export async function previewReport(
+  repoId: string | number,
+  reportType?: string
+): Promise<ReportPreview> {
+  const params = reportType ? { report_type: reportType } : undefined
+  return request<ReportPreview>(client.get(`/repos/${repoId}/reports/preview`, { params }))
 }
 
 export async function streamNarrative(

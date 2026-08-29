@@ -55,6 +55,7 @@ class Repo(Base):
     bus_factor = relationship("BusFactor", back_populates="repo", cascade="all, delete-orphan")
     deployments = relationship("Deployment", back_populates="repo", cascade="all, delete-orphan")
     pull_requests = relationship("PullRequest", back_populates="repo", cascade="all, delete-orphan")
+    report_schedules = relationship("ReportSchedule", back_populates="repo", cascade="all, delete-orphan")
 
 
 class Deployment(Base):
@@ -301,4 +302,66 @@ class PullRequest(Base):
     __table_args__ = (
         UniqueConstraint("repo_id", "pr_number", name="uq_pr_repo_number"),
         Index("idx_prs_repo_created", "repo_id", "created_at"),
+    )
+
+
+class ReportSchedule(Base):
+    __tablename__ = "report_schedules"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    repo_id = Column(Integer, ForeignKey("repos.id", ondelete="CASCADE"), nullable=False)
+    name = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
+    cron_expression = Column(String, nullable=False)  # e.g. "0 9 * * MON" for weekly Monday 9am
+    timezone = Column(String, nullable=False, default="UTC")
+    report_type = Column(String, nullable=False, default="health_summary")
+    # report_type values: health_summary, dora_metrics, team_health, full_analysis
+    is_active = Column(Boolean, nullable=False, default=True)
+    webhook_url = Column(Text, nullable=True)  # Slack / custom webhook URL
+    webhook_secret = Column(String, nullable=True)  # HMAC signing secret for webhook
+    notification_email = Column(String, nullable=True)
+    include_narrative = Column(Boolean, nullable=False, default=False)
+    last_run_at = Column(DateTime(timezone=True), nullable=True)
+    next_run_at = Column(DateTime(timezone=True), nullable=True)
+    last_delivery_status = Column(String, nullable=True)  # 'success', 'failed', 'pending'
+    consecutive_failures = Column(Integer, nullable=False, default=0)
+    max_retry_count = Column(Integer, nullable=False, default=3)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    repo = relationship("Repo", back_populates="report_schedules")
+    deliveries = relationship("ReportDelivery", back_populates="schedule", cascade="all, delete-orphan")
+
+    __table_args__ = (
+        Index("idx_report_schedules_repo", "repo_id"),
+        Index("idx_report_schedules_next_run", "next_run_at", "is_active"),
+    )
+
+
+class ReportDelivery(Base):
+    __tablename__ = "report_deliveries"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    schedule_id = Column(Integer, ForeignKey("report_schedules.id", ondelete="CASCADE"), nullable=False)
+    repo_id = Column(Integer, ForeignKey("repos.id", ondelete="CASCADE"), nullable=False)
+    status = Column(String, nullable=False, default="pending")  # pending, running, success, failed
+    report_type = Column(String, nullable=False)
+    triggered_at = Column(DateTime(timezone=True), server_default=func.now())
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+    duration_seconds = Column(Float, nullable=True)
+    report_payload = Column(Text, nullable=True)  # JSON-encoded report summary data
+    webhook_status_code = Column(Integer, nullable=True)
+    webhook_response_body = Column(Text, nullable=True)
+    error_message = Column(Text, nullable=True)
+    retry_count = Column(Integer, nullable=False, default=0)
+    snapshot_health_score = Column(Float, nullable=True)
+    snapshot_commits_analyzed = Column(Integer, nullable=True)
+    snapshot_latest_sha = Column(String, nullable=True)
+
+    schedule = relationship("ReportSchedule", back_populates="deliveries")
+    repo = relationship("Repo")
+
+    __table_args__ = (
+        Index("idx_report_deliveries_schedule", "schedule_id"),
+        Index("idx_report_deliveries_repo_time", "repo_id", "triggered_at"),
     )
