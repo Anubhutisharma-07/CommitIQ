@@ -492,6 +492,33 @@ export interface RepoCompareInsight {
   summary: string
 }
 
+export interface HealthRecommendation {
+  id: string
+  category: string
+  severity: 'critical' | 'high' | 'medium' | 'low'
+  title: string
+  description: string
+  impact: number
+  effort: 'low' | 'medium' | 'high'
+  metric: string | null
+  current_value: string | null
+  target_value: string | null
+  file_path: string | null
+}
+
+export interface RecommendationsResponse {
+  repo_name: string
+  repo_slug: string
+  generated_at: string
+  health_score: number
+  total_recommendations: number
+  critical_count: number
+  high_count: number
+  medium_count: number
+  low_count: number
+  recommendations: HealthRecommendation[]
+}
+
 export interface RepoCompareResponse {
   base: RepoCompareItem
   head: RepoCompareItem

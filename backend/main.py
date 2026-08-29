@@ -9,6 +9,7 @@ from backend.database import AsyncSessionLocal, engine, init_db
 from backend.demo_seeder import seed_demo_data_if_empty
 from backend.features.llm_analysis.router import router as llm_router
 from backend.features.metrics.router import router as metrics_router
+from backend.features.metrics.recommendations_router import router as recs_router
 from backend.features.reports.router import router as reports_router
 from backend.features.repo_ingestion.router import router as ingestion_router
 from backend.features.webhooks.router import router as webhooks_router
@@ -48,6 +49,7 @@ app.add_middleware(
 app.include_router(ingestion_router, prefix="/api")
 app.include_router(llm_router, prefix="/api")
 app.include_router(metrics_router, prefix="/api")
+app.include_router(recs_router, prefix="/api")
 app.include_router(reports_router, prefix="/api")
 app.include_router(webhooks_router, prefix="/api/webhooks", tags=["webhooks"])
 

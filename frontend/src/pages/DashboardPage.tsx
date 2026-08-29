@@ -21,6 +21,7 @@ import { NarrativeCard } from '../components/NarrativeCard'
 import { CycleTimeDashboard } from '../components/CycleTimeDashboard'
 import { DoraMetricsDashboard } from '../components/DoraMetricsDashboard'
 import { TeamHealthDashboard } from '../components/TeamHealthDashboard'
+import { RecommendationsCard } from '../components/RecommendationsCard'
 import { TimeRangeSelector, type TimeRangePreset } from '../components/TimeRangeSelector'
 import { HealthBadge } from '../components/ui/HealthBadge'
 import { ThemeToggle } from '../components/ui/ThemeToggle'
@@ -734,6 +735,8 @@ export default function DashboardPage() {
               </div>
             </div>
           )}
+
+          {repoId && <RecommendationsCard repoId={repoId} />}
 
           {repoId && (
             <HotspotMap

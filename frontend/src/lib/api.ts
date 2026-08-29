@@ -19,6 +19,7 @@ import type {
   TeamHealthMetrics,
   CodeQualityMetrics,
   RepoCompareResponse,
+  RecommendationsResponse,
 } from '../types'
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '')
@@ -220,6 +221,12 @@ export function getIngestProgress(repoId: string | number): EventSource {
 
 export async function cancelIngest(repoId: string | number): Promise<IngestStatus> {
   return request<IngestStatus>(client.post(`/repos/ingest/cancel/${repoId}`))
+}
+
+export async function getRecommendations(
+  repoId: string | number
+): Promise<RecommendationsResponse> {
+  return request<RecommendationsResponse>(client.get(`/repos/${repoId}/recommendations`))
 }
 
 export async function streamNarrative(
