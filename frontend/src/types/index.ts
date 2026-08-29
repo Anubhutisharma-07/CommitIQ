@@ -492,6 +492,74 @@ export interface RepoCompareInsight {
   summary: string
 }
 
+export interface ReportSchedule {
+  id: number
+  repo_id: number
+  name: string
+  description: string | null
+  cron_expression: string
+  cron_description: string
+  timezone: string
+  report_type: string
+  is_active: boolean
+  webhook_url: string | null
+  notification_email: string | null
+  include_narrative: boolean
+  last_run_at: string | null
+  next_run_at: string | null
+  last_delivery_status: string | null
+  consecutive_failures: number
+  max_retry_count: number
+  created_at: string | null
+  updated_at: string | null
+}
+
+export interface ReportDelivery {
+  id: number
+  schedule_id: number
+  repo_id: number
+  status: string
+  report_type: string
+  triggered_at: string | null
+  completed_at: string | null
+  duration_seconds: number | null
+  webhook_status_code: number | null
+  error_message: string | null
+  retry_count: number
+  snapshot_health_score: number | null
+  snapshot_commits_analyzed: number | null
+  snapshot_latest_sha: string | null
+}
+
+export interface ReportScheduleListResponse {
+  total: number
+  limit: number
+  offset: number
+  deliveries: ReportDelivery[]
+}
+
+export interface ReportPreview {
+  report_type: string
+  repo_name: string
+  repo_slug: string
+  generated_at: string
+  summary: {
+    total_commits: number
+    total_insertions: number
+    total_deletions: number
+    churn_rate_percent: number
+    unique_contributors: number
+    total_files_changed: number
+    default_branch: string
+  }
+  latest_commit?: {
+    sha: string
+    message: string
+    author: string | null
+    committed_at: string | null
+  }
+}
+
 export interface RepoCompareResponse {
   base: RepoCompareItem
   head: RepoCompareItem

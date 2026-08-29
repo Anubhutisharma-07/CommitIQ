@@ -303,6 +303,7 @@ Missing but obviously needed:
 - 2026-08-28: Implemented in-memory caching for Team Health calculations to improve dashboard response times (#376).
 - 2026-08-28: Integrated React Error Boundary around Code Quality Dashboard component (#380).
 - 2026-08-28: Added start_date and end_date filtering options to DORA metrics calculation API (#375).
+- 2026-08-29: Added Scheduled Health Reports system with cron scheduling, webhook delivery, and history UI (#456, #457).
 - 2026-08-29: Implemented Server-Sent Events (SSE) streaming for LLM narrative generation via `/api/explain/stream` and `/api/predict/stream` (#394, #452).
 - 2026-08-29: Added custom CSS scrollbar for Health Timeline component (#370, #455).
 - 2026-08-29: Sorted Bus Factor table rows by ownership percentage descending (#371, #454).
