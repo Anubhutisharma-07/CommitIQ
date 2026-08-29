@@ -19,6 +19,7 @@ import type {
   TeamHealthMetrics,
   CodeQualityMetrics,
   RepoCompareResponse,
+  WeeklyDigest,
 } from '../types'
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '')
@@ -220,6 +221,14 @@ export function getIngestProgress(repoId: string | number): EventSource {
 
 export async function cancelIngest(repoId: string | number): Promise<IngestStatus> {
   return request<IngestStatus>(client.post(`/repos/ingest/cancel/${repoId}`))
+}
+
+export async function getWeeklyDigest(
+  repoId: string | number,
+  weeks?: number
+): Promise<WeeklyDigest> {
+  const params = weeks && weeks !== 1 ? { weeks } : undefined
+  return request<WeeklyDigest>(client.get(`/repos/${repoId}/digest`, { params }))
 }
 
 export async function streamNarrative(
