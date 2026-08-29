@@ -12,6 +12,7 @@ const ComparePage = lazy(() => import('./pages/ComparePage'))
 const HealthRadarPage = lazy(() => import('./pages/HealthRadarPage'))
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'))
 const CommitHealthRadar = lazy(() => import('./components/CommitHealthRadar'))
+const TeamCollaborationHub = lazy(() => import('./components/TeamCollaborationHub'))
 
 function RouteFallback() {
   return (
@@ -38,6 +39,7 @@ export default function App() {
             <Route path="/health-radar" element={<HealthRadarPage />} />
             <Route path="/demo" element={<DemoPage />} />
             <Route path="/health" element={<CommitHealthRadar />} />
+            <Route path="/team" element={<TeamCollaborationHub />} />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </Suspense>
