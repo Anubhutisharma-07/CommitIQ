@@ -1,22 +1,21 @@
 # REST API Reference
 
-CommitIQ exposes a complete, high-performance RESTful API built on **FastAPI** with asynchronous SQLAlchemy database execution.
+CommitIQ exposes a RESTful API built on FastAPI with asynchronous database execution via SQLAlchemy.
 
 ---
 
-## 🌐 Base URL & Interactive Docs
+## Service Endpoints & Interactive Documentation
 
-- **Local Development**: `http://localhost:8000/api`
-- **Interactive Swagger UI**: `http://localhost:8000/docs`
-- **ReDoc Documentation**: `http://localhost:8000/redoc`
+* **Base API URL**: `http://localhost:8000/api`
+* **OpenAPI / Swagger UI**: `http://localhost:8000/docs`
+* **ReDoc Interface**: `http://localhost:8000/redoc`
 
 ---
 
-## 📌 Repositories API
+## Repositories API
 
-### 1. Ingest / Register Repository
-
-Initiates asynchronous repository cloning, commit walking, code complexity calculation, and graph indexing.
+### 1. Ingest Repository
+Initiates asynchronous repository cloning, commit traversal, code complexity analysis, and graph indexing.
 
 ```http
 POST /api/repos
@@ -31,7 +30,6 @@ Content-Type: application/json
 ```
 
 #### Response (`202 Accepted`)
-
 ```json
 {
   "id": 1,
@@ -46,16 +44,14 @@ Content-Type: application/json
 ---
 
 ### 2. Stream Ingestion Progress (SSE)
-
-Real-time Server-Sent Events stream delivering progress stages during repository analysis.
+Real-time Server-Sent Events (SSE) stream delivering progress status during background ingestion.
 
 ```http
 GET /api/repos/{repo_id}/progress
 Accept: text/event-stream
 ```
 
-#### SSE Stream Events
-
+#### Stream Event Payloads
 ```json
 data: {"status": "cloning", "progress": 25, "message": "Cloning git repository..."}
 data: {"status": "analyzing", "progress": 60, "message": "Computing cyclomatic complexity..."}
@@ -64,16 +60,14 @@ data: {"status": "ready", "progress": 100, "message": "Analysis complete."}
 
 ---
 
-### 3. Get Repository Health Timeline
-
-Fetches chronological commit health records including composite health scores, churn, complexity, and ownership signals.
+### 3. Get Health Timeline
+Retrieves chronological commit records with composite health scores, churn metrics, and risk factors.
 
 ```http
 GET /api/repos/{repo_id}/timeline?start_date=2026-08-01T00:00:00Z&end_date=2026-08-28T23:59:59Z
 ```
 
 #### Response (`200 OK`)
-
 ```json
 [
   {
@@ -95,16 +89,14 @@ GET /api/repos/{repo_id}/timeline?start_date=2026-08-01T00:00:00Z&end_date=2026-
 
 ---
 
-### 4. Get Architectural Dependency Graph
-
-Retrieves module nodes, imports, and co-change coupling edges computed across the repository tree.
+### 4. Get Dependency Graph
+Returns module nodes, imports, and co-change coupling edges computed across the repository tree.
 
 ```http
 GET /api/repos/{repo_id}/graph
 ```
 
 #### Response (`200 OK`)
-
 ```json
 {
   "nodes": [
@@ -129,16 +121,14 @@ GET /api/repos/{repo_id}/graph
 
 ---
 
-### 5. Get Hotspot Maintainability Matrix
-
-Identifies high-complexity, high-churn files representing architectural risk zones.
+### 5. Get Hotspots Matrix
+Identifies high-complexity, high-churn files that represent architectural risk areas.
 
 ```http
 GET /api/repos/{repo_id}/hotspots?limit=20&offset=0
 ```
 
 #### Response (`200 OK`)
-
 ```json
 {
   "total": 1,
@@ -158,9 +148,8 @@ GET /api/repos/{repo_id}/hotspots?limit=20&offset=0
 
 ---
 
-### 6. Get Bus Factor & Ownership Concentration
-
-Retrieves ownership distribution and identifies single-point-of-failure files.
+### 6. Get Bus Factor & Ownership
+Returns ownership distribution and flags single-contributor dependency files.
 
 ```http
 GET /api/repos/{repo_id}/bus-factor
@@ -169,8 +158,7 @@ GET /api/repos/{repo_id}/bus-factor
 ---
 
 ### 7. Export Unified Health Report (PDF)
-
-Generates an executive-ready PDF report containing DORA metrics, Cycle Time charts, Hotspots, and Team Health signals.
+Generates an executive PDF report containing DORA metrics, Cycle Time charts, Hotspots, and Team Health signals.
 
 ```http
 GET /api/repos/{repo_id}/report
@@ -179,9 +167,8 @@ Accept: application/pdf
 
 ---
 
-### 8. Side-by-Side Codebase Comparison
-
-Compares health, complexity, and maintainability metrics across two distinct repositories.
+### 8. Repository Comparison
+Compares maintainability, complexity, and churn signals across two distinct repositories.
 
 ```http
 GET /api/compare?base_slug=owner/repo1&target_slug=owner/repo2
@@ -189,9 +176,8 @@ GET /api/compare?base_slug=owner/repo1&target_slug=owner/repo2
 
 ---
 
-### 9. AI Commit Narrative Stream
-
-Generates plain-English architectural summaries of codebase changes via Anthropic Claude or Google Gemini fallback.
+### 9. AI Commit Narrative
+Generates plain-English summaries of codebase changes via Anthropic Claude or Google Gemini fallback.
 
 ```http
 POST /api/llm/narrative

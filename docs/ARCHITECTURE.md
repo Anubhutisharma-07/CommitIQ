@@ -1,65 +1,85 @@
-# Architecture Overview
+# System Architecture & Technical Design
 
-This document provides a high-level overview of the architectural design and structural components of **CommitIQ**. It is intended to help contributors understand how the project is organized and how the different systems interact.
+CommitIQ is structured as a high-throughput, decoupled client-server platform designed for concurrent repository ingestion, AST-based complexity profiling, co-change graph traversal, and real-time visualization.
 
-## 🏗️ System Architecture
+---
 
-CommitIQ follows a modernized client-server architecture with separation of concerns.
+## Architectural Topology
 
 ```mermaid
 flowchart TD
-    %% Users
-    User((User / Developer))
+    User((Developer / Maintainer))
 
-    %% Frontend Layer
-    subgraph Frontend [Frontend Client]
-        UI[User Interface]:::frontend
-        State[State Management]:::frontend
+    subgraph Frontend [Frontend Application - React 18 & Vite]
+        UI[Dashboard & Views]
+        State[SWR Cache & State]
+        GraphCanvas[Force Graph & Canvas Engine]
     end
 
-    %% Backend Layer
-    subgraph Backend [Backend API Service]
-        API[API Endpoints]:::backend
-        CoreLogic[Core Business Logic]:::backend
-        DB_Interface[Database Interface]:::backend
+    subgraph Backend [Backend Service - FastAPI & AsyncIO]
+        API[REST & SSE Endpoints]
+        Walker[Git Commit Walker]
+        Analyzer[AST & Metrics Engine - Radon/Lizard]
+        GraphEngine[Co-Change & Dependency Engine]
+        LLMLayer[LLM Narrative Generator]
+        Scheduler[APScheduler Background Worker]
     end
 
-    %% Database Layer
-    subgraph Database [Data Persistence]
-        DB[(Database)]:::database
+    subgraph Persistence [Data & Cache Layer]
+        DB[(SQLAlchemy Async / SQLite / Postgres)]
+        Cache[(In-Memory / Redis TTL Cache)]
     end
 
-    %% Interconnections
-    User <-->|HTTP / WebSocket| UI
+    User <-->|HTTPS / SSE| UI
     UI <--> State
-    State <-->|REST API / GraphQL| API
-    API <--> CoreLogic
-    CoreLogic <--> DB_Interface
-    DB_Interface <--> DB
-
-    %% Styling
-    classDef frontend fill:#3b82f6,stroke:#1e3a8a,stroke-width:2px,color:#fff;
-    classDef backend fill:#10b981,stroke:#065f46,stroke-width:2px,color:#fff;
-    classDef database fill:#8b5cf6,stroke:#4c1d95,stroke-width:2px,color:#fff;
+    State <-->|REST API| API
+    API --> Walker
+    Walker --> Analyzer
+    Analyzer --> GraphEngine
+    Analyzer --> LLMLayer
+    API <--> DB
+    LLMLayer <--> Cache
+    Scheduler --> Walker
 ```
 
-## 📂 Project Structure
+---
 
-- **`/frontend`**: Contains the client-facing user interface code, responsible for presentation and local state management.
-- **`/backend`**: Houses the core server logic, API endpoint definitions, and handles communication with external services and databases.
-- **`/migrations`**: Database schema migrations to ensure consistent data structures across environments.
-- **`/docs`**: Project documentation, including this architecture file and contributor guidelines.
+## Component Breakdown
 
-## ⚙️ Automated Workflows
+### 1. Ingestion Pipeline (`backend/features/repo_ingestion`)
+* **`clone_service.py`**: Executes asynchronous, shallow git clone operations. Automatically detects the default branch (`main`, `master`, or custom branches).
+* **`commit_walker.py`**: Traverses commit histories using `GitPython` and git subprocesses with support for merge-commit exclusion (`exclude_merges=True`).
+* **Progress Streaming**: Broadcasts live status updates over Server-Sent Events (SSE) from `cloning` to `analyzing` to `ready`.
 
-CommitIQ utilizes robust CI/CD practices to maintain code quality:
+### 2. AST & Code Quality Analysis (`backend/features/metrics`)
+* **`complexity.py`**: Evaluates McCabe Cyclomatic Complexity using AST parsing via Radon (for Python) and Lizard (for multi-language repos).
+* **`churn.py`**: Calculates file-level and repo-level line additions, deletions, and volatility ratios.
+* **`dora.py`**: Computes DORA metrics across deployment frequency, lead time for changes, change failure rate, and MTTR.
+* **`cycle_time.py`**: Deconstructs commit lifecycles into Coding, Pickup, Review, and Deploy intervals.
+* **`bus_factor.py`**: Calculates ownership concentration matrices using normalized entropy and contributor identity mapping.
 
-- **Prettier Code Formatting**: Automated checks via GitHub Actions ensure that all code changes adhere strictly to the project's formatting standards defined in `.prettierrc`.
-- **Testing**: Test runners ensure feature stability before merging.
+### 3. Dependency & Co-Change Graph Engine (`backend/features/graph`)
+* Generates an in-memory graph where nodes represent files/modules and edges represent import relationships or co-change patterns.
+* Computes PageRank and network centrality to identify critical architectural bottlenecks.
 
-## 🔮 Future Considerations
+### 4. AI Narrative Layer (`backend/features/llm_analysis`)
+* Formats commit diff context and queries Anthropic Claude or Google Gemini via streaming interfaces.
+* Employs deterministic local template fallback when API keys are absent or network circuits open (`pybreaker`).
+* Caches generated summaries using in-memory TTL or optional Redis connections.
 
-As CommitIQ scales, the architecture may expand to include:
+### 5. Frontend Client (`frontend/src`)
+* **Core Framework**: React 18, TypeScript, Vite.
+* **Data Fetching**: SWR for stale-while-revalidate client-side caching and periodic polling.
+* **Visualizations**: Recharts for time-series charts, `react-force-graph-2d` for interactive architectural graphs.
+* **Resilience**: Component-level `<ErrorBoundary>` wrappers around analytical modules.
 
-- Dedicated caching layers (e.g., Redis) to optimize frequent data reads.
-- Microservice separation if specific background tasks require distinct scaling profiles.
+---
+
+## Database Schema & Persistence
+
+CommitIQ uses SQLAlchemy Async ORM supporting SQLite (for local development and zero-config setups) and PostgreSQL (for production multi-tenant environments):
+
+* **`repositories`**: Metadata, clone URL, default branch, ingestion status, and timestamps.
+* **`commits`**: SHA, commit message, author metadata, committed timestamp, and parent SHAs.
+* **`commit_metrics`**: Pre-computed health scores, cyclomatic complexity, churn, and bus factor metrics per commit.
+* **`hotspots`**: Aggregated file-level risk scores and contributor ownership counts.

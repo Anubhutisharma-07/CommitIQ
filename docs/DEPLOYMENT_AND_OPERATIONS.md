@@ -1,12 +1,12 @@
 # Deployment & Operations Guide
 
-This guide details deployment options, infrastructure configuration, containerization, and environment management for CommitIQ in production environments.
+This guide details deployment topologies, container orchestration, environment variable configuration, and maintenance jobs for CommitIQ in production environments.
 
 ---
 
-## 🚀 Deployment Topologies
+## Deployment Architectures
 
-CommitIQ can be deployed in two primary configurations:
+CommitIQ supports two deployment configurations:
 
 ```mermaid
 graph LR
@@ -15,7 +15,7 @@ graph LR
         B --> C[(PostgreSQL Database)]
         B --> D[(Redis Cache)]
     end
-
+    
     subgraph Self-Hosted Setup
         E[Docker Compose Stack] --> F[Local SQLite DB]
     end
@@ -23,17 +23,16 @@ graph LR
 
 ---
 
-## 🌐 Production Frontend Deployment (Vercel)
+## Production Frontend Deployment (Vercel)
 
-The frontend is optimized for zero-config global edge delivery on **Vercel**:
+The React frontend is optimized for global edge distribution via Vercel:
 
 ```bash
 cd frontend
 npx vercel --prod
 ```
 
-### Routing & Rewrite Rules (`frontend/vercel.json`)
-
+### Routing Rules (`frontend/vercel.json`)
 ```json
 {
   "rewrites": [
@@ -51,39 +50,38 @@ npx vercel --prod
 
 ---
 
-## 🐳 Containerization with Docker Compose
+## Containerization with Docker Compose
 
-For on-premise, self-hosted, or air-gapped environments, CommitIQ provides a single-command Docker Compose stack:
+For on-premise and isolated self-hosted deployments, use Docker Compose:
 
 ```bash
 docker compose up --build -d
 ```
 
-### Services Defined:
-
-- `backend`: FastAPI async engine running on port `8000`.
-- `frontend`: Vite production bundle served via Nginx on port `5173`.
-- `db`: Optional PostgreSQL 16 container for enterprise database isolation.
-
----
-
-## ⚙️ Environment Configuration
-
-| Variable            | Description                                    | Default                                       | Required in Production |
-| :------------------ | :--------------------------------------------- | :-------------------------------------------- | :--------------------: |
-| `DATABASE_URL`      | Async connection string for SQLAlchemy         | `sqlite+aiosqlite:///./data/commitiq.db`      |        Optional        |
-| `GEMINI_API_KEY`    | Google Gemini API key for streaming narratives | `None` (Falls back to deterministic template) |      Recommended       |
-| `ANTHROPIC_API_KEY` | Anthropic Claude API key                       | `None`                                        |        Optional        |
-| `REDIS_URL`         | Redis connection URL for narrative caching     | `None` (Falls back to in-memory TTL cache)    |        Optional        |
-| `CORS_ORIGINS`      | Comma-separated list of allowed CORS domains   | `http://localhost:5173`                       |        **Yes**         |
-| `LOG_LEVEL`         | Application logging verbosity                  | `INFO`                                        |           No           |
+### Services:
+* `backend`: FastAPI async service listening on port `8000`.
+* `frontend`: Production bundle served via Nginx on port `5173`.
+* `db`: Optional PostgreSQL database container.
 
 ---
 
-## ⏰ Background Periodic Refresh (APScheduler)
+## Environment Configuration
 
-CommitIQ includes an automatic background scheduler that periodically synchronizes metrics for tracked repositories every 24 hours:
+| Variable | Description | Default | Required in Production |
+| :--- | :--- | :--- | :---: |
+| `DATABASE_URL` | SQLAlchemy async connection string | `sqlite+aiosqlite:///./data/commitiq.db` | Optional |
+| `GEMINI_API_KEY` | Google Gemini API key for narrative generation | `None` (Falls back to deterministic template) | Recommended |
+| `ANTHROPIC_API_KEY` | Anthropic Claude API key | `None` | Optional |
+| `REDIS_URL` | Redis connection URL for narrative caching | `None` (Falls back to in-memory TTL cache) | Optional |
+| `CORS_ORIGINS` | Comma-separated list of allowed origins | `http://localhost:5173` | Yes |
+| `LOG_LEVEL` | Application logging verbosity | `INFO` | No |
 
-- Runs non-blocking background jobs using `AsyncIOScheduler`.
-- Automatically identifies registered repositories that have not been re-scanned in >24 hours.
-- Re-calculates complexity, churn, and DORA metrics without interrupting active user traffic.
+---
+
+## Periodic Synchronization (APScheduler)
+
+CommitIQ runs a non-blocking background job every 24 hours using `AsyncIOScheduler`:
+
+* Periodically reviews registered repositories for commit updates.
+* Refreshes complexity, churn, and DORA metrics without degrading interactive API responsiveness.
+* Automatically marks stale, orphaned ingestion runs as failed on application reboot.

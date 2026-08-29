@@ -1,80 +1,68 @@
 # Developer Guide & Contributing Standards
 
-This guide covers local environment setup, architectural design patterns, testing strategies, and governance standards for contributing to CommitIQ.
+This guide covers environment setup, architecture principles, testing requirements, and quality standards for contributing to CommitIQ.
 
 ---
 
-## 🏗️ Architecture & Philosophy
+## Core Principles
 
-CommitIQ is designed with a high standard of maintainability and resilience:
-
-1. **Production-First Integrity**: No fake links, dummy placeholders, or mocked test shortcuts in production code.
-2. **Resilient Dependency Architecture**: Optional libraries (such as `reportlab` for PDF generation, `redis` for caching, and `pybreaker` for circuit breaking) must be safely handled via import guards (`try/except ImportError`).
-3. **Strict CI/CD Gates**: Every change must pass Pytest, Vitest, ESLint, Prettier, CodeQL Security Analysis, and FreshstartCI.
+1. **Production-First Integrity**: Production code and documentation must remain strictly free of placeholder snippets, invalid badges, or mock data.
+2. **Resilient Dependency Architecture**: Optional runtime libraries (such as `reportlab` for PDF generation, `redis` for caching, and `pybreaker` for circuit breaking) must be safely isolated using standard import guards (`try/except ImportError`).
+3. **Automated Verification Gates**: All contributions must pass Pytest, Vitest, ESLint, Prettier formatting, and CodeQL security analysis before merging.
 
 ---
 
-## 💻 Local Environment Setup
+## Local Environment Setup
 
 ### Prerequisites
-
-- **Python**: 3.11+
-- **Node.js**: 20+ & `npm`
-- **Git**: with support for modern CLI operations
+* Python 3.11+
+* Node.js 20+ and `npm`
+* Git
 
 ### 1. Backend Setup
-
 ```bash
-# From workspace root:
+# Create and activate virtual environment:
 python -m venv .venv
 source .venv/bin/activate
 pip install -r backend/requirements-dev.txt
 
-# Run backend API server:
+# Start backend server:
 uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ### 2. Frontend Setup
-
 ```bash
-# From frontend directory:
 cd frontend
 npm install
-
-# Run frontend development server:
 npm run dev
 ```
 
 ---
 
-## 🧪 Verification & Testing Commands
+## Automated Verification Suite
 
-Before submitting a Pull Request, run the full verification battery locally:
+Execute the following verification steps locally before submitting changes:
 
-### 1. Backend Tests & Coverage
-
+### 1. Backend Test Suite & Coverage
 ```bash
 cd backend
 python -m pytest --cov=backend
 ```
 
-### 2. Frontend Tests & Component Coverage
-
+### 2. Frontend Test Suite
 ```bash
 cd frontend
 npm run test
 ```
 
-### 3. Frontend Linting & Typecheck
-
+### 3. Frontend Linting & Production Build
 ```bash
 cd frontend
 npm run lint
 npm run build
 ```
 
-### 4. Code Formatting Verification
-
+### 4. Code Formatting
 ```bash
 npx prettier --check .
 npx prettier --write .
@@ -82,24 +70,24 @@ npx prettier --write .
 
 ---
 
-## 📝 Commit Conventions
+## Commit Conventions
 
-Commit messages must follow standard Conventional Commits:
+Commit messages must conform to standard Conventional Commits:
 
-- `feat(...)`: New features and dashboard capabilities
-- `fix(...)`: Bug fixes and regression repairs
-- `perf(...)`: Performance optimizations and caching
-- `docs(...)`: Documentation updates
-- `refactor(...)`: Code changes that neither fix a bug nor add a feature
-- `test(...)`: Adding or updating test suites
-- `chore(...)`: Maintenance, dependency updates, and CI configs
+* `feat(...)`: New user-facing features or metric calculations
+* `fix(...)`: Bug fixes and regression repairs
+* `perf(...)`: Performance optimizations and caching
+* `docs(...)`: Documentation and guide updates
+* `refactor(...)`: Code modifications that neither fix bugs nor add features
+* `test(...)`: Adding or updating test suites
+* `chore(...)`: Routine tooling, dependency, and CI configuration updates
 
 ---
 
-## 🔄 Pull Request Workflow
+## Pull Request Workflow
 
-1. Create a descriptive feature branch: `git checkout -b feat/my-new-feature`.
-2. Implement your changes along with corresponding unit tests.
-3. Update `PROJECT_BRAIN.md` with an entry documenting your addition.
-4. Run `npx prettier --write .` and execute local test suites.
-5. Push your branch and open a Pull Request against `main`.
+1. Branch naming: create a feature branch (`feat/short-description` or `fix/short-description`).
+2. Verification: confirm all automated tests pass locally.
+3. Changelog: add an entry to `PROJECT_BRAIN.md` summarizing the change.
+4. Format: run `npx prettier --write .`.
+5. Open PR: submit a pull request against `main` for automated CI review.

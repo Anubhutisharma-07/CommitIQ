@@ -1,52 +1,43 @@
 # Troubleshooting & Frequently Asked Questions (FAQ)
 
-Common questions, troubleshooting steps, and operational insights for CommitIQ.
+Technical reference for debugging common errors, concurrency bottlenecks, and operational scenarios.
 
 ---
 
-## ❓ Frequently Asked Questions
+## Frequently Asked Questions
 
-### 1. How does CommitIQ calculate the repository health score?
+### 1. How is the repository health score computed?
+The composite health score (0–100) is calculated as a bounded aggregation across 6 normalized signals:
+* **Cyclomatic Complexity (30%)**: Exponential decay function mapped to average McCabe complexity.
+* **Churn Volatility (25%)**: Ratio of modified lines relative to total codebase size over time.
+* **Ownership Concentration / Bus Factor (20%)**: Penalizes reliance on isolated individual contributors.
+* **Dependency & Co-Change Coupling (10%)**: Measures architectural inter-module sprawl and coupling density.
+* **Semantic Drift (10%)**: Evaluates divergence between diff text and commit intentions.
+* **Documentation Ratio (5%)**: Assesses comment density and structural inline documentation.
 
-The composite health score (0–100) is a weighted, bounded aggregation of 6 signals:
-
-- **Cyclomatic Complexity (30%)**: Scaled via non-linear decay from average McCabe complexity.
-- **Churn Volatility (25%)**: Ratio of modified lines to total codebase lines over time.
-- **Bus Factor & Ownership (20%)**: Penalizes single-contributor dependencies.
-- **Dependency & Co-Change Coupling (10%)**: Measures architectural inter-module sprawl.
-- **Semantic Drift (10%)**: Measures cognitive drift in git commit diff distributions.
-- **Documentation & Cleanliness (5%)**: Evaluates comment-to-code ratios and structural integrity.
-
-### 2. Can CommitIQ analyze private GitHub repositories?
-
-Yes. When running CommitIQ locally or in your self-hosted cloud environment, provide a GitHub Personal Access Token (PAT) with `repo` read scopes:
-
+### 2. Can CommitIQ analyze private repositories?
+Yes. When self-hosting or running locally, set the `GITHUB_TOKEN` environment variable with a personal access token possessing `repo` read scopes:
 ```bash
 export GITHUB_TOKEN="ghp_yourPersonalAccessToken"
 ```
 
-### 3. What languages are supported for Cyclomatic Complexity?
-
-CommitIQ uses a hybrid AST and lexical analysis pipeline (integrating **Radon** and **Lizard**), supporting:
-
-- Python, JavaScript, TypeScript, JSX, TSX
-- Java, C, C++, C#, Go, Rust, Ruby, PHP, Swift, Kotlin
+### 3. Which languages are supported for AST complexity calculation?
+CommitIQ employs a hybrid AST and lexical analysis pipeline (integrating Radon and Lizard), supporting:
+* Python, JavaScript, TypeScript, JSX, TSX
+* Go, Rust, Java, C, C++, C#, Swift, Kotlin, Ruby, PHP
 
 ---
 
-## 🛠️ Troubleshooting Common Issues
+## Troubleshooting Guide
 
-### Issue: "SQLite database is locked (`sqlite3.OperationalError`)"
+### "SQLite database is locked (`sqlite3.OperationalError`)"
+* **Root Cause**: High concurrency during simultaneous repository ingestion jobs competing for SQLite write locks.
+* **Resolution**: CommitIQ implements automatic transaction retries via `commit_with_retry(session, max_attempts=3)`. For high-throughput environments, configure PostgreSQL using `DATABASE_URL=postgresql+asyncpg://user:pass@host:5432/commitiq`.
 
-**Cause**: High concurrency during simultaneous repository ingestion jobs competing for SQLite write locks.  
-**Resolution**: CommitIQ has built-in transaction retries via `commit_with_retry(session, max_attempts=3)`. For high-throughput enterprise deployments, configure PostgreSQL by setting `DATABASE_URL=postgresql+asyncpg://user:pass@host:5432/commitiq`.
+### "Git clone network timeout"
+* **Root Cause**: Large repository histories (>50,000 commits) on slow connections.
+* **Resolution**: Specify the `max_commits` parameter (e.g. `max_commits=100` or `max_commits=500`) to perform a bounded, shallow historical clone.
 
-### Issue: "Git clone network timeout"
-
-**Cause**: Very large repository histories (>100,000 commits) on slow network links.  
-**Resolution**: Set the `max_commits` parameter (e.g. `max_commits=100` or `max_commits=500`) when requesting repository analysis to perform a bounded, shallow historical walk.
-
-### Issue: "AI Commit Narrative generation fails or falls back to template"
-
-**Cause**: Missing or exhausted `GEMINI_API_KEY` / `ANTHROPIC_API_KEY`.  
-**Resolution**: Set a valid Google Gemini API key in your `.env` file (`GEMINI_API_KEY=AIza...`). CommitIQ automatically falls back to an offline deterministic template if an AI provider is unreachable.
+### "AI narrative generation returns fallback template"
+* **Root Cause**: Unset or exhausted `GEMINI_API_KEY` / `ANTHROPIC_API_KEY`.
+* **Resolution**: Provide a valid Google Gemini API key in your `.env` file (`GEMINI_API_KEY=AIza...`). CommitIQ automatically falls back to an offline deterministic template if the external AI service is unreachable.

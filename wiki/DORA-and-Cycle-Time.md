@@ -1,12 +1,12 @@
 # DORA Metrics & Cycle Time Analytics
 
-CommitIQ provides engineering leadership and DevOps teams with real-time, commit-level **DORA (DevOps Research and Assessment) metrics** and **Software Delivery Cycle Time analytics**.
+CommitIQ provides engineering organizations with real-time, commit-level DORA (DevOps Research and Assessment) metrics and software delivery cycle time analytics.
 
 ---
 
-## 🎯 DORA Metrics Overview
+## DORA Metrics Overview
 
-DORA metrics measure software delivery performance and stability across four foundational pillars:
+DORA metrics measure software delivery performance and operational stability across four core indicators:
 
 ```mermaid
 graph TD
@@ -19,35 +19,31 @@ graph TD
 ```
 
 ### 1. Deployment Frequency
+Measures the frequency of successful code deployments to production or merges to the default branch.
 
-Measures how often code is deployed to production or merged to the default branch.
+* **Elite**: Multiple deployments per day
+* **High**: Between once per day and once per week
+* **Medium**: Between once per week and once per month
+* **Low**: Fewer than once per month
 
-- **Elite**: Multiple deploys per day
-- **High**: Between once per day and once per week
-- **Medium**: Between once per week and once per month
-- **Low**: Fewer than once per month
-
-### 2. Lead Time for Changes (Cycle Time)
-
-Measures the duration from the first commit created in a branch to the moment the corresponding code is successfully deployed to production.
+### 2. Lead Time for Changes
+Measures the elapsed duration from the initial commit authored in a branch to the point where that change is deployed to production.
 
 $$\text{Lead Time} = T_{\text{deploy}} - T_{\text{first commit}}$$
 
 ### 3. Change Failure Rate (CFR)
-
-The percentage of production deployments that result in degraded service or rollbacks requiring immediate hotfixes.
+The percentage of production releases resulting in service degradation, rollbacks, or immediate remediations.
 
 $$\text{CFR} = \left(\frac{N_{\text{failed deployments}}}{N_{\text{total deployments}}}\right) \times 100\%$$
 
 ### 4. Mean Time to Restore Service (MTTR)
-
-The average time required to recover from a production incident or failed release.
+The average duration required to restore full service availability following an unplanned outage or production regression.
 
 ---
 
-## ⏱️ Cycle Time Breakdown
+## Cycle Time Breakdown
 
-CommitIQ decomposes engineering cycle time into four distinct phases to identify workflow bottlenecks:
+CommitIQ decomposes engineering cycle time into four phases to isolate workflow bottlenecks:
 
 ```mermaid
 journey
@@ -64,20 +60,20 @@ journey
 
 ### Phase Definitions
 
-| Phase           | Measurement Boundary                              | Optimization Focus                                       |
-| :-------------- | :------------------------------------------------ | :------------------------------------------------------- |
-| **Coding Time** | First commit created $\rightarrow$ PR opened      | Break PRs into smaller, atomic batches.                  |
-| **Pickup Time** | PR opened $\rightarrow$ First reviewer activity   | Configure team review rotations and Slack notifications. |
-| **Review Time** | First review $\rightarrow$ PR approved and merged | Reduce asynchronous back-and-forth discussions.          |
-| **Deploy Time** | PR merged $\rightarrow$ Successful deployment     | Automate CI/CD pipelines and deployment staging tests.   |
+| Phase | Measurement Boundary | Optimization Strategy |
+| :--- | :--- | :--- |
+| **Coding Time** | First commit created $\rightarrow$ Pull request opened | Break features into smaller, atomic increments. |
+| **Pickup Time** | Pull request opened $\rightarrow$ First reviewer interaction | Establish team review rotations and triage notifications. |
+| **Review Time** | First review $\rightarrow$ Pull request approved and merged | Minimize asynchronous discussion rounds. |
+| **Deploy Time** | Pull request merged $\rightarrow$ Successful deployment | Automate CI/CD validation and staging pipelines. |
 
 ---
 
-## 📅 Time-Window Filtering
+## Time-Window Filtering
 
-DORA and Cycle Time calculations support custom time-window query parameters (`start_date` and `end_date` in ISO 8601 UTC format).
+DORA and Cycle Time endpoints accept ISO 8601 UTC timestamp parameters (`start_date` and `end_date`) to calculate metrics over specific evaluation intervals.
 
-### API Usage Example
+### Request Example
 
 ```http
 GET /api/repos/1/dora?start_date=2026-08-01T00:00:00Z&end_date=2026-08-28T23:59:59Z HTTP/1.1
