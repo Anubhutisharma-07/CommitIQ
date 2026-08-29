@@ -10,6 +10,7 @@ const CommitDetailPage = lazy(() => import('./pages/CommitDetailPage'))
 const DemoPage = lazy(() => import('./pages/DemoPage'))
 const ComparePage = lazy(() => import('./pages/ComparePage'))
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'))
+const ReleaseImpactAnalyzer = lazy(() => import('./components/ReleaseImpactAnalyzer'))
 
 function RouteFallback() {
   return (
@@ -34,6 +35,7 @@ export default function App() {
             <Route path="/dashboard/:repoSlug/commit/:sha" element={<CommitDetailPage />} />
             <Route path="/compare" element={<ComparePage />} />
             <Route path="/demo" element={<DemoPage />} />
+            <Route path="/releases" element={<ReleaseImpactAnalyzer />} />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </Suspense>
