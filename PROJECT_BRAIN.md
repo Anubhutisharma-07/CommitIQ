@@ -30,6 +30,7 @@ CommitIQ is a full-stack repository health analyzer for GitHub projects. It inge
 Working well:
 
 - Clear product concept with a coherent end-to-end flow: enter GitHub repo, ingest, view health timeline, inspect commit graph, review hotspots/bus-factor, generate narratives.
+- Graph Explorer node labels use measured, width-bounded ellipsis rendering with focused boundary and Unicode coverage.
 - Backend has structured schemas/models and separates ingestion, analysis, graph, bus factor, semantic, and LLM concerns.
 - LLM cost guard and cache are already part of the domain model, which is the right production instinct.
 - The UI has loading/error/empty states in many places and exposes high-value analysis concepts rather than raw tables only.

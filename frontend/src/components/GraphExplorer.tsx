@@ -26,6 +26,7 @@ import {
   FileText,
   Folder,
 } from 'lucide-react'
+import { fitTextToWidth } from '../lib/canvasText'
 import type { ForceGraphLink, ForceGraphNode, GraphExplorerProps } from '../types'
 
 interface TreeNode {
@@ -68,6 +69,8 @@ const NODE_SIZE_METRICS = new Set<NodeSizeMetric>([
   'instability',
   'equal',
 ])
+
+const MAX_NODE_LABEL_WIDTH = 96
 
 function isNodeSizeMetric(value: string): value is NodeSizeMetric {
   return NODE_SIZE_METRICS.has(value as NodeSizeMetric)
@@ -788,12 +791,14 @@ export function GraphExplorer({
       ctx.restore()
 
       if (globalScale > 0.45) {
-        const label = node.file.split('/').pop() || node.name
+        const rawLabel = node.file.split('/').pop() || node.name
         const fontSize = Math.max(3.5, size * 0.6)
         ctx.font = `500 ${fontSize}px var(--font-mono, monospace)`
         ctx.textAlign = 'center'
         ctx.textBaseline = 'middle'
 
+        const maxTextWidth = Math.min(MAX_NODE_LABEL_WIDTH, Math.max(40, size * 6))
+        const label = fitTextToWidth(rawLabel, maxTextWidth, (text) => ctx.measureText(text).width)
         const textWidth = ctx.measureText(label).width
         const isFocused = isHovered || isSelected
 
