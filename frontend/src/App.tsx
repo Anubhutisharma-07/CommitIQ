@@ -5,6 +5,7 @@ import AmbientBackground from './components/AmbientBackground'
 
 const LandingPage = lazy(() => import('./pages/LandingPage'))
 const AnalyzePage = lazy(() => import('./pages/AnalyzePage'))
+const CommitHealthRadar = lazy(() => import('./pages/CommitHealthRadar'))
 const DashboardPage = lazy(() => import('./pages/DashboardPage'))
 const CommitDetailPage = lazy(() => import('./pages/CommitDetailPage'))
 const DemoPage = lazy(() => import('./pages/DemoPage'))
@@ -34,6 +35,7 @@ export default function App() {
             <Route path="/dashboard/:repoSlug/commit/:sha" element={<CommitDetailPage />} />
             <Route path="/compare" element={<ComparePage />} />
             <Route path="/demo" element={<DemoPage />} />
+            <Route path="/health-radar" element={<CommitHealthRadar />} />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </Suspense>
