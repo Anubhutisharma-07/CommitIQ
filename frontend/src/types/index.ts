@@ -492,6 +492,158 @@ export interface RepoCompareInsight {
   summary: string
 }
 
+export interface ReportSchedule {
+  id: number
+  repo_id: number
+  name: string
+  description: string | null
+  cron_expression: string
+  cron_description: string
+  timezone: string
+  report_type: string
+  is_active: boolean
+  webhook_url: string | null
+  notification_email: string | null
+  include_narrative: boolean
+  last_run_at: string | null
+  next_run_at: string | null
+  last_delivery_status: string | null
+  consecutive_failures: number
+  max_retry_count: number
+  created_at: string | null
+  updated_at: string | null
+}
+
+export interface ReportDelivery {
+  id: number
+  schedule_id: number
+  repo_id: number
+  status: string
+  report_type: string
+  triggered_at: string | null
+  completed_at: string | null
+  duration_seconds: number | null
+  webhook_status_code: number | null
+  error_message: string | null
+  retry_count: number
+  snapshot_health_score: number | null
+  snapshot_commits_analyzed: number | null
+  snapshot_latest_sha: string | null
+}
+
+export interface ReportScheduleListResponse {
+  total: number
+  limit: number
+  offset: number
+  deliveries: ReportDelivery[]
+}
+
+export interface ReportPreview {
+  report_type: string
+  repo_name: string
+  repo_slug: string
+  generated_at: string
+  summary: {
+    total_commits: number
+    total_insertions: number
+    total_deletions: number
+    churn_rate_percent: number
+    unique_contributors: number
+    total_files_changed: number
+    default_branch: string
+  }
+  latest_commit?: {
+    sha: string
+    message: string
+    author: string | null
+    committed_at: string | null
+  }
+}
+
+export interface WeeklyDigestAlert {
+  severity: string
+  metric: string
+  message: string
+}
+
+export interface WeeklyDigest {
+  repo_name: string
+  repo_slug: string
+  generated_at: string
+  window_weeks: number
+  summary: {
+    total_commits: number
+    total_insertions: number
+    total_deletions: number
+    total_files_changed: number
+    unique_contributors: number
+  }
+  health: {
+    current_avg_score: number
+    previous_avg_score: number
+    trend: number
+    trend_direction: 'up' | 'down' | 'flat'
+  }
+  complexity: {
+    current_avg: number
+    previous_avg: number
+    trend: number
+  }
+  churn: {
+    current_avg_rate: number
+    previous_avg_rate: number
+    trend: number
+  }
+  bus_factor: {
+    total_modules: number
+    critical_risk_count: number
+    high_risk_count: number
+    top_risk_modules: Array<{
+      module: string
+      risk_level: string
+      top_contributor: string | null
+      top_contributor_pct: number
+      contributor_count: number
+    }>
+  }
+  top_contributors: Array<{
+    author: string
+    commits: number
+    insertions: number
+    deletions: number
+    files_changed: number
+  }>
+  persistent_hotspots: Array<{ path: string; snapshot_count: number }>
+  alerts: WeeklyDigestAlert[]
+}
+
+export interface HealthRecommendation {
+  id: string
+  category: string
+  severity: 'critical' | 'high' | 'medium' | 'low'
+  title: string
+  description: string
+  impact: number
+  effort: 'low' | 'medium' | 'high'
+  metric: string | null
+  current_value: string | null
+  target_value: string | null
+  file_path: string | null
+}
+
+export interface RecommendationsResponse {
+  repo_name: string
+  repo_slug: string
+  generated_at: string
+  health_score: number
+  total_recommendations: number
+  critical_count: number
+  high_count: number
+  medium_count: number
+  low_count: number
+  recommendations: HealthRecommendation[]
+}
+
 export interface RepoCompareResponse {
   base: RepoCompareItem
   head: RepoCompareItem

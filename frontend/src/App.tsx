@@ -10,7 +10,11 @@ const DashboardPage = lazy(() => import('./pages/DashboardPage'))
 const CommitDetailPage = lazy(() => import('./pages/CommitDetailPage'))
 const DemoPage = lazy(() => import('./pages/DemoPage'))
 const ComparePage = lazy(() => import('./pages/ComparePage'))
+const HealthRadarPage = lazy(() => import('./pages/HealthRadarPage'))
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'))
+
+const TeamCollaborationHub = lazy(() => import('./components/TeamCollaborationHub'))
+const ReleaseImpactAnalyzer = lazy(() => import('./components/ReleaseImpactAnalyzer'))
 
 function RouteFallback() {
   return (
@@ -34,8 +38,12 @@ export default function App() {
             <Route path="/dashboard/:repoSlug" element={<DashboardPage />} />
             <Route path="/dashboard/:repoSlug/commit/:sha" element={<CommitDetailPage />} />
             <Route path="/compare" element={<ComparePage />} />
+            <Route path="/health-radar" element={<HealthRadarPage />} />
             <Route path="/demo" element={<DemoPage />} />
-            <Route path="/health-radar" element={<CommitHealthRadar />} />
+            
+            <Route path="/health" element={<CommitHealthRadar />} />
+            <Route path="/team" element={<TeamCollaborationHub />} />
+            <Route path="/releases" element={<ReleaseImpactAnalyzer />} />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </Suspense>

@@ -43,4 +43,9 @@ markdown_extensions:
 nav:
   - Home: index.md
   - Architecture: ARCHITECTURE.md
-  - Metrics & Health: REPO_HEALTH_METRICS.md
+  - Metrics & Health Formulas: REPO_HEALTH_METRICS.md
+  - DORA & Cycle Time: DORA_AND_CYCLE_TIME.md
+  - REST API Reference: API_REFERENCE.md
+  - Developer Guide: DEVELOPER_GUIDE.md
+  - Deployment & Operations: DEPLOYMENT_AND_OPERATIONS.md
+  - Troubleshooting & FAQ: TROUBLESHOOTING_AND_FAQ.md
