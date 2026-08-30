@@ -10,6 +10,9 @@ const CommitDetailPage = lazy(() => import('./pages/CommitDetailPage'))
 const DemoPage = lazy(() => import('./pages/DemoPage'))
 const ComparePage = lazy(() => import('./pages/ComparePage'))
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'))
+const CommitHealthRadar = lazy(() => import('./pages/CommitHealthRadar'))
+const TeamCollaborationHub = lazy(() => import('./pages/TeamCollaborationHub'))
+const CodeQualityTrends = lazy(() => import('./pages/CodeQualityTrends'))
 
 function RouteFallback() {
   return (
@@ -34,6 +37,9 @@ export default function App() {
             <Route path="/dashboard/:repoSlug/commit/:sha" element={<CommitDetailPage />} />
             <Route path="/compare" element={<ComparePage />} />
             <Route path="/demo" element={<DemoPage />} />
+            <Route path="/health-radar" element={<CommitHealthRadar />} />
+            <Route path="/team" element={<TeamCollaborationHub />} />
+            <Route path="/quality-trends" element={<CodeQualityTrends />} />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </Suspense>
